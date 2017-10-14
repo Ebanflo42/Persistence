@@ -73,5 +73,8 @@ let rec strToInt (n : int) (str : string) : int =
 
 //let parse (str : string) : HasseDiagram =
 
-let _ = let input = System.Console.ReadLine()
-        printfn "%i" (strToInt input)
+let rec main : unit = let input = System.Console.ReadLine()
+                      let i = strToInt input.Length input
+                      if i = -1 then printf "Please give valid input"; main else printfn "%i" i; main
+
+let _ = main
