@@ -1,8 +1,19 @@
+//UTIL
 let bind (o : Option<'a>) (f : 'a -> Option<'b>) : Option<'b> =
   match o with
     | None   -> None
     | Some x -> f x
 
+let rec drop (n : int) (list : List<'a>) =
+  List.tail (drop (n - 1) (List.tail list))
+
+let rec checkSuperSet (set : int list) (l1 : int) (Set : int list) (l2 : int) : bool =
+  if l2 < l1 then false elif List.take l1 Set = set then true else checkSuperSet set l1 (drop l1 Set) (l2 - l1)
+
+let rec checkSubSet (Set : int list) (l1 : int) (set : int list) (l2 : int) : bool =
+  checkSuperSet set l2 Set l1
+
+//DATA TYPES
 type HasseNode(Vertices : int list, Parents : HasseNode list, Children : HasseNode list) =
   member this.Vertices = Vertices
   member this.Parents  = Parents
@@ -19,24 +30,13 @@ type HasseNode(Vertices : int list, Parents : HasseNode list, Children : HasseNo
   static member checkNode node =
     HasseNode.checkNodeChilds node && HasseNode.checkNodeParens node
 
-let checkSuperSet (set : int list) (l1 : Option<int>) (Set : int list) (l2 : Option<int>) : bool =
-  match l1 with
-    | None   -> let len1 = set.Length
-      match l2 with
-      | None -> let len2 = Set.Length
-        checkSuperSet set len1 Set len2
-    | Some m -> match l2 with
-                 | l2 while l2 < l1 -> false
-                 | _                      -> if take l1 Set = set then true
-                   else checkSuperSet set l1 (drop l1 Set) (l1 - l2)
-
-(*
-type HasseDiagram(OrderedSets : int list list) =
+type SimplicialComplex(OrderedSets : int list list) =
   member this.OrderedSets = OrderedSets
 
-  static member toNode (set : int list) =
+  member this.getNthChainRank (n : int) : int =
+    let rec numSets (sets : int list list) = match sets with
+                                          | []        -> 0
+                                          | (x :: xs) -> if x.Length = n then 1 + numSets xs else numSets xs
+    numSets OrderedSets
 
-
-  member this.toNodeList  =
-*)
 let _ = printf "A work in progress"
