@@ -41,21 +41,21 @@ type SimplicialComplex(OrderedSets : int list list) =
   member this.Dimension : int = maximum (List.map (fun (list : int list) -> list.Length) OrderedSets)
 
 //PARSING
-let rec pow10 n = match n with
-                    | 0 -> 1
-                    | 1 -> 10
-                    | 2 -> 100
-                    | 3 -> 1000
-                    | 4 -> 10000
-                    | 5 -> 100000
-                    | 6 -> 1000000
-                    | 7 -> 10000000
-                    | 8 -> 100000000
-                    | 9 -> 1000000000
-                    | _ -> 10*pow10 (n - 1)
-
+(*
 let rec strToInt (n : int) (str : string) : int =
   if n < 1 then 0 else
+    let rec pow10 n = match n with
+                        | 0 -> 1
+                        | 1 -> 10
+                        | 2 -> 100
+                        | 3 -> 1000
+                        | 4 -> 10000
+                        | 5 -> 100000
+                        | 6 -> 1000000
+                        | 7 -> 10000000
+                        | 8 -> 100000000
+                        | 9 -> 1000000000
+                        | _ -> 10*pow10 (n - 1)
     let rec getDigit c = match c with
                            | '0' -> 0
                            | '1' -> 1
@@ -69,13 +69,29 @@ let rec strToInt (n : int) (str : string) : int =
                            | '9' -> 9
                            | _   -> -1
     let digit = getDigit str.[0]
-    if digit = -1 then -1 else digit*(pow10 n) + strToInt (n - 1) str.[1..]
+    if digit = -1 then -1 else digit*(pow10 (n - 1)) + strToInt (n - 1) str.[1..]
+*)
+
+let rec parseIntList (str : string) : int list =
+  let chars = Seq.toList str
+  let len = chars.Length - 1
+  if chars.[0] = '[' && chars.[len] = ']' then
+    let rec breakList (cs : char list) : char list list =
+      match List.tryFindIndex (fun c -> c = ',') cs with
+        | None   -> [cs]
+        | Some i -> cs.[0..i] :: breakList cs.[i + 1..len]
+    List.map (fun (list : char list) -> int (new string [|for c in list -> c|])) (breakList chars)
+  else [-1]
+
+let rec printArr (list : int list) : unit =
+  for n in list do
+    printf "%i " n
 
 //let parse (str : string) : HasseDiagram =
 
 let rec main : unit = while true do
                         let input = System.Console.ReadLine()
-                        let i = strToInt input.Length input
-                        if i = -1 then printf "Please give valid input"; main else printfn "%i" i; main
+                        let i = parseIntList input
+                        if i = [-1] then printf "Please give valid input" else printArr i
 
 let _ = main
