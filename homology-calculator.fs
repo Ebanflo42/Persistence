@@ -41,57 +41,42 @@ type SimplicialComplex(OrderedSets : int list list) =
   member this.Dimension : int = maximum (List.map (fun (list : int list) -> list.Length) OrderedSets)
 
 //PARSING
-(*
-let rec strToInt (n : int) (str : string) : int =
-  if n < 1 then 0 else
-    let rec pow10 n = match n with
-                        | 0 -> 1
-                        | 1 -> 10
-                        | 2 -> 100
-                        | 3 -> 1000
-                        | 4 -> 10000
-                        | 5 -> 100000
-                        | 6 -> 1000000
-                        | 7 -> 10000000
-                        | 8 -> 100000000
-                        | 9 -> 1000000000
-                        | _ -> 10*pow10 (n - 1)
-    let rec getDigit c = match c with
-                           | '0' -> 0
-                           | '1' -> 1
-                           | '2' -> 2
-                           | '3' -> 3
-                           | '4' -> 4
-                           | '5' -> 5
-                           | '6' -> 6
-                           | '7' -> 7
-                           | '8' -> 8
-                           | '9' -> 9
-                           | _   -> -1
-    let digit = getDigit str.[0]
-    if digit = -1 then -1 else digit*(pow10 (n - 1)) + strToInt (n - 1) str.[1..]
-*)
+open System.Text.RegularExpressions
 
 let rec parseIntList (str : string) : int list =
-  let chars = Seq.toList str
-  let len = chars.Length - 1
-  if chars.[0] = '[' && chars.[len] = ']' then
-    let rec breakList (cs : char list) : char list list =
-      match List.tryFindIndex (fun c -> c = ',') cs with
-        | None   -> [cs]
-        | Some i -> cs.[0..i] :: breakList cs.[i + 1..len]
-    List.map (fun (list : char list) -> int (new string [|for c in list -> c|])) (breakList chars)
-  else [-1]
+  let capture      = Regex.Match(str, "\d+(,|])")
+  if capture       = Match.Empty then [] else
+    let init : int = capture.Index
+    printfn "%i" init
+    let fin : int  = init + capture.Length
+    printfn "%i" fin
+    let num        = str.[init..(fin - 2)]
+    printfn "%s" num
+    (int num) :: (parseIntList str.[fin..])
+
+let rec breakList (cs : char list) (len : int) (c : char) : char list list =
+  printfn "%s" (new string [|for ch in cs -> ch|])
+  match List.tryFindIndex (fun x -> x = c) cs with
+    | None   -> [cs]
+    | Some i ->
+      printfn "%i" i
+      let substring1 = cs.[0..i]
+      printfn "%s" (new string [|for ch in substring1 -> ch|])
+
+      let substring2 = cs.[(i + 1) .. (len - 1)]
+      printfn "%s" (new string [|for ch in substring2 -> ch|])
+
+      cs.[0..i] :: (breakList cs.[(i + 1) .. (len - 1)] (len - i) c)
 
 let rec printArr (list : int list) : unit =
   for n in list do
     printf "%i " n
+  printfn ""
 
-//let parse (str : string) : HasseDiagram =
-
+//TESTING
 let rec main : unit = while true do
                         let input = System.Console.ReadLine()
-                        let i = parseIntList input
-                        if i = [-1] then printf "Please give valid input" else printArr i
+                        let intList = parseIntList input
+                        if intList = [-1] then printfn "Please give valid input" else printArr intList
 
 let _ = main
