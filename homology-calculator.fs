@@ -57,21 +57,6 @@ let rec parseIntListList (str : string) : int list list =
     let fin : int  = init + capture.Length
     (parseIntList str.[init..(fin - 2)]) :: (parseIntListList str.[fin..])
 
-(*
-let rec breakList (cs : char list) (len : int) (c : char) : char list list =
-  printfn "%s" (new string [|for ch in cs -> ch|])
-  match List.tryFindIndex (fun x -> x = c) cs with
-    | None   -> [cs]
-    | Some i ->
-      printfn "%i" i
-      let substring1 = cs.[0..i]
-      printfn "%s" (new string [|for ch in substring1 -> ch|])
-
-      let substring2 = cs.[(i + 1) .. (len - 1)]
-      printfn "%s" (new string [|for ch in substring2 -> ch|])
-
-      cs.[0..i] :: (breakList cs.[(i + 1) .. (len - 1)] (len - i) c)
-*)
 let rec printArr (list : int list) : unit =
   for n in list do
     printf "%i " n
