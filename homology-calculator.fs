@@ -47,13 +47,17 @@ let rec parseIntList (str : string) : int list =
   let capture      = Regex.Match(str, "\d+(,|])")
   if capture       = Match.Empty then [] else
     let init : int = capture.Index
-    printfn "%i" init
     let fin : int  = init + capture.Length
-    printfn "%i" fin
-    let num        = str.[init..(fin - 2)]
-    printfn "%s" num
-    (int num) :: (parseIntList str.[fin..])
+    (int str.[init..(fin - 2)]) :: (parseIntList str.[fin..])
 
+let rec parseIntListList (str : string) : int list list =
+  let capture = Regex.Match(str, "\[.{3,}](,|])")
+  if capture  = Match.Empty then [] else
+    let init : int = capture.Index
+    let fin : int  = init + capture.Length
+    (parseIntList str.[init..(fin - 2)]) :: (parseIntListList str.[fin..])
+
+(*
 let rec breakList (cs : char list) (len : int) (c : char) : char list list =
   printfn "%s" (new string [|for ch in cs -> ch|])
   match List.tryFindIndex (fun x -> x = c) cs with
@@ -67,16 +71,21 @@ let rec breakList (cs : char list) (len : int) (c : char) : char list list =
       printfn "%s" (new string [|for ch in substring2 -> ch|])
 
       cs.[0..i] :: (breakList cs.[(i + 1) .. (len - 1)] (len - i) c)
-
+*)
 let rec printArr (list : int list) : unit =
   for n in list do
     printf "%i " n
   printfn ""
 
+let rec print2DArr (list : int list list) : unit =
+  match list with
+    | []        -> printfn ""
+    | (x :: xs) -> printArr x; printfn ""; (print2DArr xs)
+
 //TESTING
 let rec main : unit = while true do
                         let input = System.Console.ReadLine()
-                        let intList = parseIntList input
-                        if intList = [-1] then printfn "Please give valid input" else printArr intList
+                        let intList = parseIntListList input
+                        if intList = [] then printfn "Please give valid input" else print2DArr intList
 
 let _ = main
