@@ -10,7 +10,9 @@ let rec checkSuperSet (set : int list) (l1 : int) (Set : int list) (l2 : int) : 
 let rec checkSubSet (Set : int list) (l1 : int) (set : int list) (l2 : int) : bool =
   checkSuperSet set l2 Set l1
 
-let rec maximum (list : int list) : int = List.fold max list.[0] (List.tail list)
+let rec maximum (arr : int []) : int = Array.fold max arr.[0] arr.[1..]
+
+let arrMap (f : 'a -> 'b) (arr : 'a []) : 'b [] = [|for x in arr -> f x|]
 
 let toResizeArray (l : 'a list) =
   let result = new ResizeArray<'a>()
@@ -18,13 +20,13 @@ let toResizeArray (l : 'a list) =
     result.Add(elem)
   result
 
-let drop (n : int) (list : 'a list) : 'a list =
+let rec drop (n : int) (list : 'a list) : 'a list =
   match list with
     | [] -> []
     | _  -> if n > 0 then drop (n - 1) (List.tail list) else list
 
-let removeAt (n : int) (list : 'a list) : 'a list = (List.take (n - 1) list) + (drop n list)
-
+let removeAt (n : int) (list : 'a list) : 'a list = (List.take (n - 1) list) @ (drop n list)
+(*
 let rec factorial (n : int) =
   match n with
     | 0 -> 1
@@ -55,6 +57,9 @@ let rec getSubLists (len : int) (list : int list) : int list [] =
 
   findSubLists helper 0 true 0
   result
+*)
+let rec getImmediateSubArrs (arr : int []) : int [] [] = [|for i in 0..arr.Length - 1 -> Array.append arr.[0..i] arr.[i+1..]|]
+
 (*
 let rec getSubLists (len : int) (list : int list) (guess : int) (current : int list) (soln : int list list) (b : bool) : int list list =
   if b && current.Length = len then
@@ -66,45 +71,39 @@ let rec getSubLists (len : int) (list : int list) (guess : int) (current : int l
 *)
 
 //DATA TYPES
-type HasseNode(Vertices : int list, Parents : HasseNode list, Children : HasseNode list) =
+type HasseNode(Vertices : int [], Parents : HasseNode [], Children : HasseNode []) =
   member this.Vertices = Vertices
   member this.Parents  = Parents
   member this.Children = Children
 
-  static member checkNodeChilds (node : HasseNode) : bool =
-    List.forall (fun (list : int List) -> list.Length = node.Vertices.Length - 1)
-      (List.map (fun (n : HasseNode) -> n.Vertices) (node.Children : HasseNode list))
+  member this.checkNodeChilds =
+    let dim = Vertices.Length
+    if dim = 1 && Children = [||] then true
+    else Children
+      |> arrMap (fun nodes -> nodes.Vertices.Length)
+        |> Array.forall (fun x -> x = dim - 1)
 
-  static member checkNodeParens (node : HasseNode) : bool =
-    List.forall (fun (list : int list) -> list.Length = node.Vertices.Length + 1)
-      (List.map (fun (n : HasseNode) -> n.Vertices) (node.Children : HasseNode list))
+  member this.checkNodeParens =
+    if Parents = [||] then true
+    else Parents
+      |> arrMap (fun nodes -> nodes.Vertices.Length)
+        |> Array.forall (fun x -> x = Vertices.Length + 1)
 
-  static member checkNode node =
-    HasseNode.checkNodeChilds node && HasseNode.checkNodeParens node
+  member this.checkNode =
+    this.checkNodeChilds && this.checkNodeParens
 
-type SimplicialComplex(OrderedSets : int list list) =
-  member this.OrderedSets : int list list = OrderedSets
+type SimplicialComplex(OrderedSets : int [] []) =
+  member this.OrderedSets = OrderedSets
+
+  member this.Dimension : int = maximum (arrMap (fun (arr : int []) -> arr.Length : int) OrderedSets)
+
+  //member this.BiggestSimplices : int list list = List.filter (fun (l : 'a list) -> l.Length = this.Dimension) this.OrderedSets
 (*
-  member this.getNthChainRank (n : int) : int =
-    let rec numSets (sets : int list list) = match sets with
-                                               | []        -> 0
-                                               | (x :: xs) -> if x.Length = n then 1 + numSets xs else numSets xs
-    numSets OrderedSets
-*)
-
-//  member this.ExcludeBelow (n : int) : int list list = List.map (fun (l : 'a list) -> l.Length > n) this.OrderedSets
-
-  member this.Dimension : int = maximum (List.map (fun (list : int list) -> list.Length) OrderedSets)
-
-  member this.BiggestSimplices : int list list = List.filter (fun (l : 'a list) -> l.Length = this.Dimension) this.OrderedSets
-
   member this.Nodes : HasseNode list =
-
-    let rec makeNodes (sets : int list list) (dim : int) : HasseNode list =
-      let fstLevelNodes = List.map (getSubLists dim) sets
-      let nextLevelNodes = List.map (fun arr -> List.map ())
-
-    makeNodes this.OrderedSets (this.Dimension - 1)
+    let fstLevelNodes = arrMap (fun arr -> HasseNode arr [||]) OrderedSets
+    let rec makeNodes (seed : HasseNode [] [] -> HasseNode []) (sets : int [] []) =
+      let nextLevelNodes = arrMap (fun arr -> HasseNode )
+*)
 
 
 //PARSING
