@@ -12,6 +12,59 @@ let rec checkSubSet (Set : int list) (l1 : int) (set : int list) (l2 : int) : bo
 
 let rec maximum (list : int list) : int = List.fold max list.[0] (List.tail list)
 
+let toResizeArray (l : 'a list) =
+  let result = new ResizeArray<'a>()
+  for elem in l do
+    result.Add(elem)
+  result
+
+let drop (n : int) (list : 'a list) : 'a list =
+  match list with
+    | [] -> []
+    | _  -> if n > 0 then drop (n - 1) (List.tail list) else list
+
+let removeAt (n : int) (list : 'a list) : 'a list = (List.take (n - 1) list) + (drop n list)
+
+let rec factorial (n : int) =
+  match n with
+    | 0 -> 1
+    | n -> n * factorial (n - 1)
+
+let rec binomialCoeff (n : int) (k : int) : int =
+  let rec ordChoice (i : int) (j : int) : int =
+    match j with
+      | 0 -> 1
+      | 1 -> i
+      | 2 -> i*(i - 1)
+      | 3 -> i*(i - 1)*(i - 2)
+      | _ -> (i - j + 1)*ordChoice i (j - 1)
+  (ordChoice n k)/(factorial k)
+
+let rec getSubLists (len : int) (list : int list) : int list [] =
+  let helper = []
+  let ssLen = list.Length
+  let result = [|for i in 1..(binomialCoeff ssLen len) -> helper|]
+
+  let rec findSubLists (current : int list) (guess : int) (b : bool) (iter : int) : unit =
+    if b && current.Length = len then result.[iter] = current; findSubLists current guess false (iter + 1)
+    elif guess < ssLen then
+      let x = list.[guess]
+      findSubLists (x :: current) (guess + 1) true iter
+      findSubLists (removeAt x current) (guess + 1) true iter
+    else ()
+
+  findSubLists helper 0 true 0
+  result
+(*
+let rec getSubLists (len : int) (list : int list) (guess : int) (current : int list) (soln : int list list) (b : bool) : int list list =
+  if b && current.Length = len then
+    let newsoln = current :: soln
+    getSubLists len list guess current newsoln false
+  elif guess = list.Length then
+    let x = list.[guess] //index out of bounds exception?
+    let next = x :: current
+*)
+
 //DATA TYPES
 type HasseNode(Vertices : int list, Parents : HasseNode list, Children : HasseNode list) =
   member this.Vertices = Vertices
@@ -31,14 +84,28 @@ type HasseNode(Vertices : int list, Parents : HasseNode list, Children : HasseNo
 
 type SimplicialComplex(OrderedSets : int list list) =
   member this.OrderedSets : int list list = OrderedSets
-
+(*
   member this.getNthChainRank (n : int) : int =
     let rec numSets (sets : int list list) = match sets with
-                                          | []        -> 0
-                                          | (x :: xs) -> if x.Length = n then 1 + numSets xs else numSets xs
+                                               | []        -> 0
+                                               | (x :: xs) -> if x.Length = n then 1 + numSets xs else numSets xs
     numSets OrderedSets
+*)
+
+//  member this.ExcludeBelow (n : int) : int list list = List.map (fun (l : 'a list) -> l.Length > n) this.OrderedSets
 
   member this.Dimension : int = maximum (List.map (fun (list : int list) -> list.Length) OrderedSets)
+
+  member this.BiggestSimplices : int list list = List.filter (fun (l : 'a list) -> l.Length = this.Dimension) this.OrderedSets
+
+  member this.Nodes : HasseNode list =
+
+    let rec makeNodes (sets : int list list) (dim : int) : HasseNode list =
+      let fstLevelNodes = List.map (getSubLists dim) sets
+      let nextLevelNodes = List.map (fun arr -> List.map ())
+
+    makeNodes this.OrderedSets (this.Dimension - 1)
+
 
 //PARSING
 open System.Text.RegularExpressions
