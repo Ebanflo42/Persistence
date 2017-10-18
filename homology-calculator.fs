@@ -105,23 +105,42 @@ type SimplicialComplex(OrderedSets : int [] []) =
       let nextLevelNodes = arrMap (fun arr -> HasseNode )
 *)
 
+type Chain(Simplices : int [] [], Coefficients : int [], Dimension : int, Order : int, isReduced : bool) =
+  member this.Simplices    = Simplices
+  member this.Coefficients = Coefficients
+  member this.Order        = Order
+  member this.isReduced    = isReduced
+
+  member this.isValid : bool =
+    Simplices.Length = Coefficients.Length && Array.forall (fun (arr : int []) -> arr.Length = Dimension) Simplices
 
 //PARSING
 open System.Text.RegularExpressions
 
-let rec parseIntList (str : string) : int list =
+let rec parseIntArr (str : string) : int list =
   let capture      = Regex.Match(str, "\d+(,|])")
   if capture       = Match.Empty then [] else
     let init : int = capture.Index
     let fin : int  = init + capture.Length
-    (int str.[init..(fin - 2)]) :: (parseIntList str.[fin..])
+    (int str.[init..(fin - 2)]) :: (parseIntArr str.[fin..])
 
-let rec parseIntListList (str : string) : int list list =
+let rec parse2DIntArr (str : string) : int list list =
   let capture = Regex.Match(str, "\[.{3,}](,|])")
   if capture  = Match.Empty then [] else
     let init : int = capture.Index
     let fin : int  = init + capture.Length
-    (parseIntList str.[init..(fin - 2)]) :: (parseIntListList str.[fin..])
+    (parseIntArr str.[init..(fin - 2)]) :: (parse2DIntArr str.[fin..])
+
+let finishParsing (input : int list list) : int [] [] =
+  let len = input.Length - 1
+  let result = Array.create len [||]
+  for i in 0..len do
+    let len0 = input.[i].Length
+    let arr  = Array.create len0 0
+    for j in 0..len0 do
+      arr.[j] = input.[i].[j]
+    result.[i] = arr
+  result
 
 let rec printArr (list : int list) : unit =
   for n in list do
@@ -133,10 +152,16 @@ let rec print2DArr (list : int list list) : unit =
     | []        -> printfn ""
     | (x :: xs) -> printArr x; printfn ""; (print2DArr xs)
 
+let rec printActualArr (data : int [] []) : unit =
+  for arr in data do
+    for x in arr do
+      printf "%i" x
+    printfn ""
+
 //TESTING
 let rec main : unit = while true do
                         let input = System.Console.ReadLine()
-                        let intList = parseIntListList input
-                        if intList = [] then printfn "Please give valid input" else print2DArr intList
+                        let intArr = input |> parse2DIntArr |> finishParsing
+                        if intArr = [||] then printfn "Please give valid input" else printActualArr intArr
 
 let _ = main
