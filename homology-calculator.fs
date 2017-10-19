@@ -34,8 +34,8 @@ let rec findIndices (arr : 'a []) (elem : 'a) (index : int) : int list =
 
 let rec findAndReplace (i : int) (elem : 'a) (list : 'a list list) : 'a list =
   [|for n in 0..list.Length - 1 ->
-    if n = i then elem :: list.[n]
-    else list.[n]|] //Arrangement could confuse compiler
+      if n = i then elem :: list.[n]
+      else list.[n]|] //Arrangement could confuse compiler
 
 let rec reduceArr (input : 'a []) : 'a [] * int [] [] =
 
@@ -157,9 +157,12 @@ type Chain(Simplices : int [] [], Coefficients : int [], Dimension : int, Order 
     Simplices.Length = Coefficients.Length && Array.forall (fun (arr : int []) -> arr.Length = Dimension) Simplices
 
   member this.reduce =
-    if isReduced then this
-    else
-      let newSimplices =
+    let data      = reduceArr Simplices
+    let newCoeffs =
+      snd data
+        |> arrMap (fun arr -> arrMap (fun i -> Coefficients.[i]))
+          |> arrMap Array.sum
+    Chain(fst data, newCoeffs, Dimension, Order, true)
 
 
   member this.Boundaries : Chain [] =
