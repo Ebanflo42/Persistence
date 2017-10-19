@@ -26,6 +26,48 @@ let rec drop (n : int) (list : 'a list) : 'a list =
     | _  -> if n > 0 then drop (n - 1) (List.tail list) else list
 
 let removeAt (n : int) (list : 'a list) : 'a list = (List.take (n - 1) list) @ (drop n list)
+
+let rec findIndices (arr : 'a []) (elem : 'a) (index : int) : int list =
+  if arr = [||] then []
+  elif arr.[0] = elem then index :: (findIndices arr.[1..] elem (index + 1))
+  else findIndices arr.[1..] elem (index + 1)
+
+let rec findAndReplace (i : int) (elem : 'a) (list : 'a list list) : 'a list =
+  [|for n in 0..list.Length - 1 ->
+    if n = i then elem :: list.[n]
+    else list.[n]|] //Arrangement could confuse compiler
+
+let rec reduceArr (input : 'a []) : 'a [] * int [] [] =
+
+  let rec process (data : 'a list) (ans : 'a list) (indices : int list list) (index : int) : 'a list * int list list =
+    match data with
+      | []         -> (ans, indices)
+      | (x :: xs)  ->
+        match List.tryFindIndex x ans with
+          | None   -> process xs (x :: ans) indices (index + 1)
+          | Some i ->
+            replaceAndReplace i index indices
+              |> fun a -> process xs ans a (index + 1)
+(*
+  let rec getReduced (soln : 'a list) (helper : 'a list) (indices : int list list) : 'a list * int list list =
+    match helper with
+      | []        -> (soln, indices)
+      | (x :: xs) -> getReduced (x :: soln) (List.filter (fun a -> a != x) helper)
+*)
+  let soln   = process [|for elem in input -> elem|] [] [] 0
+  let len    = soln.Length - 1
+  let result = (Arrary.create len, Arrary.create len)
+  for i in 0..len do
+    (fst result).[i] = (fst soln).[i]
+    let s            = (snd soln).[i]
+    let len1         = s.Length - 1
+    let arr          = Array.create len1
+    for j in 0..len1 do
+      arr.[j] = s.[j]
+    (snd result).[i] = arr
+  result
+
+
 (*
 let rec factorial (n : int) =
   match n with
@@ -113,6 +155,15 @@ type Chain(Simplices : int [] [], Coefficients : int [], Dimension : int, Order 
 
   member this.isValid : bool =
     Simplices.Length = Coefficients.Length && Array.forall (fun (arr : int []) -> arr.Length = Dimension) Simplices
+
+  member this.reduce =
+    if isReduced then this
+    else
+      let newSimplices =
+
+
+  member this.Boundaries : Chain [] =
+
 
 //PARSING
 open System.Text.RegularExpressions
