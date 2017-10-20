@@ -1,4 +1,4 @@
-module util
+module Util
 
 let bind (o : Option<'a>) (f : 'a -> Option<'b>) : Option<'b> =
   match o with
@@ -33,24 +33,32 @@ let rec findIndices (arr : 'a []) (elem : 'a) (index : int) : int list =
   elif arr.[0] = elem then index :: (findIndices arr.[1..] elem (index + 1))
   else findIndices arr.[1..] elem (index + 1)
 
-let rec findAndReplace (i : int) (elem : 'a) (list : 'a list list) : 'a list =
-  [|for n in 0..list.Length - 1 ->
-      if n = i then elem :: list.[n]
-      else list.[n]|] //Arrangement could confuse compiler
+let rec findAndInsert (i : int) (elem : int) (list : int list list) : int list list =
+  list.[0..(i - 1)] @ ((elem :: list.[i]) :: list.[(i + 1)..])
+  //[|for n in 0..list.Length - 1 -> if n = i then elem :: list.[n] else list.[n]|] //Arrangement could confuse compiler
 
+(*
 let rec reduceArr (input : 'a []) : 'a [] * int [] [] =
 
-  let rec process (data : 'a list) (ans : 'a list) (indices : int list list) (index : int) : 'a list * int list list =
+  let rec makeSoln (data : int list) (ans : int list) (indices : int list list) (index : int) : int list * int list list =
     match data with
       | []         -> (ans, indices)
       | (x :: xs)  ->
         match List.tryFindIndex x ans with
-          | None   -> process xs (x :: ans) indices (index + 1)
+          | None   -> makeSoln xs (x :: ans) indices (index + 1)
           | Some i ->
-            replaceAndReplace i index indices
-              |> fun a -> process xs ans a (index + 1)
+            makeSoln xs ans a (index + 1) (findAndReplace i index indices)
 
-  let soln   = process [|for elem in input -> elem|] [] [] 0
+  let rec makeSoln2 (data : int []) (ans : int []) (indices : int [] []) : int [] * int [] [] =
+    match data with
+      | [||] -> (ans, indices)
+      | _    ->
+        match Array.tryFindIndex x ans with
+          | None   -> makeSoln2 xs (Array.append x ans) indices (index + 1)
+          | Some i ->
+            makeSoln2
+
+  let soln   = makeSoln [|for elem in input -> elem|] [] [] 0
   let len    = soln.Length - 1
   let result = (Arrary.create len, Arrary.create len)
   for i in 0..len do
@@ -62,6 +70,16 @@ let rec reduceArr (input : 'a []) : 'a [] * int [] [] =
       arr.[j] = s.[j]
     (snd result).[i] = arr
   result
+*)
+let rec makeSoln (data : int list) (ans : int list) (indices : int list list) (index : int) : int list * int list list =
+  match data with
+    | []         -> (ans, indices)
+    | (x :: xs)  ->
+      match List.tryFindIndex (fun a -> a = x) ans with
+        | None   -> makeSoln xs (x :: ans) indices (index + 1)
+        | Some i ->
+          makeSoln xs ans (findAndInsert i index indices) (index + 1)
+
 
 let rec factorial (n : int) =
   match n with

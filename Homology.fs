@@ -1,5 +1,7 @@
-open util.fs
-open parser.fs
+module Homology
+
+open Util.fs
+open Parser.fs
 
 type HasseNode(Vertices : int [], Parents : HasseNode [], Children : HasseNode []) =
   member this.Vertices = Vertices
@@ -27,7 +29,7 @@ type SimplicialComplex(OrderedSets : int [] []) =
 
   member this.Dimension : int = maximum (arrMap (fun (arr : int []) -> arr.Length : int) OrderedSets)
 
-type Chain(Simplices : int [] [], Coefficients : int [], Dimension : int, Order : int, IsReduced : bool) =
+type Chain(Simplices : int list list, Coefficients : int list, Dimension : int, Order : int, IsReduced : bool) =
   member this.Simplices    = Simplices
   member this.Coefficients = Coefficients
   member this.Order        = Order
@@ -47,8 +49,13 @@ type Chain(Simplices : int [] [], Coefficients : int [], Dimension : int, Order 
         status = false
         newCoeffs.[i] = Coefficients.[i] % Order
 
-    (Chain(Simplices, newCoeffs, Dimension, Order, IsReduced), status)
+      let rec makeList (arr : 'a []) : 'a list =
+        match arr with
+          | [||] -> []
+          | _    -> arr.[0] :: (makeList arr.[1..])
 
+    (Chain(Simplices, (makeList newCoeffs), Dimension, Order, IsReduced), status)
+(*
   member this.reduce =
     let data      = reduceArr Simplices
     let newCoeffs =
@@ -72,12 +79,6 @@ type Chain(Simplices : int [] [], Coefficients : int [], Dimension : int, Order 
 
     Chain(newSimplices, coeffs, dim, order, false)
 
-
   member this.Boundaries : Chain [] =
     arrMap (getSimplexBoundaries Dimension Order) Simplices
-
-//TESTING
-let _ = while true do
-          let input = System.Console.ReadLine()
-          let intArr = input |> parse2DIntArr |> finishParsing
-          if intArr = [||] then printfn "Please give valid input" else printActualArr intArr
+*)

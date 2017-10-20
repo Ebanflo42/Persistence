@@ -1,4 +1,4 @@
-module parser
+module Parser
 
 open System.Text.RegularExpressions
 
