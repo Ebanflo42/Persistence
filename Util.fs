@@ -95,7 +95,7 @@ let rec binomialCoeff (n : int) (k : int) : int =
       | 3 -> i*(i - 1)*(i - 2)
       | _ -> (i - j + 1)*ordChoice i (j - 1)
   (ordChoice n k)/(factorial k)
-
+(*
 let rec getSubLists (len : int) (list : int list) : int list [] =
   let helper = []
   let ssLen = list.Length
@@ -111,3 +111,4 @@ let rec getSubLists (len : int) (list : int list) : int list [] =
 
   findSubLists helper 0 true 0
   result
+*)

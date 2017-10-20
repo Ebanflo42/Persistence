@@ -1,6 +1,6 @@
-module Calculator
+module Main
 
-open Homology
+open Parser
 
 let _ = while true do
           let input = System.Console.ReadLine()
