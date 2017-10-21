@@ -54,7 +54,7 @@ let rec getSimplexBoundary (simplex : int list) order (simplices : int list list
           else order - 1
       getSimplexBoundary simplex order (s :: simplices) (c :: coeffs) (index + 1)
 
-let rec organizeChains (chains : Chain list) : Matrix =
+let rec organizeChains (chains : Chain list) : Matrix * int list list =
   let rec addAllElems (arg : 'a list) (res : 'a list) : 'a list =
     match arg with
       | []        -> res
@@ -77,9 +77,9 @@ let rec organizeChains (chains : Chain list) : Matrix =
       | None   -> 0
       | Some x -> c.Coefficients.[x]
 
-  Matrix([|for chain in chains -> [|for i in 0..(allSimplices.Length - 1) -> getCoeff i chain|]|], chains.[0].Order)
+  (Matrix([|for chain in chains -> [|for i in 0..(allSimplices.Length - 1) -> getCoeff i chain|]|], chains.[0].Order), allSimplices)
 
-let rec getBoundaryOperator (simplices : int list list) order : Matrix =
+let rec getBoundaryOperator (simplices : int list list) order : Matrix * int list list =
   let boundaries = List.map (fun (s : int list) -> getSimplexBoundary s order [] [] 0) simplices
   if List.forall (fun (c : Chain) -> c.VerifyDimension) boundaries then organizeChains boundaries
   else failwith "Somehow, the boundary of a simplex was found to have the wrong dimension"
