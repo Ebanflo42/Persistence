@@ -3,19 +3,25 @@ module SimplicialComplex
 open Matrix
 open Chain
 
-type SimplicialComplex(Parents : int list list,
-                       Children : int list list,
-                       Homology : int list list,
+type SimplicialComplex(Parents    : int list list,
+                       Children   : int list list,
+                       //Homology : int list list,
+                       Dimension  : int,
                        numUpdates : int) =
   member this.Parents    = Parents
   member this.Children   = Children
-  member this.Homology   = Homology
-  member this.numUodates = numUpdates
+  //member this.Homology   = Homology
+  member this.Dimension  = Dimension
+  member this.numUpdates = numUpdates
 
-  member this.Dimension : int =
-    Parents
-      |> List.map (fun (list : int list) -> list.Length : int)
-        |> fun (l : 'a list) -> List.fold max l.[0] l.[1..]
+  member this.CheckDimension : SimplicialComplex * bool =
+    let dim =
+      Parents
+        |> List.map (fun (list : int list) -> list.Length : int)
+          |> fun (l : 'a list) -> List.fold max l.[0] l.[1..]
+    if dim = Dimension
+    then (this, true)
+    else (SimplicialComplex(Parents, Children, numUpdates, dim), false)
 
   member this.OnlyParents =
 
@@ -31,21 +37,21 @@ type SimplicialComplex(Parents : int list list,
 
   member this.biggestSimplices =
     let dim = this.Dimension
-    List.filter (fun l -> l.Length = dim) Parents
+    List.filter (fun (l : 'a list) -> l.Length = dim) Parents
 
   member this.nDimensionalSimplices (n : int) =
-    List.filter (fun l -> l.Length = n) (Parents @ Children)
+    List.filter (fun (l : 'a list) -> l.Length = n) (Parents @ Children)
 
-  member this.Update (order : int) =
+  member this.Update (order : int)  : SimplicialComplex =
     if numUpdates = 0 then
       let data = getBoundaryOperator Parents order
-      SimplicialComplex(Parents, (snd data) @ Children, ((fst data).makeHomology) :: Homology, 1)
+      SimplicialComplex(Parents, (snd data) @ Children, (*(fst data).makeHomology) :: Homology,*) Dimension, 1)
     else
-      let data = getBoundaryOperator (this.nDimensionalSimplices (Dimension - numUpdates))
-      SimplicialComplex(Parents, (snd data) @ Children, ((fst data).makeHomology) :: Homology, numUpdates + 1)
+      let data = getBoundaryOperator (this.nDimensionalSimplices (Dimension - numUpdates)) order
+      SimplicialComplex(Parents, (snd data) @ Children, (*(fst data).makeHomology) :: Homology,*) Dimension, numUpdates + 1)
 
   member this.CalculateHomology (order : int) =
     let dim = this.Dimension
     match numUpdates with
       | dim -> this
-      | _   -> this.Update.CalculateHomology
+      | _   -> (this.Update order).CalculateHomology order
