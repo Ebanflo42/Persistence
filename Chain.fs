@@ -42,45 +42,44 @@ type Chain(Simplices : int list list, Coefficients : int list, Dimension : int, 
     Chain(fst data, newCoeffs, Dimension, Order, true)
 *)
 
-  static member getSimplexBoundary (simplex : int list) order (simplices : int list list) (coeffs : int list) index : Chain =
-    match simplex with
-      | []        -> Chain(simplices, coeffs, simplices.[0].Length - 1, order)//(simplices, coeffs)
+let rec getSimplexBoundary (simplex : int list) order (simplices : int list list) (coeffs : int list) index : Chain =
+  match simplex with
+    | []        -> Chain(simplices, coeffs, simplices.[0].Length - 1, order)//(simplices, coeffs)
+    | (x :: xs) ->
+      let s = simplex.[1..index] @ xs
+      let c =
+        if index % 2 = 0 then 1
+        else
+          if order = 2 then 0
+          else order - 1
+      getSimplexBoundary simplex order (s :: simplices) (c :: coeffs) (index + 1)
+
+let rec organizeChains (chains : Chain list) : Matrix =
+  let rec addAllElems (arg : 'a list) (res : 'a list) : 'a list =
+    match arg with
+      | []        -> res
       | (x :: xs) ->
-        let s = simplex.[1..index] @ xs
-        let c =
-          if index % 2 = 0 then 1
-          else
-            if order = 2 then 0
-            else order - 1
-        Chain.getSimplexBoundary simplex order (s :: simplices) (c :: coeffs) (index + 1)
+        if List.exists (fun a -> a = x) res then addAllElems xs res
+        else addAllElems xs (x :: res)
 
-  static member organizeChains (chains : Chain list) : Matrix =
+  let rec collect (arg : 'a list list) (result : 'a list) =
+    match arg with
+      | []        -> result
+      | (x :: xs) -> collect xs (addAllElems x result)
 
-    let rec addAllElems (arg : 'a list) (res : 'a list) : 'a list =
-      match arg with
-        | []        -> res
-        | (x :: xs) ->
-          if List.exists (fun a -> a = x) res then addAllElems xs res
-          else addAllElems xs (x :: res)
+  let allSimplices =
+    chains
+      |> List.map (fun (c : Chain) -> c.Simplices)
+        |> fun a -> collect a []
 
-    let rec collect (arg : 'a list list) (result : 'a list) =
-      match arg with
-        | []        -> result
-        | (x :: xs) -> collect xs (addAllElems x result)
+  let rec getCoeff (i : int) (c : Chain) =
+    match List.tryFindIndex (fun x -> x = allSimplices.[i]) c.Simplices with
+      | None   -> 0
+      | Some x -> c.Coefficients.[x]
 
-    let allSimplices =
-      chains
-        |> List.map (fun (c : Chain) -> c.Simplices)
-          |> fun a -> collect a []
+  Matrix([|for chain in chains -> [|for i in 0..(allSimplices.Length - 1) -> getCoeff i chain|]|], chains.[0].Order)
 
-    let rec getCoeff (i : int) (c : Chain) =
-      match List.tryFindIndex (fun x -> x = allSimplices.[i]) c.Simplices with
-        | None   -> 0
-        | Some x -> c.Coefficients.[x]
-
-    Matrix([|for chain in chains -> [|for i in 0..(allSimplices.Length - 1) -> getCoeff i chain|]|], chains.[0].Order)
-
-  static member getBoundaryOperator (simplices : int list list) order =
-    let boundaries = List.map (fun (s : int list) -> Chain.getSimplexBoundary s order [] [] 0) simplices
-    if List.forall (fun (c : Chain) -> c.VerifyDimension) boundaries then Chain.organizeChains boundaries
-    else failwith "Somehow, the boundary of a simplex was found to have the wrong dimension"
+let rec getBoundaryOperator (simplices : int list list) order : Matrix =
+  let boundaries = List.map (fun (s : int list) -> getSimplexBoundary s order [] [] 0) simplices
+  if List.forall (fun (c : Chain) -> c.VerifyDimension) boundaries then organizeChains boundaries
+  else failwith "Somehow, the boundary of a simplex was found to have the wrong dimension"
