@@ -1,5 +1,6 @@
 module SimplicialComplex
 
+open Parser
 open Matrix
 open Chain
 
@@ -14,6 +15,15 @@ type SimplicialComplex(Parents    : int list list,
   member this.Dimension  = Dimension
   member this.numUpdates = numUpdates
 
+  static member defaultParse (str : string) =
+    fst (SimplicialComplex(parse2dIntList str, [], 0, 0).CheckDimension)
+
+  member this.PrintAttribs =
+    print2dList Parents
+    print2dList Children
+    printfn "%i" Dimension
+    printfn "%i" numUpdates
+
   member this.CheckDimension : SimplicialComplex * bool =
     let dim =
       Parents
@@ -24,7 +34,6 @@ type SimplicialComplex(Parents    : int list list,
     else (SimplicialComplex(Parents, Children, numUpdates, dim), false)
 
   member this.OnlyParents =
-
     let rec checkSuperSet (set : int list) (l1 : int) (Set : int list) (l2 : int) : bool =
       if l2 < l1 then false elif List.take l1 Set = set then true else checkSuperSet set l1 (Set.[l1..]) (l2 - l1)
 
