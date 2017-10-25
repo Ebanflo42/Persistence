@@ -2,7 +2,10 @@ module Chain
 
 open Matrix
 
-type Chain(Simplices : int list list, Coefficients : int list, Dimension : int, Order : int) =
+type Chain(Simplices : int list list,
+           Coefficients : int list,
+           Dimension : int,
+           Order : int) =
   member this.Simplices    = Simplices
   member this.Coefficients = Coefficients
   member this.Order        = Order
