@@ -6,20 +6,12 @@ open Matrix
 let _ = while true do
 
           let input  = System.Console.ReadLine()
-          (*
-          let output =
+          let matrix =
             input
               |> parse2dIntList
-                |> fun (l : int list ist) -> [|for i in l -> [|for j in i -> j|]|]
-                  |> fun (m : int [] [])
-            *)
-          let output =
-            input
-              |> parseIntList
-                |> fun (l : int list) -> extEucAlg l.[0] l.[1]
+                |> fun (l : int list list) -> [|for i in l -> [|for j in i -> j|]|]
+                  |> fun (m : int [] []) -> Matrix(m, 0)
 
-          printList [for i in output -> i]
-(*
-          if output = [] then printfn "Please give valid input"
-          else print2dList output
-*)
+          let pivot = matrix.FindPivot
+
+          printfn "%i %i" (fst pivot) (snd pivot)

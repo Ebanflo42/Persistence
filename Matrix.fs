@@ -1,5 +1,7 @@
 module Matrix
 
+let flip = fun (a, b) -> (b, a)
+
 let rec extEucAlg (a : int) (b : int) : int [] =
   let rec helper (r : int * int) (s : int * int) (t : int * int) =
     match snd r with
@@ -21,31 +23,34 @@ type Matrix(Elements : int [] [], Order : int) =
   member this.Order    = Order
 
   member this.isMatrix =
-    Array.forall (fun (a : 'a []) -> a.Length = Elements.[0].Length) Elements.[1..]
+    Array.forall (fun (a : int []) -> a.Length = Elements.[0].Length) Elements.[1..]
 
   member this.Transpose =
     let elems =
       [|for i in 0..(Elements.Length - 1) -> [|for j in 0..(Elements.[0].Length) -> Elements.[j].[i]|]|]
     Matrix(elems, Order)
-(*
+
+  member this.TransposeElems = [|for i in 0..(Elements.Length - 1) -> [|for j in 0..(Elements.[0].Length - 1) -> Elements.[j].[i]|]|]
+
   member this.FindPivot : int * int =
 
-    let rec getFstIndex (mat : int [] []) (index : int) =
+    let rec getFstZeroRow (mat : int [] []) (index : int) =
       match mat with
-        | [||] -> failwith "Couldn't find pivot"
+        | [||] -> failwith "Couldn't find pivot 1"
         | _    ->
-          match Array.tryFindIndex (fun x -> x = 0) mat.[0] with
-            | None   -> getFstIndex mat.[1..] (index + 1)
-            | Just i -> (index, i)
+          if Array.exists (fun a -> a = 0) mat.[0] then index
+          else getFstZeroRow mat.[1..] (index + 1)
 
-    getFstIndex this.Elements 0
+    let rec find (mat : int [] []) =
+      let i = getFstZeroRow mat 0
+      match Array.tryFindIndex (fun a -> a <> 0) mat.[i] with
+        | None   -> find mat.[(i + 1)..]
+        | Some j -> (j, i)
 
+    find this.TransposeElems
+
+(*
   member this.improvePivot =
-
-    let rec gcd a b =
-      if b = 0
-      then abs a
-      else gcd b (a % b)
 
     let indices = this.FindPivot
     let row     = Elements.[fst indices]
@@ -57,4 +62,4 @@ type Matrix(Elements : int [] [], Order : int) =
       | (x :: xs) ->
         if x % elem != 0 then gcd x elem
         else findGCD xs
-*)
+//*)
