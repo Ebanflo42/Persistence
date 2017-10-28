@@ -28,7 +28,7 @@ type SimplicialComplex(Parents    : int list list,
     let dim =
       Parents
         |> List.map (fun (list : int list) -> list.Length : int)
-          |> fun (l : 'a list) -> List.fold max l.[0] l.[1..]
+          |> fun (l : int list) -> List.fold max l.[0] l.[1..]
     if dim = Dimension
     then (this, true)
     else (SimplicialComplex(Parents, Children, numUpdates, dim), false)
@@ -46,11 +46,11 @@ type SimplicialComplex(Parents    : int list list,
 
   member this.biggestSimplices =
     let dim = this.Dimension
-    List.filter (fun (l : 'a list) -> l.Length = dim) Parents
+    List.filter (fun (l : int list) -> l.Length = dim) Parents
 
   member this.nDimensionalSimplices (n : int) =
-    List.filter (fun (l : 'a list) -> l.Length = n) (Parents @ Children)
-
+    List.filter (fun (l : int list) -> l.Length = n) (Parents @ Children)
+(*
   member this.Update (order : int)  : SimplicialComplex =
     if numUpdates = 0 then
       let data = getBoundaryOperator Parents order
@@ -64,3 +64,4 @@ type SimplicialComplex(Parents    : int list list,
     match numUpdates with
       | dim -> this
       | _   -> (this.Update order).CalculateHomology order
+*)

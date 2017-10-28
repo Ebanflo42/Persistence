@@ -10,7 +10,7 @@ let rec parseIntList (str : string) : int list =
     (int str.[init..(fin - 2)]) :: (parseIntList str.[fin..])
 
 let rec parse2dIntList (str : string) : int list list =
-  let capture = Regex.Match(str, ".+?(?=])].")//".+\[.*](;|])"
+  let capture = Regex.Match(str, ".+?(?=])].")
   if capture  = Match.Empty then [] else
   let init : int = capture.Index + 1
   let fin : int  = init + capture.Length - 1

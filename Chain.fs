@@ -58,14 +58,15 @@ let rec getSimplexBoundary (simplex : int list) order (simplices : int list list
       getSimplexBoundary simplex order (s :: simplices) (c :: coeffs) (index + 1)
 
 let rec organizeChains (chains : Chain list) : Matrix * int list list =
-  let rec addAllElems (arg : 'a list) (res : 'a list) : 'a list =
+
+  let rec addAllElems (arg : int list list) (res : int list list) : int list list =
     match arg with
       | []        -> res
       | (x :: xs) ->
         if List.exists (fun a -> a = x) res then addAllElems xs res
         else addAllElems xs (x :: res)
 
-  let rec collect (arg : 'a list list) (result : 'a list) =
+  let rec collect (arg : int list list list) (result : int list list) =
     match arg with
       | []        -> result
       | (x :: xs) -> collect xs (addAllElems x result)

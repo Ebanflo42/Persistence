@@ -2,6 +2,9 @@ module Matrix
 
 let flip = fun (a, b) -> (b, a)
 
+let scalMult (s : int) (vec : int []) : int [] =
+  [|for x in vec -> s * x|]
+
 let rec extEucAlg (a : int) (b : int) : int [] =
   let rec helper (r : int * int) (s : int * int) (t : int * int) =
     match snd r with
@@ -49,17 +52,30 @@ type Matrix(Elements : int [] [], Order : int) =
 
     find this.TransposeElems
 
-(*
+
   member this.improvePivot =
 
-    let indices = this.FindPivot
-    let row     = Elements.[fst indices]
-    let elem    = row.[snd indices]
+    let indices   = this.FindPivot
+    let elem      = Elements.[fst indices].[snd indices]
+    let column    = [|for row in Elements -> row.[snd indices]|]
+    match Array.tryFindIndex (fun a -> a % elem <> 0) column with
+      | None       -> this
+      | Some index ->
+        let elem2     = column.[index]
+        let gcdTriple = extEucAlg elem elem2
+        let gcd       = gcdTriple.[0]
+        let q1        = elem/gcd
+        let q2        = elem2/gcd
 
-    let rec findGCD (arr : int []) =
-      match arr with
-      | []        -> failwith "Couldn't find Smith normal form"
-      | (x :: xs) ->
-        if x % elem != 0 then gcd x elem
-        else findGCD xs
-//*)
+        let newElems =
+          [|
+            for i in 0..(Elements.Length - 1) -> 
+              [|
+                for j in 0..(Elements.[0].Length - 1) ->
+                  if i = fst indices then gcdTriple.[1]*Elements.[i].[j] + gcdTriple.[2]*Elements.[i].[snd indices]
+                  elif i = index then -q2*Elements.[i].[j] + q1*Elements.[i].[i]
+                  else Elements.[i].[j]
+                |]
+              |]
+
+        Matrix(newElems, Order)

@@ -2,6 +2,8 @@ module Main
 
 open Parser
 open Matrix
+open Chain
+open SimplicialComplex
 
 let _ = while true do
 
