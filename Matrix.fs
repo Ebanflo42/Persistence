@@ -35,7 +35,7 @@ type Matrix(Elements : int [] [], Order : int) =
 
   member this.TransposeElems = [|for i in 0..(Elements.Length - 1) -> [|for j in 0..(Elements.[0].Length - 1) -> Elements.[j].[i]|]|]
 
-  member this.FindPivot : int * int =
+  member this.FindPivot : int * int = //first non-zero entry in the first column with a zero
 
     let rec getFstZeroRow (mat : int [] []) (index : int) =
       match mat with
@@ -55,27 +55,31 @@ type Matrix(Elements : int [] [], Order : int) =
 
   member this.improvePivot =
 
-    let indices   = this.FindPivot
-    let elem      = Elements.[fst indices].[snd indices]
-    let column    = [|for row in Elements -> row.[snd indices]|]
-    match Array.tryFindIndex (fun a -> a % elem <> 0) column with
-      | None       -> this
-      | Some index ->
-        let elem2     = column.[index]
-        let gcdTriple = extEucAlg elem elem2
-        let gcd       = gcdTriple.[0]
-        let q1        = elem/gcd
-        let q2        = elem2/gcd
+    let indices   = this.FindPivot //indices of pivot
+    let elem      = Elements.[fst indices].[snd indices] //pivot
+    let column    = [|for row in Elements -> row.[snd indices]|] //column containing pivot
+    
+    match Array.tryFindIndex (fun a -> a % elem <> 0) column with //try to an entry not divisble by the pivot
+      | None       -> this //if none, stop
+      | Some index -> //otherwise get the index
+        let elem2     = column.[index] //get the element at the index
+        let gcdTriple = extEucAlg elem elem2 //get the gcd and the two coefficients that give the gcd when multiplying the numbers
+        let gcd       = gcdTriple.[0] //get the gcd
+        let q1        = elem/gcd //quotient of pivot by gcd
+        let q2        = elem2/gcd //quotient of other entry by gcd
 
         let newElems =
           [|
             for i in 0..(Elements.Length - 1) -> 
               [|
                 for j in 0..(Elements.[0].Length - 1) ->
-                  if i = fst indices then gcdTriple.[1]*Elements.[i].[j] + gcdTriple.[2]*Elements.[i].[snd indices]
-                  elif i = index then -q2*Elements.[i].[j] + q1*Elements.[i].[i]
-                  else Elements.[i].[j]
+                  if i = fst indices then 
+                    (gcdTriple.[1]*Elements.[i].[j] + gcdTriple.[2]*Elements.[i].[snd indices]) % Order
+                  elif i = index then 
+                    (-q2*Elements.[i].[j] + q1*Elements.[i].[i]) % Order
+                  else 
+                    Elements.[i].[j]
                 |]
               |]
 
-        Matrix(newElems, Order)
+        Matrix(newElems, Order).improvePivot
