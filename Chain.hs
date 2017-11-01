@@ -17,8 +17,8 @@ verifyChainDimension chain = let dim = getDim chain in
 
 --gets the boundary of a simplex, simplices and coeffs (3rd and 4th args) are part of the result,
 --index is the current index of the proces in the simplex
-getSimplexBoundary :: Integral a => [[a]] -> [a] -> a -> [a] -> a -> Chain a
-getSimplexBoundary simplices coeffs index simplex order =
+getSimplexBoundary :: Integral a => [[a]] -> [a] -> a -> a -> [a] -> Chain a
+getSimplexBoundary simplices coeffs index order simplex =
   case simplex of
     []       -> Chain simplices coeffs (((fromIntegral . length . head) simplices) - 1) order
     (x : xs) ->
@@ -27,7 +27,7 @@ getSimplexBoundary simplices coeffs index simplex order =
               else
                 if order == 2 then 0
                 else order - 1 in
-      getSimplexBoundary simplex order (s : simplices) (c : coeffs) (index + 1)
+      getSimplexBoundary (s : simplices) (c : coeffs) (index + 1) order simplex
 
 --finds the coefficient of a simplex in a chain
 findCoeff :: Integral a => Chain a -> [a] -> a
@@ -50,14 +50,20 @@ regroupChains chains =
   let allSimplices = collect (map getSimplices chains) []
       coefficients = map (findAndSumCoeffs chains) allSimplices
       fstChain     = head chains in
-  Chain allSimplices coefficients (Chain.getDim fstChain) (Chain.getOrder fstChain)
+  Chain allSimplices coefficients (getDim fstChain) (Chain.getOrder fstChain)
 
 getActualCoeffs :: Integral a => [[a]] -> Chain a -> [a]
 getActualCoeffs allSimplices chain =
+  let coeffs    = getCoeffs chain 
+      simplices = getSimplices chain in
+  map (\s -> let x = elemIndex s simplices in
+             case x of 
+               Nothing -> 0
+               Just i  -> coeffs !! i) allSimplices
 
 getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
 getBoundaryOperator simplices order =
-  let simplexBounds = map (getSimplexBoundary [] [] 0) simplices
-      allSimplices  = collect (map getSimplices simplexBounds) []
-      elements      = map (\chain -> ) simplexBounds
+  let simplexBounds = map (getSimplexBoundary [] [] 0 order) simplices
+      allSimplices  = collect (map getSimplices simplexBounds) [] in
+  Matrix (map (getActualCoeffs allSimplices) simplexBounds) order
   
