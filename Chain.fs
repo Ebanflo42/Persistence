@@ -47,7 +47,7 @@ type Chain(Simplices : int list list,
 
 let rec getSimplexBoundary (simplex : int list) order (simplices : int list list) (coeffs : int list) index : Chain =
   match simplex with
-    | []        -> Chain(simplices, coeffs, simplices.[0].Length - 1, order)//(simplices, coeffs)
+    | []        -> Chain(simplices, coeffs, simplices.[0].Length - 1, order)
     | (x :: xs) ->
       let s = simplex.[1..index] @ xs
       let c =

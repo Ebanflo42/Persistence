@@ -1,5 +1,7 @@
 module Matrix
 
+open Parser
+
 let flip = fun (a, b) -> (b, a)
 
 let scalMult (s : int) (vec : int []) : int [] =
@@ -25,6 +27,10 @@ type Matrix(Elements : int [] [], Order : int) =
   member this.Elements = Elements
   member this.Order    = Order
 
+  member this.printAttribs =
+    print2dArr Elements
+    printfn "%i" Order
+
   member this.isMatrix =
     Array.forall (fun (a : int []) -> a.Length = Elements.[0].Length) Elements.[1..]
 
@@ -35,30 +41,35 @@ type Matrix(Elements : int [] [], Order : int) =
 
   member this.TransposeElems = [|for i in 0..(Elements.Length - 1) -> [|for j in 0..(Elements.[0].Length - 1) -> Elements.[j].[i]|]|]
 
-  member this.FindPivot : int * int = //first non-zero entry in the first column with a zero
+  member this.findPivot : int * int = //first non-zero entry in the first column with a zero
 
     let rec getFstZeroRow (mat : int [] []) (index : int) =
+      printfn "%i" index
       match mat with
-        | [||] -> failwith "Couldn't find pivot 1"
+        | [||] -> failwith "Couldn't find pivot"
         | _    ->
           if Array.exists (fun a -> a = 0) mat.[0] then index
           else getFstZeroRow mat.[1..] (index + 1)
 
     let rec find (mat : int [] []) =
       let i = getFstZeroRow mat 0
+      printfn "%i" i
       match Array.tryFindIndex (fun a -> a <> 0) mat.[i] with
         | None   -> find mat.[(i + 1)..]
         | Some j -> (j, i)
 
     find this.TransposeElems
 
-
   member this.improvePivot =
 
-    let indices   = this.FindPivot //indices of pivot
+    let indices   = this.findPivot //indices of pivot
+    printfn "The indices of the pivot are %i and %i" (fst indices) (snd indices)
     let elem      = Elements.[fst indices].[snd indices] //pivot
+    printfn "The pivot is %i" elem 
     let column    = [|for row in Elements -> row.[snd indices]|] //column containing pivot
-    
+    printfn "The column is"
+    for x in column do printfn "%i " x
+
     match Array.tryFindIndex (fun a -> a % elem <> 0) column with //try to an entry not divisble by the pivot
       | None       -> this //if none, stop
       | Some index -> //otherwise get the index
@@ -83,3 +94,6 @@ type Matrix(Elements : int [] [], Order : int) =
               |]
 
         Matrix(newElems, Order).improvePivot
+
+  member this.diagonalize =
+    this.improvePivot.Transpose.improvePivot.Transpose

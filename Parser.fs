@@ -4,9 +4,9 @@ open System.Text.RegularExpressions
 
 let rec parseIntList (str : string) : int list =
   let capture      = Regex.Match(str, "\d+(;|])")
-  if capture       = Match.Empty then [] else
-    let init : int = capture.Index
-    let fin : int  = init + capture.Length
+  if capture = Match.Empty then [] else
+    let init = capture.Index
+    let fin  = init + capture.Length
     (int str.[init..(fin - 2)]) :: (parseIntList str.[fin..])
 
 let rec parse2dIntList (str : string) : int list list =
@@ -26,8 +26,15 @@ let rec print2dList (list : int list list) : unit =
     | []        -> ()
     | (x :: xs) -> printList x; print2dList xs
 
+let printArr (arr : int []) =
+  for i in arr do
+    printf "%i " i
+
+
 let rec print2dArr (data : int [] []) : unit =
-  for arr in data do
-    for x in arr do
-      printf "%i" x
-    printfn ""
+  match data with
+    | [||] -> ()
+    | _    ->
+      printArr data.[0]
+      printfn ""
+      print2dArr data.[1..]

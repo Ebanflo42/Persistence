@@ -14,6 +14,7 @@ let _ = while true do
                 |> fun (l : int list list) -> [|for i in l -> [|for j in i -> j|]|]
                   |> fun (m : int [] []) -> Matrix(m, 0)
 
-          let pivot = matrix.FindPivot
-
-          printfn "%i %i" (fst pivot) (snd pivot)
+          //print2dArr matrix.Elements
+          //let pivot = matrix.findPivot
+          //printfn "%i %i" (fst pivot) (snd pivot)
+          matrix.diagonalize.printAttribs
