@@ -15,8 +15,8 @@ exists elem list =
       else exists elem xs
 
 --extended Euclidean algorithm
-helper :: Integral a => (a, a) -> (a, a) -> (a, a) -> (a, a, a)
-helper r s t =
+eeaHelper :: Integral a => (a, a) -> (a, a) -> (a, a) -> (a, a, a)
+eeaHelper r s t =
   case snd r of
     0 -> (fst r, fst s, fst t)
     _ ->
@@ -28,10 +28,10 @@ helper r s t =
           nextr = r1 - q*r2
           nexts = fst s - q*s2
           nextt = fst t - q*t2 in
-      helper (r2, nextr) (s2, nexts) (t2, nextt)
+      eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
 
 extEucAlg :: Integral a => a -> a -> (a, a, a)
-extEucAlg a b = helper (a, b) (0, 1) (1, 0)
+extEucAlg a b = eeaHelper (a, b) (0, 1) (1, 0)
 
 --elimates duplicates in first argument, second argument is the result
 regroupElems :: Eq a => [[a]] -> [[a]] -> [[a]]
@@ -42,11 +42,14 @@ regroupElems arg res =
           if exists x res then regroupElems xs res
           else regroupElems xs (x : res)
 
-collect :: Eq a => [[[a]]] -> [[a]] -> [[a]]
-collect arg result =
+chelper :: Eq a => [[a]] -> [[[a]]] -> [[a]]
+chelper result arg =
   case arg of
     []       -> result
-    (x : xs) -> collect xs (regroupElems x result)
+    (x : xs) -> chelper (regroupElems x result) xs
+
+collect :: Eq a => [[[a]]] -> [[a]]    
+collect = chelper []
 
 forall :: (a -> Bool) -> [a] -> Bool
 forall _ []     = True

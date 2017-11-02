@@ -33,6 +33,7 @@ type SimplicialComplex(Parents    : int list list,
     then (this, true)
     else (SimplicialComplex(Parents, Children, numUpdates, dim), false)
 
+(* I dont know why I made this
   member this.OnlyParents =
     let rec checkSuperSet (set : int list) (l1 : int) (Set : int list) (l2 : int) : bool =
       if l2 < l1 then false elif List.take l1 Set = set then true else checkSuperSet set l1 (Set.[l1..]) (l2 - l1)
@@ -43,7 +44,7 @@ type SimplicialComplex(Parents    : int list list,
         if checkSuperSet Parents.[i] Parents.[i].Length Parents.[j] Parents.[j].Length
           then failwith "The simplicial complex has children simplices that are supposed to be parent simplices"
         else ()
-
+*)
   member this.biggestSimplices =
     let dim = this.Dimension
     List.filter (fun (l : int list) -> l.Length = dim) Parents

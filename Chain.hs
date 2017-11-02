@@ -47,7 +47,7 @@ findAndSumCoeffs chains simplex =
 --probably needs to be optimized
 regroupChains :: Integral a => [Chain a] -> Chain a
 regroupChains chains =
-  let allSimplices = collect (map getSimplices chains) []
+  let allSimplices = collect $ map getSimplices chains
       coefficients = map (findAndSumCoeffs chains) allSimplices
       fstChain     = head chains in
   Chain allSimplices coefficients (getDim fstChain) (Chain.getOrder fstChain)
@@ -64,6 +64,6 @@ getActualCoeffs allSimplices chain =
 getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
 getBoundaryOperator simplices order =
   let simplexBounds = map (getSimplexBoundary [] [] 0 order) simplices
-      allSimplices  = collect (map getSimplices simplexBounds) [] in
+      allSimplices  = collect $ map getSimplices simplexBounds in
   Matrix (map (getActualCoeffs allSimplices) simplexBounds) order
   
