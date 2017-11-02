@@ -44,7 +44,6 @@ type Matrix(Elements : int [] [], Order : int) =
   member this.findPivot : int * int = //first non-zero entry in the first column with a zero
 
     let rec getFstZeroRow (mat : int [] []) (index : int) =
-      printfn "%i" index
       match mat with
         | [||] -> failwith "Couldn't find pivot"
         | _    ->
@@ -53,7 +52,6 @@ type Matrix(Elements : int [] [], Order : int) =
 
     let rec find (mat : int [] []) =
       let i = getFstZeroRow mat 0
-      printfn "%i" i
       match Array.tryFindIndex (fun a -> a <> 0) mat.[i] with
         | None   -> find mat.[(i + 1)..]
         | Some j -> (j, i)
