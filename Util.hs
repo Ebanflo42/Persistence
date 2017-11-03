@@ -6,6 +6,10 @@ one (a, _, _) = a
 two (_, b, _) = b
 thr (_, _, c) = c
 
+not1 (_, b, c) = (b, c)
+not2 (a, _, c) = (a, c)
+not3 (a, b, _) = (a, b)
+
 exists :: Eq a => a -> [a] -> Bool
 exists elem list =
   case list of
