@@ -38,6 +38,11 @@ getSubLists i t (a, b) (x:xs) =
     else let sublists = getSubLists (i + 1) t (a, b) xs in
       (one sublists, two sublists, x : (thr sublists))
 
+switchElems :: Int -> Int -> [a] -> [a]
+switchElems i j list =
+  let sublists = getSubLists 0 True (i, j) list in
+    (one sublists) ++ ((head (thr sublists)) : (tail (two sublists))) ++ ((head (two sublists)) : (tail (thr sublists)))
+
 exists :: Eq a => a -> [a] -> Bool
 exists elem list =
   case list of

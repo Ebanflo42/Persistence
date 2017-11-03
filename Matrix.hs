@@ -10,10 +10,7 @@ getOrder (Matrix _ order) = order
 
 --switch two columns, second must be greater than first
 switchCols :: Int -> Int -> [[a]] -> [[a]]
-switchCols col1 col2 matrix =
-  let separate1 = map (splitAt col1) matrix
-      separate2 = map (splitAt (col2 - col1)) (snd separate1) in
-  (fst separate1) ++ (((head . snd) separate2) : ((tail . fst) separate2)) ++ (((head . fst) separate2) : ((tail . snd) separate2))
+switchCols col1 col2 matrix = map (switchElems col1 col2) matrix
 
 --finds the first column with a zero entry
 getFstZeroCol :: Integral a => [[a]] -> Maybe Int
@@ -75,18 +72,21 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
                   else modulo (((two gcdTriple) `mul` row2) `add` ((thr gcdTriple) `mul` row1))
       newRow2   = if b then modulo (((-q2) `mul` row1) `add` (q1 `mul` row2))
                   else modulo (((-q2) `mul` row2) `add` (q1 `mul` row1))
-      newElems  = (one subMats) ++ (newRow1 : (tail subMat1)) ++ (newRow2 : (tail subMat2)) in
-  Matrix newElems ord
+      newElems  = (one subMats) ++ (newRow1 : (tail subMat1)) ++ (newRow2 : (tail subMat2))
+      nonDivis  = findNonDivisible 0 col pivot elems in
+  case nonDivis of
+    Nothing    -> Matrix newElems ord
+    Just stuff -> improvePivot col (pIndex, pivot) stuff (Matrix newElems ord)
 
 --returns improved matrix and the index of the column to be eliminated
 findAndImprovePivot :: Integral a => Matrix a -> (Int, Matrix a)
 findAndImprovePivot (Matrix elems ord) =
   let column    = case getFstZeroCol elems of
-    Nothing -> length elems - 1
-    Just i  -> i
+                    Nothing -> length elems - 1
+                    Just i  -> i
       pivotData = findPivot 0 column elems in
   case snd pivotData of
-    Nothing -> findAndImprovePivot $ Matrix (switchCols column (length elems - 1)) ord
+    Nothing -> findAndImprovePivot $ Matrix (switchCols column (length elems - 1) elems) ord
     Just p  ->
       case findNonDivisible 0 column p elems of
         Nothing -> (column, Matrix elems ord)
