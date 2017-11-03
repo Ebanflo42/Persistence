@@ -11,8 +11,7 @@ not2 (a, _, c) = (a, c)
 not3 (a, b, _) = (a, b)
 
 mul :: Num a => a -> [a] -> [a]
-mul _ []     = []
-mul s (x:xs) = (s*x) : (s `mul` xs)
+mul s vec = map (*s) vec
 
 add :: Num a => [a] -> [a] -> [a]
 add [] _ = error "First list wasn't long enough"
@@ -25,18 +24,18 @@ getSubLists :: Int -> Bool -> (Int, Int) -> [a] -> ([a], [a], [a])
 getSubLists _ _ _ []          = ([], [], [])
 getSubLists i t (a, b) (x:xs) =
   if t then
-    if i < a then let sublists = getSubLists (i + 1) (a, b) xs in
+    if i < a then let sublists = getSubLists (i + 1) t (a, b) xs in
       (x : (one sublists), two sublists, thr sublists)
-    else if i < b then let sublists = getSubLists (i + 1) (a, b) xs in
+    else if i < b then let sublists = getSubLists (i + 1) t (a, b) xs in
       (one sublists, x : (two sublists), thr sublists)
-    else let sublists = getSubLists (i + 1) (a, b) xs in
+    else let sublists = getSubLists (i + 1) t (a, b) xs in
       (one sublists, two sublists, x : (thr sublists))
   else
-    if i < b then let sublists = getSubLists (i + 1) (a, b) xs in
+    if i < b then let sublists = getSubLists (i + 1) t (a, b) xs in
       (x : (one sublists), two sublists, thr sublists)
-    else if i < a then let sublists = getSubLists (i + 1) (a, b) xs in
+    else if i < a then let sublists = getSubLists (i + 1) t (a, b) xs in
       (one sublists, x : (two sublists), thr sublists)
-    else let sublists = getSubLists (i + 1) (a, b) xs in
+    else let sublists = getSubLists (i + 1) t (a, b) xs in
       (one sublists, two sublists, x : (thr sublists))
 
 exists :: Eq a => a -> [a] -> Bool
