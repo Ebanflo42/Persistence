@@ -20,28 +20,26 @@ add (x:xs) (y:ys) = (x + y) : (xs `add` ys)
 
 --first argument is current index, third argument is the two indices to split at, second argument is which index is greater,
 --fourth arg is the list to be split
-getSubLists :: Int -> Bool -> (Int, Int) -> [a] -> ([a], [a], [a])
-getSubLists _ _ _ []          = ([], [], [])
-getSubLists i t (a, b) (x:xs) =
-  if t then
-    if i < a then let sublists = getSubLists (i + 1) t (a, b) xs in
-      (x : (one sublists), two sublists, thr sublists)
-    else if i < b then let sublists = getSubLists (i + 1) t (a, b) xs in
-      (one sublists, x : (two sublists), thr sublists)
-    else let sublists = getSubLists (i + 1) t (a, b) xs in
-      (one sublists, two sublists, x : (thr sublists))
-  else
-    if i < b then let sublists = getSubLists (i + 1) t (a, b) xs in
-      (x : (one sublists), two sublists, thr sublists)
-    else if i < a then let sublists = getSubLists (i + 1) t (a, b) xs in
-      (one sublists, x : (two sublists), thr sublists)
-    else let sublists = getSubLists (i + 1) t (a, b) xs in
-      (one sublists, two sublists, x : (thr sublists))
+getSubLists :: Int -> (Int, Int) -> [a] -> ([a], [a], [a])
+getSubLists _ _ []          = ([], [], [])
+getSubLists i (a, b) (x:xs) =
+  if i < a then let sublists = getSubLists (i + 1) (a, b) xs in
+    (x : (one sublists), two sublists, thr sublists)
+  else if i < b then let sublists = getSubLists (i + 1) (a, b) xs in
+    (one sublists, x : (two sublists), thr sublists)
+  else let sublists = getSubLists (i + 1) (a, b) xs in
+    (one sublists, two sublists, x : (thr sublists))
 
 switchElems :: Int -> Int -> [a] -> [a]
 switchElems i j list =
-  let sublists = getSubLists 0 True (i, j) list in
+  if i == j then list
+  else let fstTwo = splitAt i list
+           sndTwo = splitAt (j - i) (snd fstTwo) in
+       (fst fstTwo) ++ ((head $ snd sndTwo) : (tail $ fst sndTwo)) ++ ((head $ fst sndTwo) : (tail $ snd sndTwo))
+  {-
+  let sublists = getSubLists 0 (i, j) list in
     (one sublists) ++ ((head (thr sublists)) : (tail (two sublists))) ++ ((head (two sublists)) : (tail (thr sublists)))
+    -}
 
 exists :: Eq a => a -> [a] -> Bool
 exists elem list =

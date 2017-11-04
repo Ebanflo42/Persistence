@@ -10,7 +10,7 @@ getOrder (Matrix _ order) = order
 
 --switch two columns, second must be greater than first
 switchCols :: Int -> Int -> [[a]] -> [[a]]
-switchCols col1 col2 matrix = map (switchElems col1 col2) matrix
+switchCols col1 col2 = (transpose . (switchElems col1 col2) . transpose)
 
 --finds the first column with a zero entry
 findFstZeroCol :: Integral a => [[a]] -> Maybe Int
@@ -58,6 +58,7 @@ improvePivot mat = let elems     = getElems mat --matrix elements
 improvePivot :: Integral a => Int -> (Int, a) -> (Int, a) -> Matrix a -> Matrix a
 improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) = 
   let gcdTriple = extEucAlg pivot elem --gcd + bezout coefficients
+      --TODO: bezout coefficients might be inthe wrong order
       gcd       = one gcdTriple
       q1        = pivot `div` gcd
       q2        = elem `div` gcd
@@ -68,7 +69,13 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
       row1      = head subMat1
       row2      = head subMat2
       -}
-      fstTwo    = 
+      fstTwo    = splitAt pIndex elems
+      fstSub    = fst fstTwo
+      sndTwo    = splitAt (index - pIndex) (snd fstTwo)
+      sndSub    = fst sndTwo
+      thrSub    = snd sndTwo
+      row1      = head sndSub
+      row2      = head thrSub
 
       modulo    = if ord == 0 then id
                   else map (\n -> n `mod` ord)
@@ -76,7 +83,7 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
       newRow1   = modulo (((two gcdTriple) `mul` row1) `add` ((thr gcdTriple) `mul` row2))
       newRow2   = modulo (((-q2) `mul` row1) `add` (q1 `mul` row2))
 
-      newElems  = subMat0 ++ (newRow1 : (tail subMat1)) ++ (newRow2 : (tail subMat2))
+      newElems  = fstSub ++ (newRow1 : (tail sndSub)) ++ (newRow2 : (tail thrSub))
       nonDivis  = findNonDivisible 0 col pivot elems in
 
   case nonDivis of
@@ -84,6 +91,7 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
     Just stuff -> improvePivot col (pIndex, pivot) stuff (Matrix newElems ord)
 
 --returns improved matrix and the index of the column to be eliminated
+--TODO: fix column switching issues
 findAndImprovePivot :: Integral a => Matrix a -> (Int, Matrix a)
 findAndImprovePivot (Matrix elems ord) =
   let column    = case findFstZeroCol elems of
@@ -93,6 +101,7 @@ findAndImprovePivot (Matrix elems ord) =
   case snd pivotData of
     Nothing -> findAndImprovePivot $ Matrix (switchCols column (length elems - 1) elems) ord
     Just p  ->
-      case findNonDivisible 0 column p elems of
+      let pIndex = fst pivotData in
+      case findNonDivisible pIndex column p (drop pIndex elems) of
         Nothing -> (column, Matrix elems ord)
-        Just x  -> (column, improvePivot column (fst pivotData, p) x (Matrix elems ord))
+        Just x  -> (column, improvePivot column (pIndex, p) x (Matrix elems ord))
