@@ -3,7 +3,7 @@ module Matrix where
 import Util
 import Data.List
 
-data Matrix a = Matrix [[a]] a
+data Matrix a = Matrix [[a]] a deriving Show
 
 getElems (Matrix elems _) = elems
 getOrder (Matrix _ order) = order
@@ -13,11 +13,11 @@ switchCols :: Int -> Int -> [[a]] -> [[a]]
 switchCols col1 col2 matrix = map (switchElems col1 col2) matrix
 
 --finds the first column with a zero entry
-getFstZeroCol :: Integral a => [[a]] -> Maybe Int
-getFstZeroCol []     = Nothing
-getFstZeroCol (r:rs) =
+findFstZeroCol :: Integral a => [[a]] -> Maybe Int
+findFstZeroCol []     = Nothing
+findFstZeroCol (r:rs) =
   case elemIndex 0 r of
-    Nothing -> getFstZeroCol rs
+    Nothing -> findFstZeroCol rs
     Just i  -> Just i
 
 --first arg is the row index, second arg is the first column with a zero entry
@@ -39,7 +39,7 @@ findNonDivisible row col pivot (r:rs) = let elem = r !! col in
 {-
 improvePivot :: Integral a => Matrix a -> Matrix a
 improvePivot mat = let elems     = getElems mat --matrix elements
-                       col       = case getFstZeroCol elems of --pivot column
+                       col       = case findFstZeroCol elems of --pivot column
                          Nothing -> length mat - 1
                          Just c  -> c
                        pivotData = findPivot 0 col elems
@@ -61,19 +61,24 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
       gcd       = one gcdTriple
       q1        = pivot `div` gcd
       q2        = elem `div` gcd
-      b         = pIndex < index
+      {-
       subMats   = getSubLists 0 b (pIndex, index) elems
       subMat1   = two subMats
       subMat2   = thr subMats
       row1      = head subMat1
       row2      = head subMat2
-      modulo    = map (\n -> n `mod` ord)
-      newRow1   = if b then modulo (((two gcdTriple) `mul` row1) `add` ((thr gcdTriple) `mul` row2))
-                  else modulo (((two gcdTriple) `mul` row2) `add` ((thr gcdTriple) `mul` row1))
-      newRow2   = if b then modulo (((-q2) `mul` row1) `add` (q1 `mul` row2))
-                  else modulo (((-q2) `mul` row2) `add` (q1 `mul` row1))
-      newElems  = (one subMats) ++ (newRow1 : (tail subMat1)) ++ (newRow2 : (tail subMat2))
+      -}
+      fstTwo    = 
+
+      modulo    = if ord == 0 then id
+                  else map (\n -> n `mod` ord)
+
+      newRow1   = modulo (((two gcdTriple) `mul` row1) `add` ((thr gcdTriple) `mul` row2))
+      newRow2   = modulo (((-q2) `mul` row1) `add` (q1 `mul` row2))
+
+      newElems  = subMat0 ++ (newRow1 : (tail subMat1)) ++ (newRow2 : (tail subMat2))
       nonDivis  = findNonDivisible 0 col pivot elems in
+
   case nonDivis of
     Nothing    -> Matrix newElems ord
     Just stuff -> improvePivot col (pIndex, pivot) stuff (Matrix newElems ord)
@@ -81,7 +86,7 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
 --returns improved matrix and the index of the column to be eliminated
 findAndImprovePivot :: Integral a => Matrix a -> (Int, Matrix a)
 findAndImprovePivot (Matrix elems ord) =
-  let column    = case getFstZeroCol elems of
+  let column    = case findFstZeroCol elems of
                     Nothing -> length elems - 1
                     Just i  -> i
       pivotData = findPivot 0 column elems in
