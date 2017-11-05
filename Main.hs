@@ -1,5 +1,3 @@
-module HomCalc where
-
 import Util
 import Chain
 import Matrix

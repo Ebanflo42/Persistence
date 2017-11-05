@@ -10,6 +10,12 @@ not1 (_, b, c) = (b, c)
 not2 (a, _, c) = (a, c)
 not3 (a, b, _) = (a, b)
 
+get1 (a, _, _, _, _) = a
+get2 (_, b, _, _, _) = b
+get3 (_, _, c, _, _) = c
+get4 (_, _, _, d, _) = d
+get5 (_, _, _, _, e) = e
+
 mul :: Num a => a -> [a] -> [a]
 mul s vec = map (*s) vec
 
@@ -29,6 +35,15 @@ getSubLists i (a, b) (x:xs) =
     (one sublists, x : (two sublists), thr sublists)
   else let sublists = getSubLists (i + 1) (a, b) xs in
     (one sublists, two sublists, x : (thr sublists))
+
+splitListHelper :: Int -> ([a], Maybe a, [a], Maybe a, [a]) -> Int -> Int -> [a] -> ([a], Maybe a, [a], Maybe a, [a])
+splitListHelper _ result _ _ []  = result
+splitListHelper current (l1, e1, l2, e2, l3) i j (x:xs)
+  | current < i  = splitListHelper (current + 1) (x:l1, e1, l2, e2, l3) i j xs
+  | current == i = splitListHelper (current + 1) (l1, Just x, l2, e2, l3) i j xs
+  | current < j  = splitListHelper (current + 1) (l1, e1, x:l2, e2, l3) i j xs
+  | current == j = splitListHelper (current + 1) (l1, e1, l2, Just x, l3) i j xs
+  | otherwise    = splitListHelper (current + 1) (l1, e1, l2, e2, x:l3) i j xs
 
 switchElems :: Int -> Int -> [a] -> [a]
 switchElems i j list =

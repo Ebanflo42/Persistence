@@ -36,6 +36,12 @@ findNonDivisible row col pivot (r:rs) = let elem = r !! col in
   if elem `mod` pivot /= 0 then Just (row, elem)
   else findNonDivisible (row + 1) col pivot rs
 
+splitMatrix :: Integral a => Int -> Int -> [[a]] -> ([[a]], [a], [[a]], [a], [[a]])
+splitMatrix i j matrix =
+  case splitListHelper 0 ([], Nothing, [], Nothing, []) i j matrix of
+    (_, Nothing, _, _, _)                    -> error "There was an error splitting the matrix."
+    (_, _, _, Nothing, _)                    -> error "There was an error splitting the matrix."
+    (mat1, Just row1, mat2, Just row2, mat3) -> (mat1, row1, mat2, row2, mat3)
 {-
 improvePivot :: Integral a => Matrix a -> Matrix a
 improvePivot mat = let elems     = getElems mat --matrix elements
@@ -69,6 +75,7 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
       row1      = head subMat1
       row2      = head subMat2
       -}
+      {-
       fstTwo    = splitAt pIndex elems
       fstSub    = fst fstTwo
       sndTwo    = splitAt (index - pIndex) (snd fstTwo)
@@ -76,6 +83,10 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
       thrSub    = snd sndTwo
       row1      = head sndSub
       row2      = head thrSub
+      -}
+      split     = splitMatrix pIndex index elems
+      row1      = get2 split
+      row2      = get4 split
 
       modulo    = if ord == 0 then id
                   else map (\n -> n `mod` ord)
@@ -83,7 +94,7 @@ improvePivot col (pIndex, pivot) (index, elem) (Matrix elems ord) =
       newRow1   = modulo (((two gcdTriple) `mul` row1) `add` ((thr gcdTriple) `mul` row2))
       newRow2   = modulo (((-q2) `mul` row1) `add` (q1 `mul` row2))
 
-      newElems  = fstSub ++ (newRow1 : (tail sndSub)) ++ (newRow2 : (tail thrSub))
+      newElems  = (get1 split) ++ (newRow1 : (get3 split)) ++ (newRow2 : (get5 split))
       nonDivis  = findNonDivisible 0 col pivot elems in
 
   case nonDivis of
