@@ -1,6 +1,7 @@
 module Util where
 
 import Data.List
+import Control.Parallel
 
 one (a, _, _) = a
 two (_, b, _) = b
@@ -10,18 +11,24 @@ not1 (_, b, c) = (b, c)
 not2 (a, _, c) = (a, c)
 not3 (a, b, _) = (a, b)
 
-get1 (a, _, _, _, _) = a
-get2 (_, b, _, _, _) = b
-get3 (_, _, c, _, _) = c
-get4 (_, _, _, d, _) = d
-get5 (_, _, _, _, e) = e
+five1 (a, _, _, _, _) = a
+five2 (_, b, _, _, _) = b
+five3 (_, _, c, _, _) = c
+five4 (_, _, _, d, _) = d
+five5 (_, _, _, _, e) = e
+
+four1 (a, _, _, _) = a
+four2 (_, b, _, _) = b
+four3 (_, _, c, _) = c
+four4 (_, _, _, d) = d
 
 mul :: Num a => a -> [a] -> [a]
-mul s vec = map (*s) vec
+mul s = map (*s)
 
 add :: Num a => [a] -> [a] -> [a]
-add [] _ = error "First list wasn't long enough"
-add _ [] = error "Second list wasn't long enough"
+add [] []         = []
+add [] y          = y
+add x []          = x
 add (x:xs) (y:ys) = (x + y) : (xs `add` ys)
 
 --first argument is current index, third argument is the two indices to split at, second argument is which index is greater,
@@ -56,14 +63,6 @@ switchElems i j list =
     (one sublists) ++ ((head (thr sublists)) : (tail (two sublists))) ++ ((head (two sublists)) : (tail (thr sublists)))
     -}
 
-exists :: Eq a => a -> [a] -> Bool
-exists elem list =
-  case list of
-    []       -> False
-    (x : xs) ->
-      if x == elem then True
-      else exists elem xs
-
 --extended Euclidean algorithm
 eeaHelper :: Integral a => (a, a) -> (a, a) -> (a, a) -> (a, a, a)
 eeaHelper r s t =
@@ -78,7 +77,7 @@ eeaHelper r s t =
           nextr = r1 - q*r2
           nexts = fst s - q*s2
           nextt = fst t - q*t2 in
-      eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
+      eeaHelper (par (s2, nexts) (r2, nextr)) (par (t2, nextt) (s2, nexts)) (t2, nextt)
 
 extEucAlg :: Integral a => a -> a -> (a, a, a)
 extEucAlg a b = eeaHelper (a, b) (0, 1) (1, 0)
@@ -103,5 +102,10 @@ collect = chelper []
 
 forall :: (a -> Bool) -> [a] -> Bool
 forall _ []     = True
-forall p (x:xs) = if p x then forall p xs
-                  else False
+forall p (x:xs) = (p x) && (forall p xs)
+
+exists :: Eq a => a -> [a] -> Bool
+exists elem list =
+  case list of
+    []       -> False
+    (x : xs) -> (x == elem) || (exists elem xs)
