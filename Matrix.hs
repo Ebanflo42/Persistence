@@ -4,10 +4,15 @@ import Util
 import Data.List
 import Control.Parallel
 
-data Matrix a = Matrix [[a]] a deriving Show
+data Matrix a = Matrix [[a]] a
 
 getElems (Matrix elems _) = elems
 getOrder (Matrix _ order) = order
+
+toString :: Matrix Int -> String 
+toString matrix =
+  let mat = flatten $ map (\row -> '\n':(flatten $ map (\e -> ' ':(show e)) row)) (getElems matrix) in
+  mat ++ "\nmodulo " ++ (show $ getOrder matrix)
 
 --switch two columns, second must be greater than first
 --switchElems found in Util
@@ -34,15 +39,18 @@ findPivot row col (r:rs) =
   if elem == 0 then findPivot (row + 1) col rs
   else (row, Just elem)
 
---maybe finds the first element in a column that isn't divisible by the pivot
+--Finds all non-divisible elements in a column and their indices
 findNonDivisible :: Integral a => Int -> Int -> a -> [[a]] -> [(Int, a)]
 findNonDivisible _ _ _ []             = []
 findNonDivisible row col pivot (r:rs) =
-  let elem = r !! col
-      rest = findNonDivisible (row + 1) col pivot rs
-      bool = elem `mod` pivot /= 0 in
-  if seq bool (par rest bool) then (row, elem) : rest
-  else rest
+  let rest = findNonDivisible (row + 1) col pivot rs in
+  case par rest (r !! col) of
+    0     -> rest
+    pivot -> rest
+    x     ->
+      if x `mod` pivot /= 0 then
+        (row, x) : rest
+      else rest
 
 splitMatrix :: Int -> ([[a]], [a], [[a]], [a], [[a]]) -> Int -> Int -> [[a]] -> ([[a]], [a], [[a]], [a], [[a]])
 splitMatrix _ result _ _ [] = result

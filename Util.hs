@@ -22,6 +22,10 @@ four2 (_, b, _, _) = b
 four3 (_, _, c, _) = c
 four4 (_, _, _, d) = d
 
+flatten :: [[a]] -> [a]
+flatten []     = []
+flatten (x:xs) = x ++ (flatten xs)
+
 mul :: Num a => a -> [a] -> [a]
 mul s = map (*s)
 
