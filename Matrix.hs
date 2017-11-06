@@ -44,13 +44,11 @@ findNonDivisible :: Integral a => Int -> Int -> a -> [[a]] -> [(Int, a)]
 findNonDivisible _ _ _ []             = []
 findNonDivisible row col pivot (r:rs) =
   let rest = findNonDivisible (row + 1) col pivot rs in
-  case par rest (r !! col) of
-    0     -> rest
-    pivot -> rest
-    x     ->
-      if x `mod` pivot /= 0 then
-        (row, x) : rest
-      else rest
+    case par rest (r !! col) of
+      0                      -> rest
+      x | x == pivot         -> rest
+      x | x `mod` pivot == 0 -> rest
+      x                      -> (row, x) : rest
 
 splitMatrix :: Int -> ([[a]], [a], [[a]], [a], [[a]]) -> Int -> Int -> [[a]] -> ([[a]], [a], [[a]], [a], [[a]])
 splitMatrix _ result _ _ [] = result
@@ -85,7 +83,7 @@ improvePivot col (pIndex, pivot) [(index, elem)] (Matrix elems ord) =
       modulo    = if ord == 0 then id
                   else map (\n -> n `mod` ord)
 
-      newRow1   = modulo (((two gcdTriple) `mul` row1) `add` ((thr gcdTriple) `mul` row2))
+      newRow1   = modulo (((thr gcdTriple) `mul` row1) `add` ((two gcdTriple) `mul` row2))
       newRow2   = modulo (((-q2) `mul` row1) `add` (q1 `mul` row2))
 
       newElems  = (five1 split) ++ (newRow1 : (five3 split)) ++ (newRow2 : (five5 split))
@@ -125,7 +123,7 @@ eliminateEntries matrix =
                  else (map . map) (\n -> n `mod` ord)
       newElems = map (\row -> let e = row !! col in
                               if e == pivot then row
-                              else let q = e `div` pivot in
-                                (-q) `mul` pRow `add` row)
+                              else
+                                ((-e) `div` pivot) `mul` pRow `add` row)
                    (getElems mat) in
   Matrix (modulo newElems) (getOrder mat)

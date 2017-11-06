@@ -68,6 +68,7 @@ switchElems i j list =
     -}
 
 --extended Euclidean algorithm
+{-
 eeaHelper :: Integral a => (a, a) -> (a, a) -> (a, a) -> (a, a, a)
 eeaHelper r s t =
   case snd r of
@@ -82,9 +83,24 @@ eeaHelper r s t =
           nexts = fst s - q*s2
           nextt = fst t - q*t2 in
       eeaHelper (par (s2, nexts) (r2, nextr)) (par (t2, nextt) (s2, nexts)) (t2, nextt)
+-}
 
 extEucAlg :: Integral a => a -> a -> (a, a, a)
-extEucAlg a b = eeaHelper (a, b) (0, 1) (1, 0)
+extEucAlg a b = --eeaHelper (a, b) (0, 1) (1, 0)
+  let eeaHelper r s t =
+        case snd r of
+          0 -> (fst r, fst s, fst t)
+          _ ->
+            let r1    = fst r
+                r2    = snd r
+                s2    = snd s
+                t2    = snd t
+                q     = r1 `div` r2
+                nextr = r1 - q*r2
+                nexts = fst s - q*s2
+                nextt = fst t - q*t2 in
+            eeaHelper (par (s2, nexts) (r2, nextr)) (par (t2, nextt) (s2, nexts)) (t2, nextt) in
+    eeaHelper (a, b) (0, 1) (1, 0)    
 
 --elimates duplicates in first argument, second argument is the result
 regroupElems :: Eq a => [[a]] -> [[a]] -> [[a]]
