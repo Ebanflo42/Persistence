@@ -4,7 +4,7 @@ import Util
 import Matrix
 import Data.List
 
-data Chain a = Chain [[a]] [a] a a
+data Chain a = Chain [[a]] [a] Int a
 
 getSimplices (Chain simplices _ _ _) = map (map fromIntegral) simplices
 getCoeffs (Chain _ coeffs _ _) = coeffs
@@ -65,5 +65,5 @@ getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
 getBoundaryOperator simplices order =
   let simplexBounds = map (getSimplexBoundary [] [] 0 order) simplices
       allSimplices  = collect $ map getSimplices simplexBounds in
-  Matrix (map (getActualCoeffs allSimplices) simplexBounds) order
+  Matrix (map (getActualCoeffs allSimplices) simplexBounds) order 0
   
