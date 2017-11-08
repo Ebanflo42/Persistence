@@ -133,32 +133,30 @@ eliminateEntries matrix =
       pRow     = elems !! pIndex
       pivot    = two improved
       ord      = getOrder mat
-      modulo   = if ord == 0 then id
-                 else (map . map) (\n -> n `mod` ord)
       newElems = map (\row -> let e = row !! pIndex in
-                              if e == pivot then row
+                              if e == pivot || e == 0 then row
                               else
-                                ((-e) `div` pivot) `mul` pRow `add` row)
+                                (((-e) `div` pivot) `mul` pRow) `add` row)
                    (getElems mat) in
-  Matrix (modulo newElems) (getOrder mat) (getLength mat) (getIndex mat)
+  Matrix newElems (getOrder mat) (getLength mat) (getIndex mat)
 
-getMinimalEntries :: Integral a => Matrix a -> Matrix a
-getMinimalEntries (Matrix elems order len n) =
-  let elim = eliminateEntries (Matrix elems order len n)
-      tr   = eliminateEntries $ Matrix (transpose $ getElems elim) order len (getIndex elim) in
+minimizeEntries :: Integral a => Matrix a -> Matrix a
+minimizeEntries (Matrix elems ord len n) =
+  let elim = eliminateEntries (Matrix elems ord len n)
+      tr   = eliminateEntries $ Matrix (transpose $ getElems elim) ord len (getIndex elim) in
   case getIndex tr of
-    i | i == len -> Matrix (transpose $ getElems tr) order len i
-    i            -> getMinimalEntries $ Matrix (transpose $ getElems tr) order len i
+    i | i == len -> Matrix (((if ord == 0 then id else (map . map) (\n -> n `mod` ord)) . transpose . getElems) tr) ord len i
+    i            -> minimizeEntries $ Matrix (transpose $ getElems tr) ord len i
 {--
   case getElems elim of
     m | m == elems ->
       let tr = transpose elems in
       case eliminateEntries (Matrix tr order n) of
         Matrix es o  n | es == tr -> if b then Matrix (transpose tr) o n else Matrix tr o n
-        m                         -> getMinimalEntries True m
+        m                         -> minimizeEntries True m
     m              ->
       case getIndex elim of
         i | i == length elems - 1 -> if b then Matrix (transpose m) order i
                                      else Matrix m order i
-        i                         -> getMinimalEntries False (Matrix m order i)
+        i                         -> minimizeEntries False (Matrix m order i)
 --}
