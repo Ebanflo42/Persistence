@@ -143,6 +143,7 @@ eliminateEntries matrix =
                    (getElems mat) in
   Matrix newElems (getOrder mat) (getLength mat) (getIndex mat)
 --}
+{--
 minimizeEntries :: Integral a => Matrix a -> Matrix a
 minimizeEntries (Matrix elems ord len n) =
   let elim = eliminateEntries (Matrix elems ord len n)
@@ -150,6 +151,7 @@ minimizeEntries (Matrix elems ord len n) =
   case getIndex tr of
     i | i == len -> Matrix (((if ord == 0 then id else (map . map) (\n -> n `mod` ord)) . transpose . getElems) tr) ord len i
     i            -> minimizeEntries $ Matrix (transpose $ getElems tr) ord len i
+--}
 {--
   case getElems elim of
     m | m == elems ->
@@ -164,28 +166,29 @@ minimizeEntries (Matrix elems ord len n) =
         i                         -> minimizeEntries False (Matrix m order i)
 --}
 {--}
-findRow :: Integral a => Int -> [[a]] -> Either Int (Int, Int)
+findRow :: Integral a => Int -> [[a]] -> Maybe (Either Int (Int, Int))
 findRow i [r]     =
-  if r !! i /= 0 then Left i
-  else
+  if r !! i == 0 then
     case findIndex (\n -> n /= 0) r of
-      Nothing -> error "Matrix is all zeroes"
-      Just x  -> Right (i, x)
+      Nothing -> Nothing
+      Just x  -> Just $ Right (i, x)
+  else Just $ Left i
 findRow i (r:rs) =
-  case elemIndex 0 r of
-    Nothing -> findRow (i + 1) rs
-    Just x  ->
-      if r !! i == 0 then Right (i, x)
-      else Left x
+  if r !! i == 0 then
+    case findIndex (\n -> n /= 0) r of
+      Nothing -> findRow (i + 1) rs
+      Just x  -> Just $ Right (i, x)
+  else Just $ Left i
 
-choosePivot :: Integral a => Matrix a -> (a, Matrix a)
+choosePivot :: Integral a => Matrix a -> (Maybe a, Matrix a)
 choosePivot (Matrix elems ord len i) =
   case findRow i (drop i elems) of
-    Left x       -> (elems !! x !! x, Matrix elems ord len i)
-    Right (x, y) ->
+    Nothing             -> (Nothing, Matrix elems ord len i)
+    Just (Left x)       -> (Just $ elems !! x !! x, Matrix elems ord len i)
+    Just (Right (x, y)) ->
       let pivot = elems !! x !! y
           newElems = map (switchElems x y) elems in
-      (pivot, Matrix newElems ord len x)
+      (Just pivot, Matrix newElems ord len x)
 
 colOperationHelper :: Integral a => Int -> [((a, a, a), Int)] -> [a] -> [a]
 colOperationHelper _ [] row = row
@@ -194,15 +197,15 @@ colOperationHelper pIndex [((gcd, coeff1, coeff2), index)] row
   | index < pIndex  =
     let first  = take index row
         second = drop (index + 1) (take pIndex row)
-        third  = drop (index + 1) row
+        third  = drop (pIndex + 1) row
         elem1  = row !! index
         elem2  = row !! pIndex
         q1     = elem1 `div` gcd
         q2     = elem2 `div` gcd in
     first ++ (((-q2)*elem1 + q1*elem2) : second) ++ ((coeff1*elem2 + coeff2*elem1) : third)
   | otherwise       =
-    let first  = take index row
-        second = drop (index + 1) (take pIndex row)
+    let first  = take pIndex row
+        second = drop (pIndex + 1) (take index row)
         third  = drop (index + 1) row
         elem1  = row !! index
         elem2  = row !! pIndex
@@ -221,18 +224,32 @@ improvePivot (pivot, Matrix elems ord len pIndex) =
   Matrix newElems ord len pIndex
 
 eliminationHelper :: Integral a => a -> [a] -> [a] -> [a]
-eliminationHelper _ [] []             = []
-eliminationHelper pivot (c:cs) (e:es) =
-  (e - c*pivot) : (eliminationHelper pivot cs es)
+eliminationHelper _ [] []            = []
+eliminationHelper elem (c:cs) (e:es) =
+  (e - c*elem) : (eliminationHelper elem cs es)
 
 eliminateEntries :: Integral a => Matrix a -> Matrix a
-eliminateEntries matrix =
-  let pivotData = choosePivot matrix
-      pivot     = fst pivotData
-      improved  = improvePivot pivotData
-      elems     = getElems improved
-      pIndex    = getIndex improved
-      coeffs    = map (\n -> n `div` pivot) (elems !! pIndex)
-      newElems  = parMap (eliminationHelper pivot coeffs) elems in
-  Matrix newElems (getOrder matrix) (getLength matrix) pIndex
+eliminateEntries (Matrix elems ord len pIndex) =
+  let row      = elems !! pIndex
+      pivot    = row !! pIndex
+      coeffs   = map (\n -> if n == 0 then 0 else n `div` pivot) row
+      newElems = map (\row -> eliminationHelper (row !! pIndex) coeffs row) elems in
+  Matrix newElems ord len pIndex
+
+getSmithNormalForm :: Integral a => Matrix a -> Matrix a
+getSmithNormalForm matrix =
+  case choosePivot matrix of
+    (Nothing, _)  -> matrix
+    (Just p, mat) ->
+      let m      = improvePivot (p, mat)
+          elim1  = eliminateEntries m
+          pIndex = getIndex elim1
+          ord    = getOrder elim1
+          len    = getLength elim1
+          elems  = getElems elim1
+          pivot  = elems !! pIndex !! pIndex --zero??
+          tr     = Matrix (transpose $ getElems elim1) ord len pIndex
+          elim2  = eliminateEntries $ improvePivot (pivot, tr) in
+      if pivot == 0 then getSmithNormalForm elim1 --maybe a bad fix
+      else getSmithNormalForm elim2
 --}
