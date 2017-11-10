@@ -65,5 +65,5 @@ getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
 getBoundaryOperator simplices order =
   let simplexBounds = map (getSimplexBoundary [] [] 0 order) simplices
       allSimplices  = collect $ map getSimplices simplexBounds in
-  initializeMatrix order (map (getActualCoeffs allSimplices) simplexBounds)
+  Matrix (map (getActualCoeffs allSimplices) simplexBounds) order 0
   
