@@ -9,7 +9,7 @@ data Matrix a = Matrix [[a]] a Int Int
 getElems (Matrix elems _ _ _) = elems --elements of the matrix
 getOrder (Matrix _ order _ _) = order --modulus of the elements
 getLength (Matrix _ _ len _)  = len   --the minimum of the column and row length of the matrix minus one (maximum val for index)
-getIndex (Matrix _ _ _ index) = index --index of the pivot that was found last
+getIndex (Matrix _ _ _ index) = index --index of the current pivot
 
 initializeMatrix :: Integral a => a -> [[a]] -> Matrix a
 initializeMatrix order []    = error "Nobody likes an empty matrix"
@@ -96,6 +96,7 @@ rowOperation pIndex index pcoeff1 pcoeff2 coeff1 coeff2 (Matrix elems _ _ _)
 --first argument is the index of the column of interest
 --second arg is the row index of the pivot and the value of the pivot
 --third arg is the other element's index and it's value
+{--
 improvePivot :: Integral a => Int -> a -> [(Int, a)] -> Matrix a -> Matrix a
 improvePivot _ _ [] m                                            = m
 improvePivot pIndex pivot [(index, elem)] (Matrix elems ord l n) =
@@ -109,8 +110,9 @@ improvePivot pIndex pivot [(index, elem)] (Matrix elems ord l n) =
 
 improvePivot col pair (nonDivis : rest) matrix =
   improvePivot col pair rest (improvePivot col pair [nonDivis] matrix)
-
+--}
 --returns index of column to be eliminated, pivot, and the improved matrix
+{--
 findAndImprovePivot :: Integral a => Matrix a -> (Int, a, Matrix a)
 findAndImprovePivot (Matrix elems ord l num) =
   case findPivot num (drop num elems) of
@@ -122,8 +124,9 @@ findAndImprovePivot (Matrix elems ord l num) =
       --}
     Just (i, p) ->
       (i, p, improvePivot i p (findNonDivisible 0 p (elems !! i)) (Matrix elems ord l i))
-
+--}
 --calls findAndImprovePivot then eliminates the appropriate column
+{--
 eliminateEntries :: Integral a => Matrix a -> Matrix a
 eliminateEntries matrix = 
   let improved = findAndImprovePivot matrix
@@ -139,7 +142,7 @@ eliminateEntries matrix =
                                 (((-e) `div` pivot) `mul` pRow) `add` row)
                    (getElems mat) in
   Matrix newElems (getOrder mat) (getLength mat) (getIndex mat)
-
+--}
 minimizeEntries :: Integral a => Matrix a -> Matrix a
 minimizeEntries (Matrix elems ord len n) =
   let elim = eliminateEntries (Matrix elems ord len n)
@@ -159,4 +162,77 @@ minimizeEntries (Matrix elems ord len n) =
         i | i == length elems - 1 -> if b then Matrix (transpose m) order i
                                      else Matrix m order i
         i                         -> minimizeEntries False (Matrix m order i)
+--}
+{--}
+findRow :: Integral a => Int -> [[a]] -> Either Int (Int, Int)
+findRow i [r]     =
+  if r !! i /= 0 then Left i
+  else
+    case findIndex (\n -> n /= 0) r of
+      Nothing -> error "Matrix is all zeroes"
+      Just x  -> Right (i, x)
+findRow i (r:rs) =
+  case elemIndex 0 r of
+    Nothing -> findRow (i + 1) rs
+    Just x  ->
+      if r !! i == 0 then Right (i, x)
+      else Left x
+
+choosePivot :: Integral a => Matrix a -> (a, Matrix a)
+choosePivot (Matrix elems ord len i) =
+  case findRow i (drop i elems) of
+    Left x       -> (elems !! x !! x, Matrix elems ord len i)
+    Right (x, y) ->
+      let pivot = elems !! x !! y
+          newElems = map (switchElems x y) elems in
+      (pivot, Matrix newElems ord len x)
+
+colOperationHelper :: Integral a => Int -> [((a, a, a), Int)] -> [a] -> [a]
+colOperationHelper _ [] row = row
+colOperationHelper pIndex [((gcd, coeff1, coeff2), index)] row
+  | index == pIndex = row
+  | index < pIndex  =
+    let first  = take index row
+        second = drop (index + 1) (take pIndex row)
+        third  = drop (index + 1) row
+        elem1  = row !! index
+        elem2  = row !! pIndex
+        q1     = elem1 `div` gcd
+        q2     = elem2 `div` gcd in
+    first ++ (((-q2)*elem1 + q1*elem2) : second) ++ ((coeff1*elem2 + coeff2*elem1) : third)
+  | otherwise       =
+    let first  = take index row
+        second = drop (index + 1) (take pIndex row)
+        third  = drop (index + 1) row
+        elem1  = row !! index
+        elem2  = row !! pIndex
+        q1     = elem1 `div` gcd
+        q2     = elem2 `div` gcd in
+    first ++ ((coeff1*elem2 + coeff2*elem1) : second) ++ (((-q2)*elem1 + q1*elem2) : third)
+colOperationHelper pIndex (x:xs) row =
+  colOperationHelper pIndex xs (colOperationHelper pIndex [x] row)
+
+improvePivot :: Integral a => (a, Matrix a) -> Matrix a
+improvePivot (pivot, Matrix elems ord len pIndex) =
+  let row          = elems !! pIndex
+      nonDivisList = filter (\n -> (fst n) `mod` pivot /= 0) (zip row [0..(length row - 1)])
+      gcdList      = parMap (\n -> (extEucAlg pivot (fst n), snd n)) nonDivisList
+      newElems     = parMap (colOperationHelper pIndex gcdList) elems in
+  Matrix newElems ord len pIndex
+
+eliminationHelper :: Integral a => a -> [a] -> [a] -> [a]
+eliminationHelper _ [] []             = []
+eliminationHelper pivot (c:cs) (e:es) =
+  (e - c*pivot) : (eliminationHelper pivot cs es)
+
+eliminateEntries :: Integral a => Matrix a -> Matrix a
+eliminateEntries matrix =
+  let pivotData = choosePivot matrix
+      pivot     = fst pivotData
+      improved  = improvePivot pivotData
+      elems     = getElems improved
+      pIndex    = getIndex improved
+      coeffs    = map (\n -> n `div` pivot) (elems !! pIndex)
+      newElems  = parMap (eliminationHelper pivot coeffs) elems in
+  Matrix newElems (getOrder matrix) (getLength matrix) pIndex
 --}

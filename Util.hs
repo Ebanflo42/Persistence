@@ -68,7 +68,7 @@ switchElems i j list
   | j == i              = list
   | j < i               =
     let first  = take j list
-        second = drop (j + 1) (take j list)
+        second = drop (j + 1) (take i list)
         third  = drop (i + 1) list in
     first ++ ((list !! i) : second) ++ ((list !! j) : third)
   | otherwise           =
@@ -122,3 +122,10 @@ exists elem list =
   case list of
     []       -> False
     (x : xs) -> (x == elem) || (exists elem xs)
+
+parMap :: (a -> b) -> [a] -> [b]
+parMap f []     = []
+parMap f [x]    = [f x]
+parMap f (x:x':xs) =
+  let rest = parMap f xs in
+  par rest ((f x):(f x'):rest)
