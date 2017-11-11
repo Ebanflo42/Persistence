@@ -23,3 +23,10 @@ biggestSimplices sc =
 
 nDimensionalSimplices :: Integral a => a -> SimplicialComplex a -> [[a]]
 nDimensionalSimplices n sc = filter (\s -> (fromIntegral . length) s == n) (getParents sc ++ getChildren sc)
+
+levenshtein :: String -> String -> Int
+levenshtein s1 s2 = last $ foldl transform [0 .. length s1] s2
+  where
+    transform ns@(n:ns1) c = scanl calc (n + 1) $ zip3 s1 ns ns1
+      where
+        calc z (c1, x, y) = minimum [y + 1, z + 1, x + fromEnum (c1 /= c)]

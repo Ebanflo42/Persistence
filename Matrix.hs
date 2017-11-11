@@ -4,11 +4,16 @@ import Util
 import Data.List
 import Control.Parallel
 
-data Matrix a = Matrix [[a]] a Int
+data Matrix a = Matrix [[a]] a Int Int
 
-getElems (Matrix elems _ _) = elems --elements of the matrix
-getOrder (Matrix _ order _) = order --modulus of the elements
-getIndex (Matrix _ _ index) = index --index of the current pivot
+getElems (Matrix elems _ _ _) = elems --elements of the matrix
+getOrder (Matrix _ order _ _) = order --modulus of the elements
+getIndex (Matrix _ _ index _) = index --index of the current pivot
+getMaxIndex (Matrix _ _ _ m)  = m
+
+initializeMatrix :: Integral a => a -> [[a]] -> Matrix a
+initializeMatrix order elems =
+  Matrix elems order 0 ((min (length $ elems !! 0) (length elems)) - 1)
 
 toString :: Matrix Int -> String 
 toString matrix =
@@ -71,7 +76,7 @@ splitMatrix current (mat1, row1, mat2, row2, mat3) i j (r:rs)
 --first two args are the indices of the rows undergoing the operation
 --3rd and 4th are the coefficients multiplying the two rows to give the row at the pivot index
 rowOperation :: Integral a => Int -> Int -> a -> a -> a -> a -> Matrix a -> [[a]]
-rowOperation pIndex index pcoeff1 pcoeff2 coeff1 coeff2 (Matrix elems _ _)
+rowOperation pIndex index pcoeff1 pcoeff2 coeff1 coeff2 (Matrix elems _ _ _)
   | pIndex == index     = error "Tried to perform a row operation on a single row"
   | pIndex < index      =
     let first  = take pIndex elems
@@ -89,75 +94,68 @@ rowOperation pIndex index pcoeff1 pcoeff2 coeff1 coeff2 (Matrix elems _ _)
     first ++ (((coeff1 `mul` row1) `add` (coeff2 `mul` row2)):second) ++ (((pcoeff1 `mul` row1) `add` (pcoeff2 `mul` row2)):third)
 
 {--}
-findRow :: Integral a => Int -> [[a]] -> Maybe (Either Int (Int, Int))
-findRow i [r]     =
-  if r !! i == 0 then
+findRow :: Integral a => Int -> Int -> [[a]] -> Maybe (Either Int (Int, Int))
+findRow i max [r]     =
+  if i >= max then Nothing
+  else if r !! i == 0 then
     case findIndex (\n -> n /= 0) r of
       Nothing -> Nothing
       Just x  -> Just $ Right (i, x)
   else Just $ Left i
-findRow i (r:rs) =
+findRow i max (r:rs) =
   if r !! i == 0 then
     case findIndex (\n -> n /= 0) r of
-      Nothing -> findRow (i + 1) rs
+      Nothing -> findRow (i + 1) max rs
       Just x  -> Just $ Right (i, x)
   else Just $ Left i
 
 choosePivot :: Integral a => Matrix a -> (Maybe a, Matrix a)
-choosePivot (Matrix elems ord i) =
-  case findRow i (drop i elems) of
-    Nothing             -> (Nothing, Matrix elems ord i)
-    Just (Left x)       -> (Just $ elems !! x !! x, Matrix elems ord i)
+choosePivot (Matrix elems ord i max) =
+  case findRow i max (drop i elems) of
+    Nothing             -> (Nothing, Matrix elems ord i max)
+    Just (Left x)       -> (Just $ elems !! x !! x, Matrix elems ord x max)
     Just (Right (x, y)) ->
       let pivot = elems !! x !! y
           newElems = map (switchElems x y) elems in
-      (Just pivot, Matrix newElems ord x)
+      (Just pivot, Matrix newElems ord x max)
 
-colOperationHelper :: Integral a => Int -> [((a, a, a), Int)] -> [a] -> [a]
+colOperationHelper :: Integral a => Int -> [((a, a, a, a, a), Int)] -> [a] -> [a]
 colOperationHelper _ [] row = row
-colOperationHelper pIndex [((gcd, coeff1, coeff2), index)] row
+colOperationHelper pIndex [((gcd, coeff1, coeff2, q1, q2), index)] row
   | index == pIndex = row
   | index < pIndex  =
     let first  = take index row
         second = drop (index + 1) (take pIndex row)
         third  = drop (pIndex + 1) row
         elem1  = row !! index
-        elem2  = row !! pIndex
-        q1     = elem1 `div` gcd
-        q2     = elem2 `div` gcd in
+        elem2  = row !! pIndex in
     first ++ (((-q2)*elem1 + q1*elem2) : second) ++ ((coeff1*elem2 + coeff2*elem1) : third)
   | otherwise       =
     let first  = take pIndex row
         second = drop (pIndex + 1) (take index row)
         third  = drop (index + 1) row
         elem1  = row !! index
-        elem2  = row !! pIndex
-        q1     = elem1 `div` gcd
-        q2     = elem2 `div` gcd in
+        elem2  = row !! pIndex in
     first ++ ((coeff1*elem2 + coeff2*elem1) : second) ++ (((-q2)*elem1 + q1*elem2) : third)
 colOperationHelper pIndex (x:xs) row =
   colOperationHelper pIndex xs (colOperationHelper pIndex [x] row)
 
 improvePivot :: Integral a => (a, Matrix a) -> Matrix a
-improvePivot (pivot, Matrix elems ord pIndex) =
+improvePivot (pivot, Matrix elems ord pIndex max) =
   let row          = elems !! pIndex
-      nonDivisList = filter (\n -> (fst n) `mod` pivot /= 0) (zip row [0..(length row - 1)])
-      gcdList      = parMap (\n -> (extEucAlg pivot (fst n), snd n)) nonDivisList
-      newElems     = parMap (colOperationHelper pIndex gcdList) elems in
-  Matrix newElems ord pIndex
-
-eliminationHelper :: Integral a => a -> [a] -> [a] -> [a]
-eliminationHelper _ [] []            = []
-eliminationHelper elem (c:cs) (e:es) =
-  (e - c*elem) : (eliminationHelper elem cs es)
+      nonDivisList = filter (\n -> (fst n) /= 0 || (fst n) `mod` pivot /= 0) (zip row [0..(length row - 1)])
+      gcdList      = map (\pair -> (extEucAlg pivot (fst pair), snd pair)) nonDivisList
+      gcdList'     = map (\((gcd, coeff1, coeff2), i) -> ((gcd, coeff1, coeff2, (row !! i) `div` gcd, pivot `div` gcd), i)) gcdList
+      newElems     = map (colOperationHelper pIndex gcdList') elems in
+  Matrix newElems ord pIndex max
 
 eliminateEntries :: Integral a => Matrix a -> Matrix a
-eliminateEntries (Matrix elems ord pIndex) =
+eliminateEntries (Matrix elems ord pIndex max) =
   let row      = elems !! pIndex
       pivot    = row !! pIndex
       coeffs   = map (\n -> if n == 0 then 0 else n `div` pivot) row
-      newElems = parMap (\row -> eliminationHelper (row !! pIndex) coeffs row) elems in
-  Matrix newElems ord pIndex
+      newElems = map (\row -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs !! i)*(row !! pIndex)) row) elems in
+  Matrix newElems ord pIndex max
 
 getSmithNormalForm :: Integral a => Matrix a -> Matrix a
 getSmithNormalForm matrix =
@@ -170,7 +168,7 @@ getSmithNormalForm matrix =
           ord    = getOrder elim1
           elems  = getElems elim1
           pivot  = elems !! pIndex !! pIndex --zero??
-          tr     = Matrix (transpose $ getElems elim1) ord pIndex
+          tr     = Matrix (transpose $ getElems elim1) ord pIndex (getMaxIndex elim1)
           elim2  = eliminateEntries $ improvePivot (pivot, tr) in
       if pivot == 0 then getSmithNormalForm elim1 --maybe a bad fix
       else getSmithNormalForm elim2

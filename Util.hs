@@ -122,10 +122,30 @@ exists elem list =
   case list of
     []       -> False
     (x : xs) -> (x == elem) || (exists elem xs)
-
+{--
 parMap :: (a -> b) -> [a] -> [b]
-parMap f []     = []
-parMap f [x]    = [f x]
+parMap f []        = []
+parMap f [x]       = [f x]
 parMap f (x:x':xs) =
   let rest = parMap f xs in
   par rest ((f x):(f x'):rest)
+--}
+parMap :: (a -> b) -> [a] -> [b]
+parMap f [] = []
+parMap f (x:xs) =
+  let rest = parMap f xs in
+  par rest ((f x):rest)
+
+mapWithIndex :: (Int -> a -> b) -> [a] -> [b]
+mapWithIndex f list =
+  let helper _ []     = []
+      helper n (x:xs) = (f n x):(helper (n + 1) xs) in
+  helper 0 list
+
+parMapwIndex :: (Int -> a -> b) -> [a] -> [b]
+parMapwIndex f list =
+  let helper _ []        = []
+      helper i (x:xs) =
+        let rest = helper (i + 1) xs in
+        par rest ((f i x):rest) in
+  helper 0 list
