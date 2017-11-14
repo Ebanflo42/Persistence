@@ -119,10 +119,9 @@ choosePivot (Matrix elems ord i max) =
           newElems = map (switchElems x y) elems in
       (Just pivot, Matrix newElems ord x max)
 
-colOperationHelper :: Integral a => Int -> [((a, a, a, a, a), Int)] -> [a] -> [a]
-colOperationHelper _ [] row = row
-colOperationHelper pIndex [((gcd, coeff1, coeff2, q1, q2), index)] row
-  | index == pIndex = row
+colOperationHelper :: Integral a => Int -> ((a, a, a, a, a), Int) -> [a] -> [a]
+colOperationHelper pIndex ((gcd, coeff1, coeff2, q1, q2), index) row
+  | index == pIndex = error "Tried to do column operation on a single column."
   | index < pIndex  =
     let first  = take index row
         second = drop (index + 1) (take pIndex row)
@@ -137,17 +136,18 @@ colOperationHelper pIndex [((gcd, coeff1, coeff2, q1, q2), index)] row
         elem1  = row !! index
         elem2  = row !! pIndex in
     first ++ ((coeff1*elem2 + coeff2*elem1) : second) ++ (((-q2)*elem1 + q1*elem2) : third)
-colOperationHelper pIndex (x:xs) row =
-  colOperationHelper pIndex xs (colOperationHelper pIndex [x] row)
 
 improvePivot :: Integral a => (a, Matrix a) -> Matrix a
 improvePivot (pivot, Matrix elems ord pIndex max) =
-  let row          = elems !! pIndex
-      nonDivisList = filter (\n -> (fst n) /= 0 || (fst n) `mod` pivot /= 0) (zip row [0..(length row - 1)])
-      gcdList      = map (\pair -> (extEucAlg pivot (fst pair), snd pair)) nonDivisList
-      gcdList'     = map (\((gcd, coeff1, coeff2), i) -> ((gcd, coeff1, coeff2, (row !! i) `div` gcd, pivot `div` gcd), i)) gcdList
-      newElems     = map (colOperationHelper pIndex gcdList') elems in
-  Matrix newElems ord pIndex max
+  let row          = elems !! pIndex in
+  case indexAndElem (\n -> n `mod` pivot /= 0) row of
+    Nothing     -> Matrix elems ord pIndex max
+    Just (n, i) ->
+      let gcdTriple    = extEucAlg pivot n
+          gcd          = one gcdTriple
+          transform    = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i) --may need to switch order
+          newElems     = map (colOperationHelper pIndex transform) elems in
+      improvePivot (newElems !! pIndex !! pIndex, Matrix newElems ord pIndex max)
 
 eliminateEntries :: Integral a => Matrix a -> Matrix a
 eliminateEntries (Matrix elems ord pIndex max) =
@@ -162,14 +162,14 @@ getSmithNormalForm matrix =
   case choosePivot matrix of
     (Nothing, _)  -> matrix
     (Just p, mat) ->
-      let m      = improvePivot (p, mat)
-          elim1  = eliminateEntries m
-          pIndex = getIndex elim1
-          ord    = getOrder elim1
-          elems  = getElems elim1
-          pivot  = elems !! pIndex !! pIndex --zero??
-          tr     = Matrix (transpose $ getElems elim1) ord pIndex (getMaxIndex elim1)
-          elim2  = eliminateEntries $ improvePivot (pivot, tr) in
-      if pivot == 0 then getSmithNormalForm elim1 --maybe a bad fix
-      else getSmithNormalForm elim2
+      if p == 0 then error "Pivot was found to be zero."
+      else
+        let m      = improvePivot (p, mat)
+            elim1  = eliminateEntries m
+            pIndex = getIndex elim1
+            ord    = getOrder elim1
+            elems  = getElems elim1
+            tr     = Matrix (transpose $ getElems elim1) ord pIndex (getMaxIndex elim1)
+            elim2  = eliminateEntries $ improvePivot (p, tr) in
+        getSmithNormalForm elim2
 --}

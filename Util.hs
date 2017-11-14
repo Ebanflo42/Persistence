@@ -149,3 +149,11 @@ parMapwIndex f list =
         let rest = helper (i + 1) xs in
         par rest ((f i x):rest) in
   helper 0 list
+
+indexAndElem :: (a -> Bool) -> [a] -> Maybe (a, Int)
+indexAndElem p list =
+  let helper _ []     = Nothing
+      helper i (x:xs) =
+        if p x then Just (x, i)
+        else helper (i + 1) xs in
+  helper 0 list
