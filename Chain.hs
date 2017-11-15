@@ -6,14 +6,14 @@ import Data.List
 
 data Chain a = Chain [[a]] [a] Int a
 
-getSimplices (Chain simplices _ _ _) = map (map fromIntegral) simplices
+getBasis (Chain simplices _ _ _) = map (map fromIntegral) simplices
 getCoeffs (Chain _ coeffs _ _) = coeffs
 getDim (Chain _ _ dim _) = dim
 getOrder (Chain _ _ _ order) = order
 
 verifyChainDimension :: Integral a => Chain a -> Bool
 verifyChainDimension chain = let dim = getDim chain in
-  forall (\a -> a == dim) (map (\l -> (fromIntegral (length l))) (getSimplices chain))
+  forall (\a -> a == dim) (map (\l -> (fromIntegral (length l))) (getBasis chain))
 
 --gets the boundary of a simplex, simplices and coeffs (3rd and 4th args) are part of the result,
 --index is the current index of the proces in the simplex
@@ -32,7 +32,7 @@ getSimplexBoundary simplices coeffs index order simplex =
 --finds the coefficient of a simplex in a chain
 findCoeff :: Integral a => Chain a -> [a] -> a
 findCoeff chain simplex =
-  case elemIndex simplex (getSimplices chain) of 
+  case elemIndex simplex (getBasis chain) of 
     Nothing -> 0
     Just i  -> (getCoeffs chain) !! i
 
@@ -47,7 +47,7 @@ findAndSumCoeffs chains simplex =
 --probably needs to be optimized
 regroupChains :: Integral a => [Chain a] -> Chain a
 regroupChains chains =
-  let allSimplices = collect $ map getSimplices chains
+  let allSimplices = collect $ map getBasis chains
       coefficients = map (findAndSumCoeffs chains) allSimplices
       fstChain     = head chains in
   Chain allSimplices coefficients (getDim fstChain) (Chain.getOrder fstChain)
@@ -55,7 +55,7 @@ regroupChains chains =
 getActualCoeffs :: Integral a => [[a]] -> Chain a -> [a]
 getActualCoeffs allSimplices chain =
   let coeffs    = getCoeffs chain 
-      simplices = getSimplices chain in
+      simplices = getBasis chain in
   map (\s -> let x = elemIndex s simplices in
              case x of 
                Nothing -> 0
@@ -64,6 +64,6 @@ getActualCoeffs allSimplices chain =
 getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
 getBoundaryOperator simplices order =
   let simplexBounds = map (getSimplexBoundary [] [] 0 order) simplices
-      allSimplices  = collect $ map getSimplices simplexBounds in
+      allSimplices  = collect $ map getBasis simplexBounds in
   initializeMatrix order (map (getActualCoeffs allSimplices) simplexBounds)
   

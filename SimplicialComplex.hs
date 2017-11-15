@@ -24,16 +24,38 @@ biggestSimplices sc =
 nDimensionalSimplices :: Integral a => a -> SimplicialComplex a -> [[a]]
 nDimensionalSimplices n sc = filter (\s -> (fromIntegral . length) s == n) (getParents sc ++ getChildren sc)
 
-makeNeighborhoodGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [(Int, Int)]
-makeNeighborhoodGraph scale metric list =
+makeNbrhoodGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [[Int]]
+makeNbrhoodGraph scale metric list =
   let helper _ []     = []
       helper i (x:xs) =
         let helper2 _ []     = []
             helper2 j (y:ys) =
-              if metric x y < scale then (i, j) : (helper2 (j + 1) ys)
+              if metric x y < scale then [i, j] : (helper2 (j + 1) ys)
               else (helper2 (j + 1) ys) in
         helper2 (i + 1) xs in
   helper 0 list
+
+constructSimplices :: [Int] -> [(Int, Int)] -> [[Int]] -> [[Int]]
+constructSimplices verts edges result =
+  case verts of
+    []     -> []
+    (v:vs) ->
+      constructSimplices vs edges
+        (map (\simplex ->
+          if forall (\point ->
+            existsPredicate (\edge -> (fst edge == v && snd edge == point) || (fst edge == point && snd edge == v)) edges) simplex
+              then v:simplex else simplex)
+                result)
+{--   
+makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Int -> SimplicialComplex Int
+makeVRComplex scale metric list =
+  let edges         = makeNbrhoodGraph scale metric list
+      helper []     = []
+      helper (p:ps) =
+        case ps of
+          [] -> [fst p, snd p]
+--}
+  
 
 levenshtein :: String -> String -> Int
 levenshtein s1 s2 = last $ foldl transform [0 .. length s1] s2

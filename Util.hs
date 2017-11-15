@@ -122,6 +122,12 @@ exists elem list =
   case list of
     []       -> False
     (x : xs) -> (x == elem) || (exists elem xs)
+
+existsPredicate :: (a -> Bool) -> [a] -> Bool
+existsPredicate p []     = False
+existsPredicate p (x:xs) =
+  if p x then True
+  else existsPredicate p xs
 {--
 parMap :: (a -> b) -> [a] -> [b]
 parMap f []        = []
@@ -157,3 +163,14 @@ indexAndElem p list =
         if p x then Just (x, i)
         else helper (i + 1) xs in
   helper 0 list
+
+findTriangles :: Eq a => (a, a) -> (a, a) -> [a]
+findTriangles (w, x) (y, z)
+  | w == y    = [w, x, z]
+  | w == z    = [w, x, y]
+  | x == y    = [w, x, z]
+  | x == z    = [w, x, y]
+  | otherwise = []
+
+multipleUnion :: Eq a => [[a]] -> [a]
+multipleUnion = foldl1 union
