@@ -174,3 +174,13 @@ findTriangles (w, x) (y, z)
 
 multipleUnion :: Eq a => [[a]] -> [a]
 multipleUnion = foldl1 union
+
+exactlyOneNonZero :: (Eq a, Num a) => [a] -> Bool
+exactlyOneNonZero list =
+  let helper b []     = b
+      helper b (x:xs) =
+        if x /= fromIntegral 0 then
+          if b then False
+          else helper True xs
+        else helper b xs in
+  helper False list

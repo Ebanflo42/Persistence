@@ -28,7 +28,7 @@ toString matrix =
   let mat = flatten $ map (\row -> '\n':(flatten $ map (\e -> ' ':(show e)) row)) (getElems matrix) in
   mat ++ "\nmodulo " ++ (show $ getOrder matrix)
 
---first argument is alooping index, second argument is the upper bound for that index
+--first argument is a looping index, second argument is the upper bound for that index
 --if a pivot row isn't found return nothing
 --if it is found and the diagonal element is non-zero return the pivot index
 --if it is found and is zero return the row index and the column index of the first non-zero element in the row
@@ -52,10 +52,19 @@ choosePivot :: Integral a => Matrix a -> (Maybe a, Matrix a)
 choosePivot (Matrix elems ord i max) =
   case pivotHelper i max (drop i elems) of
     Nothing             -> (Nothing, Matrix elems ord i max)
-    Just (Left x)       -> (Just $ elems !! x !! x, Matrix elems ord x max)
+    Just (Left x)       ->
+      let row = elems !! x in
+      if exactlyOneNonZero row then
+        choosePivot $ Matrix elems ord (i + 1) max
+      else
+        (Just $ row !! x, Matrix elems ord x max)
     Just (Right (x, y)) ->
-      let pivot = elems !! x !! y
-          newElems = map (switchElems x y) elems in
+      let row = elems !! x in
+      if exactlyOneNonZero row then
+        choosePivot $ Matrix elems ord (i + 1) max
+      else
+        let pivot    = row !! y
+            newElems = map (switchElems x y) elems in
       (Just pivot, Matrix newElems ord x max)
 
 --given the index of the pivot, a pair, and a row of a matrix
@@ -111,11 +120,11 @@ getSmithNormalForm matrix =
       if p == 0 then error "Pivot was found to be zero."
       else
         let improved = improvePivot (p, mat)
-            elim1    = eliminateEntries improved
-            pIndex   = getIndex elim1
-            ord      = getOrder elim1
-            elems    = getElems elim1
-            tr       = Matrix (transpose elems) ord pIndex (getMaxIndex elim1) in
+            elim     = eliminateEntries improved
+            pIndex   = getIndex elim
+            ord      = getOrder elim
+            elems    = getElems elim
+            tr       = Matrix (transpose elems) ord pIndex (getMaxIndex elim) in
         case choosePivot tr of
           (Nothing, _)  -> (getSmithNormalForm . incrementIndex) tr
           (Just p, mat) -> (getSmithNormalForm . incrementIndex . eliminateEntries . improvePivot) (p, mat)
