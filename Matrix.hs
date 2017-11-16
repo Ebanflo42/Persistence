@@ -128,3 +128,10 @@ getSmithNormalForm matrix =
         case choosePivot tr of
           (Nothing, _)  -> (getSmithNormalForm . incrementIndex) tr
           (Just p, mat) -> (getSmithNormalForm . incrementIndex . eliminateEntries . improvePivot) (p, mat)
+
+getUnsignedDiagonal :: Integral a => Matrix a -> [a]
+getUnsignedDiagonal matrix =
+  let helper _ []     = []
+      helper i (x:xs) =
+        (abs $ x !! i) : (getUnsignedDiagonal (i + 1) xs) in
+  helper 0 (getElems matrix)

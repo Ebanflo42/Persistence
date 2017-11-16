@@ -17,17 +17,16 @@ verifyChainDimension chain = let dim = getDim chain in
 
 --gets the boundary of a simplex, simplices and coeffs (3rd and 4th args) are part of the result,
 --index is the current index of the proces in the simplex
-getSimplexBoundary :: Integral a => [[a]] -> [a] -> a -> a -> [a] -> Chain a
-getSimplexBoundary simplices coeffs index order simplex =
-  case simplex of
-    []       -> Chain simplices coeffs (((fromIntegral . length . head) simplices) - 1) order
-    (x : xs) ->
-      let s = (tail simplex) ++ xs
-          c = if index `mod` 2 == 0 then 1
-              else
-                if order == 2 then 0
-                else order - 1 in
-      getSimplexBoundary (s : simplices) (c : coeffs) (index + 1) order simplex
+getSimplexBoundary :: Integral a => Int -> [[a]] -> [a] -> Int -> a -> [a] -> Chain a
+getSimplexBoundary max simplices coeffs index order simplex =
+  if i == max then Chain simplices coeffs max order
+  else
+    let c = if simplex !! index `mod` 2 == 0 then 1
+            else
+              if order == 2 then 0
+              else order - 1 in
+        s = (take index simplex) ++ (drop (index + 1) simplex)
+    getSimplexBoundary (s : simplices) (c : coeffs) (index + 1) order simplex
 
 --finds the coefficient of a simplex in a chain
 findCoeff :: Integral a => Chain a -> [a] -> a
