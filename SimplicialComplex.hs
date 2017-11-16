@@ -5,55 +5,55 @@ import Matrix
 import Chain
 import Data.List
 
-data SimplicialComplex a = SimplicialComplex [[a]] [[a]] (Maybe a) a
+data SimplicialComplex a = SimplicialComplex [[a]] (Maybe a) a
 
-getParents (SimplicialComplex parents _ _ _) = parents
-getChildren (SimplicialComplex _ children _ _) = children
-getDimension (SimplicialComplex parents _ dim _) =
+getSimplices (SimplicialComplex simplices _ _) = simplices
+--getChildren (SimplicialComplex _ children _ _) = children
+getDimension (SimplicialComplex simplices dim _) =
   case dim of
     Nothing ->
-      fromIntegral $ foldl1 max (map length parents)
+      fromIntegral $ foldl1 max (map length simplices)
     Just d  -> d
-getOrder (SimplicialComplex _ _ _ order) = order
+getOrder (SimplicialComplex _ _ order) = order
 
 biggestSimplices :: Integral a => SimplicialComplex a -> [[a]]
 biggestSimplices sc =
   let dim = getDimension sc in
-  filter (\s -> (fromIntegral . length) s == dim) (getParents sc)
+  filter (\s -> (fromIntegral . length) s == dim) (getSimplices sc)
 
 nDimensionalSimplices :: Integral a => a -> SimplicialComplex a -> [[a]]
-nDimensionalSimplices n sc = filter (\s -> (fromIntegral . length) s == n) (getParents sc ++ getChildren sc)
+nDimensionalSimplices n sc = filter (\s -> (fromIntegral . length) s == n) (getSimplices sc)
 
-makeNbrhoodGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [[Int]]
+makeNbrhoodGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [(Int, Int)]
 makeNbrhoodGraph scale metric list =
   let helper _ []     = []
       helper i (x:xs) =
         let helper2 _ []     = []
             helper2 j (y:ys) =
-              if metric x y < scale then [i, j] : (helper2 (j + 1) ys)
+              if metric x y < scale then (i, j) : (helper2 (j + 1) ys)
               else (helper2 (j + 1) ys) in
         helper2 (i + 1) xs in
   helper 0 list
 
 constructSimplices :: [Int] -> [(Int, Int)] -> [[Int]] -> [[Int]]
-constructSimplices verts edges result =
-  case verts of
-    []     -> []
+constructSimplices vertices edges result =
+  case vertices of
+    []     -> result
     (v:vs) ->
-      constructSimplices vs edges
-        (map (\simplex ->
+      constructSimplices vs edges $
+        map (\simplex ->
           if forall (\point ->
-            existsPredicate (\edge -> (fst edge == v && snd edge == point) || (fst edge == point && snd edge == v)) edges) simplex
-              then v:simplex else simplex)
-                result)
-{--   
+            existsPredicate (\edge ->
+              (fst edge == v && snd edge == point) || (fst edge == point && snd edge == v)) edges) simplex
+                then v:simplex else simplex)
+                  result
+{--
+constructSimplices' :: [Int] -> [(Int, Int)] -> [[Int]] -> [[Int]]
+constructSimplices
+--}
 makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Int -> SimplicialComplex Int
 makeVRComplex scale metric list =
-  let edges         = makeNbrhoodGraph scale metric list
-      helper []     = []
-      helper (p:ps) =
-        case ps of
-          [] -> [fst p, snd p]
+  SimplicialComplex (constructSimplices [0..length list - 1] (makeNbrhoodGraph scale metric list) []) Nothing
 --}
   
 
