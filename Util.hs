@@ -184,3 +184,16 @@ exactlyOneNonZero list =
           else helper True xs
         else helper b xs in
   helper False list
+
+diffByOneElem :: Eq a => [a] -> [a] -> Maybe a
+diffByOneElem list1 list2 =
+  let helper a [] []         = a
+      helper a (x:xs) (y:ys) =
+        case a of
+          Just z  ->
+            if x == y then Nothing
+            else helper a xs ys
+          Nothing ->
+            if x == y then helper (Just x) xs ys
+            else helper (Just y) xs ys in
+  helper Nothing list1 list2

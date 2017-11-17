@@ -133,5 +133,5 @@ getUnsignedDiagonal :: Integral a => Matrix a -> [a]
 getUnsignedDiagonal matrix =
   let helper _ []     = []
       helper i (x:xs) =
-        (abs $ x !! i) : (getUnsignedDiagonal (i + 1) xs) in
+        (abs $ x !! i) : (helper (i + 1) xs) in
   helper 0 (getElems matrix)

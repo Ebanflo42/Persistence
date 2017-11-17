@@ -19,14 +19,14 @@ verifyChainDimension chain = let dim = getDim chain in
 --index is the current index of the proces in the simplex
 getSimplexBoundary :: Integral a => Int -> [[a]] -> [a] -> Int -> a -> [a] -> Chain a
 getSimplexBoundary max simplices coeffs index order simplex =
-  if i == max then Chain simplices coeffs max order
+  if index == max then Chain simplices coeffs max order
   else
     let c = if simplex !! index `mod` 2 == 0 then 1
             else
               if order == 2 then 0
-              else order - 1 in
-        s = (take index simplex) ++ (drop (index + 1) simplex)
-    getSimplexBoundary (s : simplices) (c : coeffs) (index + 1) order simplex
+              else order - 1
+        s = (take index simplex) ++ (drop (index + 1) simplex) in
+    getSimplexBoundary max (s : simplices) (c : coeffs) (index + 1) order simplex
 
 --finds the coefficient of a simplex in a chain
 findCoeff :: Integral a => Chain a -> [a] -> a
@@ -62,7 +62,7 @@ getActualCoeffs allSimplices chain =
 
 getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
 getBoundaryOperator simplices order =
-  let simplexBounds = map (getSimplexBoundary [] [] 0 order) simplices
+  let simplexBounds = map (getSimplexBoundary (length (head simplices) - 1) [] [] 0 order) simplices
       allSimplices  = collect $ map getBasis simplexBounds in
   initializeMatrix order (map (getActualCoeffs allSimplices) simplexBounds)
   
