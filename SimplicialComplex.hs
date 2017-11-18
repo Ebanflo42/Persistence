@@ -35,11 +35,8 @@ checkAdjacentSimplices dim simplex simplices adjacency result =
     (Nothing:rest)   ->
       checkAdjacentSimplices dim simplex simplices rest result
     ((Just x):rest)  ->
-      let commonSimplices = filter (exists x) simplices
-          len             = length commonSimplices in
-      if len > dim then
-        error "Haven't programmed this case yet."
-      else if len == dim then
+      let commonSimplices = filter (exists x) simplices in
+      if length commonSimplices == dim then
         checkAdjacentSimplices dim simplex simplices rest ((x:simplex):result)
       else
         checkAdjacentSimplices dim simplex simplices rest result
