@@ -34,17 +34,18 @@ toString matrix =
 --if it is found and is zero return the row index and the column index of the first non-zero element in the row
 pivotHelper :: Integral a => Int -> Int -> [[a]] -> Maybe (Either Int (Int, Int))
 pivotHelper i max [r]     =
-  if i >= max then Nothing
-  else if r !! i == 0 then
+  if r !! i == 0 then
     case findIndex (\n -> n /= 0) r of
       Nothing -> Nothing
       Just x  -> Just $ Right (i, x)
+  else if exactlyOneNonZero r then Nothing
   else Just $ Left i
 pivotHelper i max (r:rs) =
   if r !! i == 0 then
     case findIndex (\n -> n /= 0) r of
-      Nothing -> pivotHelper (i + 1) max rs
+      Nothing -> Nothing
       Just x  -> Just $ Right (i, x)
+  else if exactlyOneNonZero r then Nothing
   else Just $ Left i
 
 --calls pivot helper, rearranges the matrix if necessary, returns the matrix pair with its pivot
@@ -55,7 +56,7 @@ choosePivot (Matrix elems ord i max) =
     Just (Left x)       -> (Just $ elems !! x !! x, Matrix elems ord x max)
     Just (Right (x, y)) ->
       let newElems = map (switchElems x y) elems in
-      (Just (newElems !! x !! x), Matrix newElems ord x max)
+      (Just $ newElems !! x !! x, Matrix newElems ord x max)
 
 --given the index of the pivot, a pair, and a row of a matrix
 --the first part of the pair is the gcd, bezout coefficients, and quotients
@@ -102,16 +103,16 @@ eliminateEntries (Matrix elems ord pIndex max) =
 
 --gets the smith normal form of a matrix
 getSmithNormalForm :: Integral a => Matrix a -> Matrix a
-getSmithNormalForm matrix =
-  case choosePivot matrix of
-    (Nothing, _)  -> matrix
+getSmithNormalForm (Matrix elems ord index max) =
+  if index == max then Matrix elems ord index max else
+  case choosePivot $ Matrix elems ord index max of
+    (Nothing, _)  ->
+      let tr = Matrix (transpose elems) ord index max in
+      case choosePivot tr of
+        (Nothing, _)  -> (getSmithNormalForm . incrementIndex) tr
+        (Just p, mat) -> (getSmithNormalForm . incrementIndex . eliminateEntries . improvePivot) (p, mat)
     (Just p, mat) ->
-      let improved = improvePivot (p, mat)
-          elim     = eliminateEntries improved
-          pIndex   = getIndex elim
-          ord      = getOrder elim
-          elems    = getElems elim
-          tr       = Matrix (transpose elems) ord pIndex (getMaxIndex elim) in
+      let tr = Matrix ((transpose . getElems . eliminateEntries . improvePivot) (p, mat)) ord index max in
       case choosePivot tr of
         (Nothing, _)  -> (getSmithNormalForm . incrementIndex) tr
         (Just p, mat) -> (getSmithNormalForm . incrementIndex . eliminateEntries . improvePivot) (p, mat)
