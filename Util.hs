@@ -148,8 +148,8 @@ mapWithIndex f list =
       helper n (x:xs) = (f n x):(helper (n + 1) xs) in
   helper 0 list
 
-parMapwIndex :: (Int -> a -> b) -> [a] -> [b]
-parMapwIndex f list =
+parMapWithIndex :: (Int -> a -> b) -> [a] -> [b]
+parMapWithIndex f list =
   let helper _ []        = []
       helper i (x:xs) =
         let rest = helper (i + 1) xs in
@@ -163,17 +163,6 @@ indexAndElem p list =
         if p x then Just (x, i)
         else helper (i + 1) xs in
   helper 0 list
-
-findTriangles :: Eq a => (a, a) -> (a, a) -> [a]
-findTriangles (w, x) (y, z)
-  | w == y    = [w, x, z]
-  | w == z    = [w, x, y]
-  | x == y    = [w, x, z]
-  | x == z    = [w, x, y]
-  | otherwise = []
-
-multipleUnion :: Eq a => [[a]] -> [a]
-multipleUnion = foldl1 union
 
 exactlyOneNonZero :: (Eq a, Num a) => [a] -> Bool
 exactlyOneNonZero list =
