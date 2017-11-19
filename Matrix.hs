@@ -55,18 +55,21 @@ choosePivot (Matrix elems ord i max) =
 --given the index of the pivot, a pair, and a row of a matrix
 --the first part of the pair is the gcd, bezout coefficients, and quotients
 --second part of the pair is the index of the element to which that applies
-colOperationHelper :: Integral a => Int -> a -> a -> ((a, a, a, a, a), Int) -> [a] -> [a]
-colOperationHelper pIndex pivot elem ((gcd, coeff1, coeff2, q1, q2), index) row =
+colOperationHelper :: Integral a => Int -> ((a, a, a, a, a), Int) -> [a] -> [a]
+colOperationHelper pIndex ((gcd, coeff1, coeff2, q1, q2), index) row =
+  let elem1 = row !! index; elem2 = row !! pIndex in
   if index < pIndex then
     let first  = take index row
         second = drop (index + 1) (take pIndex row)
-        third  = drop (pIndex + 1) row in
-    first ++ (((-q2)*elem + q1*pivot) : second) ++ ((coeff1*elem + coeff2*pivot) : third)
+        third  = drop (pIndex + 1) row
+        elem1  = row !! index
+        elem2  = row !! pIndex in
+    first ++ ((q2*elem1 - q1*elem2) : second) ++ ((coeff1*elem1 + coeff2*elem2) : third)
   else
     let first  = take pIndex row
         second = drop (pIndex + 1) (take index row)
         third  = drop (index + 1) row in
-    first ++ ((coeff1*elem + coeff2*pivot) : second) ++ (((-q2)*elem + q1*pivot) : third)
+    first ++ ((coeff1*elem1 + coeff2*elem2) : second) ++ ((q2*elem1 - q1*elem2) : third)
 
 --given the pivot of a matrix and the matrix itself to improve that row with column operations
 improvePivot :: Integral a => (a, Matrix a) -> Matrix a
@@ -79,7 +82,7 @@ improvePivot (pivot, Matrix elems ord pIndex max) =
       let gcdTriple    = extEucAlg pivot n
           gcd          = one gcdTriple
           transform    = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
-          newElems     = map (colOperationHelper pIndex pivot n transform) elems in
+          newElems     = map (colOperationHelper pIndex transform) elems in
       improvePivot (newElems !! pIndex !! pIndex, Matrix newElems ord pIndex max)
 
 --given a matrix whose pivot row has been improved, eliminates the entries in that row
