@@ -99,19 +99,18 @@ extEucAlg a b = --eeaHelper (a, b) (0, 1) (1, 0)
 regroupElems :: Eq a => [[a]] -> [[a]] -> [[a]]
 regroupElems arg res =
     case arg of
-        []       -> res
-        (x : xs) ->
+        []     -> res
+        (x:xs) ->
           if exists x res then regroupElems xs res
           else regroupElems xs (x : res)
 
-chelper :: Eq a => [[a]] -> [[[a]]] -> [[a]]
-chelper result arg =
-  case arg of
-    []       -> result
-    (x : xs) -> chelper (regroupElems x result) xs
-
-collect :: Eq a => [[[a]]] -> [[a]]    
-collect = chelper []
+collect :: Eq a => [[[a]]] -> [[a]]
+collect block =
+  let helper result arg =
+        case arg of
+          []     -> result
+          (x:xs) -> helper (regroupElems x result) xs in
+  helper [] block
 
 forall :: (a -> Bool) -> [a] -> Bool
 forall _ []     = True
@@ -186,3 +185,16 @@ diffByOneElem list1 list2 =
             if x == y then helper (Just x) xs ys
             else helper (Just y) xs ys in
   helper Nothing list1 list2
+  
+levenshtein :: String -> String -> Int
+levenshtein s1 s2 = last $ foldl transform [0 .. length s1] s2
+  where
+    transform ns@(n:ns1) c = scanl calc (n + 1) $ zip3 s1 ns ns1
+      where
+        calc z (c1, x, y) = minimum [y + 1, z + 1, x + fromEnum (c1 /= c)]
+
+findMissing :: Eq a => [a] -> [a] -> a
+findMissing (x:xs) sup =
+  case elemIndex x sup of
+    Nothing -> x
+    Just _  -> findMissing xs sup

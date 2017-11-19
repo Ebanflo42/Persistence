@@ -29,18 +29,15 @@ getSimplexBoundary max simplices coeffs index order simplex =
     getSimplexBoundary max (s : simplices) (c : coeffs) (index + 1) order simplex
 
 --finds the coefficient of a simplex in a chain
-findCoeff :: Integral a => Chain a -> [a] -> a
-findCoeff chain simplex =
+findCoeff :: Integral a => [a] -> Chain a -> a
+findCoeff simplex chain =
   case elemIndex simplex (getBasis chain) of 
     Nothing -> 0
     Just i  -> (getCoeffs chain) !! i
 
 --finds the sum of coefficients of a simplex in a list of chains
 findAndSumCoeffs :: Integral a => [Chain a] -> [a] -> a
-findAndSumCoeffs chains simplex =
-  case chains of
-    []     -> 0
-    (c:cs) -> findCoeff c simplex + findAndSumCoeffs cs simplex
+findAndSumCoeffs chains simplex = sum $ map (findCoeff simplex) chains
 
 --combines like terms
 --probably needs to be optimized
