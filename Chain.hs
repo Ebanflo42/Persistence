@@ -55,10 +55,3 @@ getActualCoeffs allSimplices chain =
              case x of
                Nothing -> 0
                Just i  -> coeffs !! i) allSimplices
-
-getBoundaryOperator :: Integral a => [[a]] -> a -> Matrix a
-getBoundaryOperator simplices order =
-  let simplexBounds = map (getSimplexBoundary (length (head simplices) - 1) [] [] 0 order) simplices
-      allSimplices  = collect $ map getBasis simplexBounds in
-  initializeMatrix order (map (getActualCoeffs allSimplices) simplexBounds)
-  

@@ -2,8 +2,9 @@ module SimplicialComplex where
 
 import Util
 import Matrix
-import Chain
+--import Chain
 import Data.List
+import Control.Parallel
 
 data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] a
 
@@ -16,16 +17,7 @@ biggestSimplices (SimplicialComplex simplices _) = last simplices
 
 nDimensionalSimplices :: Integral a => Int -> SimplicialComplex a -> [([a], [Int])]
 nDimensionalSimplices n sc = (getSimplices sc) !! n
-
-getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> Chain a
-getSimplexBoundary dim (SimplicialComplex simplices ord) (simplex, indices) =
-  let subsimplices = map (\index -> fst $ simplices !! (dim - 1) !! index) indices
-      makeCoeff s  =
-        case (findMissing s simplex) `mod` 2 of
-          0 -> if ord == 2 then 0 else ord - 1
-          1 -> 1 in
-  Chain subsimplices (map makeCoeff subsimplices) (dim - 1) ord
-
+  
 makeNbrhoodGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [[([Int], [Int])]]
 makeNbrhoodGraph scale metric list =
   let helper _ []     = []
@@ -72,3 +64,54 @@ makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Int -> SimplicialComplex 
 makeVRComplex scale metric list =
   SimplicialComplex (constructSimplices 2 (makeNbrhoodGraph scale metric list))
 --}
+
+getEdgeBoundary :: Integral a => SimplicialComplex a -> Matrix a
+getEdgeBoundary (SimplicialComplex simplices order) =
+  let makeCoeff n =
+        case n `mod` 2 of
+          0 -> if order == 2 then 0 else order - 1
+          1 -> 1 in
+  initializeMatrix order (map (\e -> [makeCoeff $ head $ fst e, makeCoeff $ last $ fst e]) $ simplices !! 1)
+
+getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> [a]
+getSimplexBoundary dim (SimplicialComplex simplices ord) (simplex, indices) =
+  let subsimplices = map (\index -> fst $ simplices !! (dim - 1) !! index) indices
+      makeCoeff s  =
+        case (findMissing s simplex) `mod` 2 of
+          0 -> if ord == 2 then 0 else ord - 1
+          1 -> 1 in
+  map makeCoeff subsimplices
+
+getBoundaryOperator :: Integral a => Int -> SimplicialComplex a -> Matrix a
+getBoundaryOperator dim sc =
+  initializeMatrix
+    (SimplicialComplex.getOrder sc)
+      (map (SimplicialComplex.getSimplexBoundary dim sc) $ (getSimplices sc) !! dim)
+
+calculateNthHomology :: Integral a => Int -> SimplicialComplex a -> [a]
+calculateNthHomology n = getUnsignedDiagonal . getSmithNormalForm . (getBoundaryOperator n)
+
+calculateNthHomologyParallel :: Integral a => Int -> SimplicialComplex a -> [a]
+calculateNthHomologyParallel n = getUnsignedDiagonal . getSmithNormalFormParallel . (getBoundaryOperator n)
+
+calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
+calculateHomology sc =
+  let simplices = getSimplices sc
+      dim       = getDimension sc
+      zeroth    = replicate (length $ head simplices) 0
+      first     = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
+      calc n    = if n > dim then [] else (calculateNthHomology n sc) : (calc (n + 1)) in
+  zeroth : first : (calc 2)
+
+calculateHomologyParallel :: Integral a => SimplicialComplex a -> [[a]]
+calculateHomologyParallel sc =
+  let simplices = getSimplices sc
+      dim       = getDimension sc
+      zeroth    = replicate (length $ head simplices) 0
+      first     = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
+      calc n    =
+        if n > dim then [] else
+          let rest = calc (n + 1) in
+          par rest ((calculateNthHomologyParallel n sc) : rest) in
+  zeroth : first : (calc 2)
+  
