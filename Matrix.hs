@@ -56,7 +56,7 @@ choosePivot (Matrix elems ord i max) =
 --the first part of the pair is the gcd, bezout coefficients, and quotients
 --second part of the pair is the index of the element to which that applies
 colOperationHelper :: Integral a => Int -> ((a, a, a, a, a), Int) -> [a] -> [a]
-colOperationHelper pIndex ((gcd, coeff1, coeff2, q1, q2), index) row =
+colOperationHelper pIndex ((gcd, c1, c2, q1, q2), index) row =
   let elem1 = row !! index; elem2 = row !! pIndex in
   if index < pIndex then
     let first  = take index row
@@ -64,12 +64,12 @@ colOperationHelper pIndex ((gcd, coeff1, coeff2, q1, q2), index) row =
         third  = drop (pIndex + 1) row
         elem1  = row !! index
         elem2  = row !! pIndex in
-    first ++ ((q2*elem1 - q1*elem2) : second) ++ ((coeff1*elem1 + coeff2*elem2) : third)
+    first ++ ((q2*elem1 - q1*elem2) : second) ++ ((c1*elem2 + c2*elem1) : third)
   else
     let first  = take pIndex row
         second = drop (pIndex + 1) (take index row)
         third  = drop (index + 1) row in
-    first ++ ((coeff1*elem1 + coeff2*elem2) : second) ++ ((q2*elem1 - q1*elem2) : third)
+    first ++ ((c1*elem1 + c2*elem2) : second) ++ ((q2*elem1 - q1*elem2) : third)
 
 --given the pivot of a matrix and the matrix itself to improve that row with column operations
 improvePivot :: Integral a => (a, Matrix a) -> Matrix a
@@ -132,7 +132,7 @@ getSmithNormalForm matrix =
 --gets the smith normal form of a matrix
 getSmithNormalForm :: Integral a => Matrix a -> Matrix a
 getSmithNormalForm (Matrix elems ord index max) =
-  if index == max then Matrix elems ord index max else
+  if index > max then Matrix elems ord index max else
   case choosePivot $ Matrix elems ord index max of
     (Nothing, _)  ->
       let tr = Matrix (transpose elems) ord index max in
@@ -145,7 +145,17 @@ getSmithNormalForm (Matrix elems ord index max) =
         (Nothing, _)  -> (getSmithNormalForm . incrementIndex) tr
         (Just p, mat) -> (getSmithNormalForm . incrementIndex . eliminateEntries . improvePivot) (p, mat)
 --}
-
+{--
+getSmithNormalForm :: Integral a => Matrix a -> Matrix a
+getSmithNormalForm (Matrix elems ord 0 max) =
+  let eliminateRows (Matrix e o i m) =
+        if i > m then Matrix e o i m else
+        case choosePivot $ Matrix e o i m of
+          (Nothing, _)  -> eliminateRows $ Matrix e o (i + 1) m
+          (Just p, mat) -> (eliminateRows . incrementIndex . eliminateEntries . improvePivot) (p, mat)
+      firstRound                     = eliminateRows $ Matrix elems ord 0 max in
+  eliminateRows $ Matrix (getElems firstRound) ord 0 max
+--}
 getSmithNormalFormParallel :: Integral a => Matrix a -> Matrix a
 getSmithNormalFormParallel (Matrix elems ord index max) =
   if index == max then Matrix elems ord index max else
