@@ -198,3 +198,9 @@ findMissing (x:xs) sup =
   case elemIndex x sup of
     Nothing -> x
     Just _  -> findMissing xs sup
+
+minusOnePow :: Integral a => a -> a
+minusOnePow x =
+  case x `mod` 2 of
+    0 -> 1
+    1 -> -1

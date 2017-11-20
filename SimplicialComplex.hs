@@ -67,19 +67,17 @@ makeVRComplex scale metric list =
 
 getEdgeBoundary :: Integral a => SimplicialComplex a -> Matrix a
 getEdgeBoundary (SimplicialComplex simplices order) =
-  let makeCoeff n =
-        case n `mod` 2 of
-          0 -> if order == 2 then 0 else order - 1
-          1 -> 1 in
-  initializeMatrix order (map (\e -> [makeCoeff $ head $ fst e, makeCoeff $ last $ fst e]) $ simplices !! 1)
+  let makeCoeff n = if order == 0 then minusOnePow n 
+                    else (order - n) `mod` order in
+  initializeMatrix order (map (\e -> [makeCoeff $ last $ fst e, makeCoeff $ head $ fst e]) $ simplices !! 1)
 
 getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> [a]
 getSimplexBoundary dim (SimplicialComplex simplices ord) (simplex, indices) =
   let subsimplices = map (\index -> fst $ simplices !! (dim - 1) !! index) indices
       makeCoeff s  =
-        case (findMissing s simplex) `mod` 2 of
-          0 -> if ord == 2 then 0 else ord - 1
-          1 -> 1 in
+        let missing = findMissing s simplex in
+        if ord == 0 then minusOnePow missing
+        else (ord - missing) `mod` ord in
   map makeCoeff subsimplices
 
 getBoundaryOperator :: Integral a => Int -> SimplicialComplex a -> Matrix a
@@ -98,20 +96,18 @@ calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomology sc =
   let simplices = getSimplices sc
       dim       = getDimension sc
-      zeroth    = replicate (length $ head simplices) 0
-      first     = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
+      zeroth    = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
       calc n    = if n > dim then [] else (calculateNthHomology n sc) : (calc (n + 1)) in
-  zeroth : first : (calc 2)
+  zeroth : (calc 2)
 
 calculateHomologyParallel :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomologyParallel sc =
   let simplices = getSimplices sc
       dim       = getDimension sc
-      zeroth    = replicate (length $ head simplices) 0
-      first     = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
+      zeroth    = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
       calc n    =
         if n > dim then [] else
           let rest = calc (n + 1) in
           par rest ((calculateNthHomologyParallel n sc) : rest) in
-  zeroth : first : (calc 2)
+  zeroth : (calc 2)
   
