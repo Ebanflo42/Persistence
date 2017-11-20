@@ -9,7 +9,7 @@ data Matrix a = Matrix [[a]] a Int Int
 getElems (Matrix elems _ _ _) = elems --elements of the matrix
 getOrder (Matrix _ order _ _) = order --modulus of the elements
 getIndex (Matrix _ _ index _) = index --index of the current pivot
-getMaxIndex (Matrix _ _ _ m)  = m
+getMaxpIndex (Matrix _ _ _ m) = m     --maximum pivot index (minimum of dimensions)
 
 --given the *order* of the group and the elements of the matrix
 --calculates the maximum pivot index and sets initial pivot index to zero
@@ -27,6 +27,13 @@ toString :: Matrix Int -> String
 toString matrix =
   let mat = flatten $ map (\row -> '\n':(flatten $ map (\e -> ' ':(show e)) row)) (getElems matrix) in
   mat ++ "\nmodulo " ++ (show $ getOrder matrix)
+
+--multiply two matrices
+multiply :: (Num a, Eq a) => Matrix a -> Matrix a -> Matrix a
+multiply (Matrix e1 o1 _ _) (Matrix e2 o2 _ _) =
+  if o1 /= o2 then error "Matrices were not of the same modulus."
+  else let right = transpose e2; newElems = map (\row -> map (dotProduct row) right) e1 in
+    initializeMatrix o1 newElems
 
 --first argument is a looping index, second argument is the upper bound for that index
 --if a pivot row isn't found return nothing

@@ -6,7 +6,7 @@ import Matrix
 import Data.List
 import Control.Parallel
 
-data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] a
+data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] [Matrix a] a
 
 getSimplices (SimplicialComplex simplices _) = simplices
 getDimension (SimplicialComplex simplices _) = length simplices
@@ -86,28 +86,12 @@ getBoundaryOperator dim sc =
     (SimplicialComplex.getOrder sc)
       (map (SimplicialComplex.getSimplexBoundary dim sc) $ (getSimplices sc) !! dim)
 
-calculateNthHomology :: Integral a => Int -> SimplicialComplex a -> [a]
-calculateNthHomology n = getUnsignedDiagonal . getSmithNormalForm . (getBoundaryOperator n)
-
-calculateNthHomologyParallel :: Integral a => Int -> SimplicialComplex a -> [a]
-calculateNthHomologyParallel n = getUnsignedDiagonal . getSmithNormalFormParallel . (getBoundaryOperator n)
-
-calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
-calculateHomology sc =
-  let simplices = getSimplices sc
-      dim       = getDimension sc
-      zeroth    = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
-      calc n    = if n > dim then [] else (calculateNthHomology n sc) : (calc (n + 1)) in
-  zeroth : (calc 2)
-
-calculateHomologyParallel :: Integral a => SimplicialComplex a -> [[a]]
-calculateHomologyParallel sc =
-  let simplices = getSimplices sc
-      dim       = getDimension sc
-      zeroth    = (getUnsignedDiagonal . getSmithNormalForm . getEdgeBoundary) sc
-      calc n    =
-        if n > dim then [] else
-          let rest = calc (n + 1) in
-          par rest ((calculateNthHomologyParallel n sc) : rest) in
-  zeroth : (calc 2)
+makeBoundaryOperators :: Integral a => SimplicialComplex a -> SimplicialComplex a
+makeBoundaryOperators sc =
+  let dim    = getDimension sc
+      calc i =
+        if i > dim then []
+        else if i == 1 then (getEdgeBoundary sc) : (calc 2)
+        else (getBoundaryOperator i sc) : (calc (i + 1)) in
+  SimplicialComplex (getSimplices sc) (calc 1) (getOrder sc)
   

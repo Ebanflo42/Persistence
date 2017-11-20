@@ -35,6 +35,11 @@ add [] y          = y
 add x []          = x
 add (x:xs) (y:ys) = (x + y) : (xs `add` ys)
 
+dotProduct :: Num a => [a] -> [a]
+dotProduct [] _          = error "Second vector too big"
+dotProduct _ []          = error "First vector too big"
+dotProduct (x:xs) (y:ys) = x*y + dotProduct xs ys
+
 --first argument is current index, third argument is the two indices to split at, second argument is which index is greater,
 --fourth arg is the list to be split
 getSubLists :: Int -> (Int, Int) -> [a] -> ([a], [a], [a])
