@@ -35,7 +35,7 @@ add [] y          = y
 add x []          = x
 add (x:xs) (y:ys) = (x + y) : (xs `add` ys)
 
-dotProduct :: Num a => [a] -> [a]
+dotProduct :: Num a => [a] -> [a] -> a
 dotProduct [] _          = error "Second vector too big"
 dotProduct _ []          = error "First vector too big"
 dotProduct (x:xs) (y:ys) = x*y + dotProduct xs ys

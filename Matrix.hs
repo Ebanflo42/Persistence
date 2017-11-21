@@ -29,11 +29,19 @@ toString matrix =
   mat ++ "\nmodulo " ++ (show $ getOrder matrix)
 
 --multiply two matrices
-multiply :: (Num a, Eq a) => Matrix a -> Matrix a -> Matrix a
+multiply :: Integral a => Matrix a -> Matrix a -> Matrix a
 multiply (Matrix e1 o1 _ _) (Matrix e2 o2 _ _) =
   if o1 /= o2 then error "Matrices were not of the same modulus."
   else let right = transpose e2; newElems = map (\row -> map (dotProduct row) right) e1 in
     initializeMatrix o1 newElems
+
+findKernel :: Integral a => Matrix a -> Matrix a
+findKernel (Matrix elems ord index max) =
+  if index == max then Matrix elems ord index max
+  else
+    case choosePivot $ Matrix elems ord index max of
+      (Nothing, _)  -> findKernel $ Matrix elems ord (index + 1) max
+      (Just p, mat) -> (findKernel . incrementIndex . eliminateEntries . improvePivot) (p, mat)
 
 --first argument is a looping index, second argument is the upper bound for that index
 --if a pivot row isn't found return nothing
