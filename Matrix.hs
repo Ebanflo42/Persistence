@@ -4,18 +4,18 @@ import Util
 import Data.List
 import Control.Parallel
 
-data Matrix a = Matrix [[a]] a Int Int
+data Matrix a = Matrix [[a]] Bool Int Int
 
 getElems (Matrix elems _ _ _) = elems --elements of the matrix
-getOrder (Matrix _ order _ _) = order --modulus of the elements
+isMod2 (Matrix _ modulo2 _ _) = modulo2 --modulus of the elements
 getIndex (Matrix _ _ index _) = index --index of the current pivot
 getMaxpIndex (Matrix _ _ _ m) = m     --maximum pivot index (minimum of dimensions)
 
 --given the *order* of the group and the elements of the matrix
 --calculates the maximum pivot index and sets initial pivot index to zero
-initializeMatrix :: Integral a => a -> [[a]] -> Matrix a
-initializeMatrix order elems =
-  Matrix elems order 0 ((min (length $ elems !! 0) (length elems)) - 1)
+initializeMatrix :: Integral a => Bool -> [[a]] -> Matrix a
+initializeMatrix ismod2 elems =
+  Matrix elems ismod2 0 ((min (length $ elems !! 0) (length elems)) - 1)
 
 --increments the pivot index
 incrementIndex :: Integral a => Matrix a -> Matrix a
@@ -26,7 +26,7 @@ incrementIndex (Matrix a b i c) = Matrix a b (i + 1) c
 toString :: Matrix Int -> String
 toString matrix =
   let mat = flatten $ map (\row -> '\n':(flatten $ map (\e -> ' ':(show e)) row)) (getElems matrix) in
-  mat ++ "\nmodulo " ++ (show $ getOrder matrix)
+  mat ++ (if isMod2 matrix then "\nmodulo 2" else "")
 
 --multiply two matrices
 multiply :: Integral a => Matrix a -> Matrix a -> Matrix a
@@ -180,15 +180,21 @@ getSmithNormalFormParallel (Matrix elems ord index max) =
 
 getUnsignedDiagonal :: Integral a => Matrix a -> [a]
 getUnsignedDiagonal matrix =
-  let helper _ []     = []
+  let f = if isMod2 matrix then \n -> mod n 2 else abs
+      helper _ []     = []
       helper i (x:xs) =
-        (abs $ x !! i) : (helper (i + 1) xs) in
+        (f $ x !! i) : (helper (i + 1) xs) in
   helper 0 (getElems matrix)
 
-moveAllZeroRowsBack :: Integral a => Matrix a -> Matrix a
+--switch two columns or
+--add two columns specified by indicies of fst field with coefficients from snd, destination row given by second index 
+data ColumnOp a = Switch (Int, Int) | Combo ((Int, Int), (a, a))
+
+--preps the matrix for gauss-jordan and returns the index of the last non-zero row
+moveAllZeroRowsBack :: Integral a => Matrix a -> (Int, Matrix a)
 moveAllZeroRowsBack (Matrix elems o i m) =
   let zeroes = filterAndCount (\row -> forall (\x -> x == 0) row) elems in
-  Matrix ((snd zeroes) ++ (replicate (fst zeroes) (replicate (length $ head elems) 0))) o i m
+  (length elems - (fst zeroes + 1), Matrix ((snd zeroes) ++ (replicate (fst zeroes) (replicate (length $ head elems) 0))) o i m)
 
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernel :: Integral a => Matrix a -> Matrix a
@@ -198,4 +204,3 @@ findKernel (Matrix elems ord index max) =
     case choosePivot $ Matrix elems ord index max of
       (Nothing, _)  -> findKernel $ Matrix elems ord (index + 1) max
       (Just p, mat) -> (findKernel . incrementIndex . eliminateEntries . improvePivot) (p, mat)
---}

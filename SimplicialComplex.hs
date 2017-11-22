@@ -2,16 +2,15 @@ module SimplicialComplex where
 
 import Util
 import Matrix
---import Chain
 import Data.List
 import Control.Parallel
 
-data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] [Matrix a] a
+data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] [Matrix a] Bool
 
 getSimplices (SimplicialComplex simplices _ _) = simplices
 getBoundaries (SimplicialComplex _ matrices _) = matrices
 getDimension (SimplicialComplex simplices _ _) = length simplices
-getOrder (SimplicialComplex _ _ order)         = order
+isMod2 (SimplicialComplex _ _ modulo2)         = modulo2
 
 biggestSimplices :: Integral a => SimplicialComplex a -> [([a], [Int])]
 biggestSimplices (SimplicialComplex simplices _ _) = last simplices
@@ -61,30 +60,30 @@ constructSimplices dim result =
       constructSimplices (dim + 1) (result ++ [findHigherSimplices dim (mapWithIndex (\i e -> (e, i)) $ map fst currentSimplices)])
 
 --may need to start dimension higher or lower, line 75 first arg of constructSimplices
-makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Int -> SimplicialComplex Int
+makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Bool -> SimplicialComplex Int
 makeVRComplex scale metric list =
   SimplicialComplex (constructSimplices 2 (makeNbrhoodGraph scale metric list)) []
 --}
 
 getEdgeBoundary :: Integral a => SimplicialComplex a -> Matrix a
-getEdgeBoundary (SimplicialComplex simplices _ order) =
-  let makeCoeff n = if order == 0 then minusOnePow n 
-                    else (order - n) `mod` order in
-  initializeMatrix order (map (\e -> [makeCoeff $ last $ fst e, makeCoeff $ head $ fst e]) $ simplices !! 1)
+getEdgeBoundary (SimplicialComplex simplices _ ismod2) =
+  let makeCoeff = \n -> if ismod2 || n `mod` 2 == 0 then 1 else -1 in
+  initializeMatrix ismod2 (map (\e -> [makeCoeff $ last $ fst e, makeCoeff $ head $ fst e]) $ simplices !! 1)
 
 getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> [a]
-getSimplexBoundary dim (SimplicialComplex simplices _ ord) (simplex, indices) =
+getSimplexBoundary dim (SimplicialComplex simplices _ ismod2) (simplex, indices) =
   let subsimplices = map (\index -> fst $ simplices !! (dim - 1) !! index) indices
       makeCoeff s  =
-        let missing = findMissing s simplex in
-        if ord == 0 then minusOnePow missing
-        else (ord - missing) `mod` ord in
+        if ismod2 then 1
+        else let missing = findMissing s simplex in
+             if missing `mod` 2 == 0 then 1
+             else -1 in
   map makeCoeff subsimplices
 
 getBoundaryOperator :: Integral a => Int -> SimplicialComplex a -> Matrix a
 getBoundaryOperator dim sc =
   initializeMatrix
-    (SimplicialComplex.getOrder sc)
+    (SimplicialComplex.isMod2 sc)
       (map (SimplicialComplex.getSimplexBoundary dim sc) $ (getSimplices sc) !! dim)
 
 makeBoundaryOperators :: Integral a => SimplicialComplex a -> SimplicialComplex a
@@ -94,7 +93,7 @@ makeBoundaryOperators sc =
         if i > dim then []
         else if i == 1 then (getEdgeBoundary sc) : (calc 2)
         else (getBoundaryOperator i sc) : (calc (i + 1)) in
-  SimplicialComplex (getSimplices sc) (calc 1) (SimplicialComplex.getOrder sc)
+  SimplicialComplex (getSimplices sc) (calc 1) (SimplicialComplex.isMod2 sc)
 
 caclulateNthHomology :: Integral a => Int -> SimplicialComplex a -> [a]
 caclulateNthHomology n sc =
@@ -109,9 +108,9 @@ caclulateNthHomology n sc =
     Just m  ->
       if n == 0 then getUnsignedDiagonal $ getSmithNormalForm m --boundary of vertices is zero so just quotient space of vertices by image of edge boundary operator
       else let kernel = findKernel (boundOps !! n) in
-        (getUnsignedDiagonal . getSmithNormalForm . (multiply kernel)) m --otherwise multiply the image by the kernel matrix to get the project the vectors in
-                                                                    --the image onto the ones in the kernel
-
+        (getUnsignedDiagonal . getSmithNormalForm . (multiply kernel)) m 
+        --otherwise multiply the image by the kernel matrix to get the project the vectors in the image onto the ones in the kernel
+{--
 caclulateNthHomologyParallel :: Integral a => Int -> SimplicialComplex a -> [a]
 caclulateNthHomologyParallel n sc =
   let boundOps = getBoundaries sc
@@ -129,14 +128,14 @@ caclulateNthHomologyParallel n sc =
       if n == 0 then getUnsignedDiagonal $ getSmithNormalFormParallel m
       else let kernel = findKernelParallel (boundOps !! n) in
         (getUnsignedDiagonal . getSmithNormalFormParallel . (multiply kernel)) m
-  
+--}
 calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomology sc =
   let calc i =
         if i > getDimension sc then []
         else (caclulateNthHomology i sc) : (calc $ i + 1) in
   calc 0
-
+{--
 calculateHomologyParallel :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomologyParallel sc =
   let calc i =
@@ -144,3 +143,4 @@ calculateHomologyParallel sc =
         else let rest = calc $ i + 1 in
           par rest ((caclulateNthHomologyParallel i sc) : rest) in
   calc 0
+--}
