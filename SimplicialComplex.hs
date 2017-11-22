@@ -5,6 +5,8 @@ import Matrix
 import Data.List
 import Control.Parallel
 
+--every element of this list is a list of simplices whose dimension is given by the index
+--every simplex is paired with a list of indices pointing to its subsimplices
 data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] [Matrix a] Bool
 
 getSimplices (SimplicialComplex simplices _ _) = simplices
@@ -17,9 +19,11 @@ biggestSimplices (SimplicialComplex simplices _ _) = last simplices
 
 nDimensionalSimplices :: Integral a => Int -> SimplicialComplex a -> [([a], [Int])]
 nDimensionalSimplices n sc = (getSimplices sc) !! n
-  
-makeNbrhoodGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [[([Int], [Int])]]
-makeNbrhoodGraph scale metric list =
+
+--given a scale, a metric, and a data set this constructs a graph out of the points in the data set
+--two points share an edge iff the distance between them is less than the scale
+makeNbrhdGraph :: Ord a => a -> (b -> b -> a) -> [b] -> [[([Int], [Int])]]
+makeNbrhdGraph scale metric list =
   let helper _ []     = []
       helper i (x:xs) =
         let helper2 _ []     = []
@@ -29,21 +33,27 @@ makeNbrhoodGraph scale metric list =
         helper2 (i + 1) xs in
   (map (\n -> ([n], [])) [0..length list - 1]) : [helper 0 list]
 
-checkAdjacentSimplices :: Int -> ([Int], Int) -> [([Int], Int)] -> [Maybe Int] -> [([Int], [Int])] -> [([Int], [Int])]
-checkAdjacentSimplices dim simplex simplices adjacency result =
+
+--this function is passed the dimension, a simplex, the rest of the simplices maybe differ by exactly one element
+--if a simplex does differ from the argument by one point it searches for all other simplices differing by that point
+--and tries to make a higher simplex out of them
+checkAdjacentSimplices :: Int -> Int -> ([Int], Int) -> [([Int], Int)] -> [Maybe Int] -> [([Int], [Int])] -> [([Int], [Int])]
+checkAdjacentSimplices index dim simplex simplices adjacency result =
   case adjacency of
     []               -> result
     (Nothing:rest)   ->
-      checkAdjacentSimplices dim simplex simplices rest result
+      checkAdjacentSimplices (index + 1) dim simplex simplices rest result
     ((Just x):rest)  ->
-      let commonSimplices = filter (\s -> exists x (fst s)) simplices
-          len             = length commonSimplices in
-      if length commonSimplices == dim then
-        checkAdjacentSimplices dim simplex simplices rest ((x:(fst simplex), (snd simplex):(map snd simplices)):result)
+      let common = myfilter (\a -> a == Just x) rest
+          len    = length $ one common in
+      if len == dim then
+        checkAdjacentSimplices (index + 1) dim simplex simplices (thr common)
+          ((x:(fst simplex), (snd simplex):(map (\i -> i + index) $ two common)):result)
       else if len < dim then
-        checkAdjacentSimplices dim simplex simplices rest result
-      else error "Neighborhood graph was a multigraph."
+        checkAdjacentSimplices (index + 1) dim simplex simplices rest result
+      else error "Neighborhood graph was a multigraph, or this algorithm isn't working."
 
+--given a dimension and all simplices of that dimension, finds simplices one dimension higher
 findHigherSimplices :: Int -> [([Int], Int)] -> [([Int], [Int])]
 findHigherSimplices dim simplices =
   case simplices of
@@ -51,25 +61,27 @@ findHigherSimplices dim simplices =
     (x:xs) ->
       (checkAdjacentSimplices dim x xs (map (diffByOneElem $ fst x) $ map fst xs) []) ++ (findHigherSimplices dim xs)
 
+--given the neighborhood graph, constructs the clique complex
 constructSimplices :: Int -> [[([Int], [Int])]] -> [[([Int], [Int])]]
 constructSimplices dim result =
   let currentSimplices = last result in
   case currentSimplices of
-    [] -> init result
+    [] -> init result --if there are no higher simplices to be found, return
     _  ->
       constructSimplices (dim + 1) (result ++ [findHigherSimplices dim (mapWithIndex (\i e -> (e, i)) $ map fst currentSimplices)])
 
 --may need to start dimension higher or lower, line 75 first arg of constructSimplices
 makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Bool -> SimplicialComplex Int
 makeVRComplex scale metric list =
-  SimplicialComplex (constructSimplices 2 (makeNbrhoodGraph scale metric list)) []
---}
+  SimplicialComplex (constructSimplices 2 $ makeNbrhoodGraph scale metric list) []
 
+--gets the first boundary operator (because edges don't need to point to their subsimplices)
 getEdgeBoundary :: Integral a => SimplicialComplex a -> Matrix a
 getEdgeBoundary (SimplicialComplex simplices _ ismod2) =
   let makeCoeff = \n -> if ismod2 || n `mod` 2 == 0 then 1 else -1 in
   initializeMatrix ismod2 (map (\e -> [makeCoeff $ last $ fst e, makeCoeff $ head $ fst e]) $ simplices !! 1)
 
+--gets the boundary coefficients for a simplex of dimension 2 or greater
 getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> [a]
 getSimplexBoundary dim (SimplicialComplex simplices _ ismod2) (simplex, indices) =
   let subsimplices = map (\index -> fst $ simplices !! (dim - 1) !! index) indices
@@ -80,12 +92,14 @@ getSimplexBoundary dim (SimplicialComplex simplices _ ismod2) (simplex, indices)
              else -1 in
   map makeCoeff subsimplices
 
+--makes boundary operator for all simplices of dimension 2 or greater
 getBoundaryOperator :: Integral a => Int -> SimplicialComplex a -> Matrix a
 getBoundaryOperator dim sc =
   initializeMatrix
     (SimplicialComplex.isMod2 sc)
       (map (SimplicialComplex.getSimplexBoundary dim sc) $ (getSimplices sc) !! dim)
 
+--makes all the boundary operators, should always be called before calculating homology
 makeBoundaryOperators :: Integral a => SimplicialComplex a -> SimplicialComplex a
 makeBoundaryOperators sc =
   let dim    = getDimension sc
