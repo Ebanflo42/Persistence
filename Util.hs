@@ -209,3 +209,13 @@ minusOnePow x =
   case x `mod` 2 of
     0 -> 1
     1 -> -1
+
+filterAndCount :: (a -> Bool) -> [a] -> (Int, [a])
+filterAndCount p list =
+  let helper = \arg i result ->
+       case arg of
+         []     -> (i, result)
+         (x:xs) ->
+           if p x then helper xs i (x:result)
+           else helper xs (i + 1) result in
+  helper list 0 []

@@ -35,14 +35,6 @@ multiply (Matrix e1 o1 _ _) (Matrix e2 o2 _ _) =
   else let right = transpose e2; newElems = map (\row -> map (dotProduct row) right) e1 in
     initializeMatrix o1 newElems
 
-findKernel :: Integral a => Matrix a -> Matrix a
-findKernel (Matrix elems ord index max) =
-  if index == max then Matrix elems ord index max
-  else
-    case choosePivot $ Matrix elems ord index max of
-      (Nothing, _)  -> findKernel $ Matrix elems ord (index + 1) max
-      (Just p, mat) -> (findKernel . incrementIndex . eliminateEntries . improvePivot) (p, mat)
-
 --first argument is a looping index, second argument is the upper bound for that index
 --if a pivot row isn't found return nothing
 --if it is found and the diagonal element is non-zero return the pivot index
@@ -192,3 +184,18 @@ getUnsignedDiagonal matrix =
       helper i (x:xs) =
         (abs $ x !! i) : (helper (i + 1) xs) in
   helper 0 (getElems matrix)
+
+moveAllZeroRowsBack :: Integral a => Matrix a -> Matrix a
+moveAllZeroRowsBack (Matrix elems o i m) =
+  let zeroes = filterAndCount (\row -> forall (\x -> x == 0) row) elems in
+  Matrix ((snd zeroes) ++ (replicate (fst zeroes) (replicate (length $ head elems) 0))) o i m
+
+--finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
+findKernel :: Integral a => Matrix a -> Matrix a
+findKernel (Matrix elems ord index max) =
+  if index == max then Matrix elems ord index max
+  else
+    case choosePivot $ Matrix elems ord index max of
+      (Nothing, _)  -> findKernel $ Matrix elems ord (index + 1) max
+      (Just p, mat) -> (findKernel . incrementIndex . eliminateEntries . improvePivot) (p, mat)
+--}

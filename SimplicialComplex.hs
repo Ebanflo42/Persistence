@@ -105,11 +105,11 @@ caclulateNthHomology n sc =
   case parN1 of
     Nothing ->
       let kernel = findKernel (boundOps !! n) in --rows of this matrix form a basis for the kernel of nth boundary operator
-      replicate (length kernel) 0 --if the image of the boundary is the identity return the infinite cyclic group to the power of the dimension of the kernel
+      replicate (length $ getElems kernel) 0 --if the image of the boundary is the identity return the infinite cyclic group to the power of the dimension of the kernel
     Just m  ->
       if n == 0 then getUnsignedDiagonal $ getSmithNormalForm m --boundary of vertices is zero so just quotient space of vertices by image of edge boundary operator
       else let kernel = findKernel (boundOps !! n) in
-        (getUnsignedDiagonal . getSmithNormalForm . (multiply k)) m --otherwise multiply the image by the kernel matrix to get the project the vectors in
+        (getUnsignedDiagonal . getSmithNormalForm . (multiply kernel)) m --otherwise multiply the image by the kernel matrix to get the project the vectors in
                                                                     --the image onto the ones in the kernel
 
 caclulateNthHomologyParallel :: Integral a => Int -> SimplicialComplex a -> [a]
@@ -117,14 +117,14 @@ caclulateNthHomologyParallel n sc =
   let boundOps = getBoundaries sc
       parN1    =
         if n == (getDimension sc) then Nothing
-        else boundOps !! n
+        else Just $ boundOps !! n
       kernel  =
         if n == 0 then Nothing
         else Just $ findKernelParallel (boundOps !! n) in
   case parN1 of
     Nothing ->
       let kernel = findKernelParallel (boundOps !! n) in
-      replicate (length kernel) 0
+      replicate (length $ getElems kernel) 0
     Just m  ->
       if n == 0 then getUnsignedDiagonal $ getSmithNormalFormParallel m
       else let kernel = findKernelParallel (boundOps !! n) in
@@ -134,7 +134,7 @@ calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomology sc =
   let calc i =
         if i > getDimension sc then []
-        else (caclulateNthHomology) : (calc $ i + 1) in
+        else (caclulateNthHomology i sc) : (calc $ i + 1) in
   calc 0
 
 calculateHomologyParallel :: Integral a => SimplicialComplex a -> [[a]]
@@ -142,5 +142,5 @@ calculateHomologyParallel sc =
   let calc i =
         if i > getDimension sc then []
         else let rest = calc $ i + 1 in
-          par rest ((caclulateNthHomologyParallel) : rest) in
+          par rest ((caclulateNthHomologyParallel i sc) : rest) in
   calc 0
