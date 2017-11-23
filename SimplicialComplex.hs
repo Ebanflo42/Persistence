@@ -59,7 +59,7 @@ findHigherSimplices dim simplices =
   case simplices of
     []     -> []
     (x:xs) ->
-      (checkAdjacentSimplices dim x xs (map (diffByOneElem $ fst x) $ map fst xs) []) ++ (findHigherSimplices dim xs)
+      (checkAdjacentSimplices 0 dim x xs (map (diffByOneElem $ fst x) $ map fst xs) []) ++ (findHigherSimplices dim xs)
 
 --given the neighborhood graph, constructs the clique complex
 constructSimplices :: Int -> [[([Int], [Int])]] -> [[([Int], [Int])]]
@@ -70,33 +70,35 @@ constructSimplices dim result =
     _  ->
       constructSimplices (dim + 1) (result ++ [findHigherSimplices dim (mapWithIndex (\i e -> (e, i)) $ map fst currentSimplices)])
 
---may need to start dimension higher or lower, line 75 first arg of constructSimplices
+--may need to start dimension higher or lower, line 76 first arg of constructSimplices
 makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Bool -> SimplicialComplex Int
 makeVRComplex scale metric list =
-  SimplicialComplex (constructSimplices 2 $ makeNbrhoodGraph scale metric list) []
+  SimplicialComplex (constructSimplices 2 $ makeNbrhdGraph scale metric list) []
 
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
 getEdgeBoundary :: Integral a => SimplicialComplex a -> Matrix a
 getEdgeBoundary (SimplicialComplex simplices _ ismod2) =
   let makeCoeff = \n -> if ismod2 || n `mod` 2 == 0 then 1 else -1 in
-  initializeMatrix ismod2 (map (\e -> [makeCoeff $ last $ fst e, makeCoeff $ head $ fst e]) $ simplices !! 1)
+  initializeMatrix ismod2 $ transpose $
+    map (\edge ->
+      map (\vert -> let v = head vert in
+                    if v == head edge || v == last edge then makeCoeff v
+                    else 0) $ map fst $ head simplices) $ map fst (simplices !! 1)
 
 --gets the boundary coefficients for a simplex of dimension 2 or greater
 getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> [a]
 getSimplexBoundary dim (SimplicialComplex simplices _ ismod2) (simplex, indices) =
-  let subsimplices = map (\index -> fst $ simplices !! (dim - 1) !! index) indices
-      makeCoeff s  =
+  let makeCoeff s  =
         if ismod2 then 1
-        else let missing = findMissing s simplex in
-             if missing `mod` 2 == 0 then 1
-             else -1 in
-  map makeCoeff subsimplices
+        else if (findMissing s simplex) `mod` 2 == 0 then 1
+        else -1 in
+  mapWithIndex (\i s -> if exists i indices then makeCoeff s else 0) (map fst $ simplices !! (dim - 1))
 
 --makes boundary operator for all simplices of dimension 2 or greater
 getBoundaryOperator :: Integral a => Int -> SimplicialComplex a -> Matrix a
 getBoundaryOperator dim sc =
   initializeMatrix
-    (SimplicialComplex.isMod2 sc)
+    (SimplicialComplex.isMod2 sc) $ transpose $
       (map (SimplicialComplex.getSimplexBoundary dim sc) $ (getSimplices sc) !! dim)
 
 --makes all the boundary operators, should always be called before calculating homology

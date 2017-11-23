@@ -163,11 +163,11 @@ parMapWithIndex f list =
 filterWithIndex :: (Int -> a -> Bool) -> [a] -> [a]
 filterWithIndex p list =
   let helper = \i l ->
-    case l of
-      []     -> []
-      (x:xs) ->
-        if p i x  then x : (helper (i + 1) xs)
-        else helper (i + 1) xs in
+        case l of
+          []     -> []
+          (x:xs) ->
+            if p i x  then x : (helper (i + 1) xs)
+            else helper (i + 1) xs in
   helper 0 list
 
 indexAndElem :: (a -> Bool) -> [a] -> Maybe (a, Int)
@@ -234,10 +234,10 @@ filterAndCount p list =
 myfilter :: (a -> Bool) -> [a] -> ([a], [Int], [a])
 myfilter p list =
   let helper = \i l ->
-    case l of
-      []     -> ([],[],[])
-      (x:xs) ->
-        let rest = helper (i + 1) xs in
-        if p x then (x:(one rest), i:(two rest), thr rest)
-        else (one rest, two rest, x:(thr rest)) in
+        case l of
+          []     -> ([],[],[])
+          (x:xs) ->
+            let rest = helper (i + 1) xs in
+            if p x then (x:(one rest), i:(two rest), thr rest)
+            else (one rest, two rest, x:(thr rest)) in
   helper 0 list
