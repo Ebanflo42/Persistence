@@ -132,14 +132,7 @@ existsPredicate p []     = False
 existsPredicate p (x:xs) =
   if p x then True
   else existsPredicate p xs
-{--
-parMap :: (a -> b) -> [a] -> [b]
-parMap f []        = []
-parMap f [x]       = [f x]
-parMap f (x:x':xs) =
-  let rest = parMap f xs in
-  par rest ((f x):(f x'):rest)
---}
+
 parMap :: (a -> b) -> [a] -> [b]
 parMap f [] = []
 parMap f (x:xs) =

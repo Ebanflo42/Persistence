@@ -4,7 +4,7 @@ import Util
 import Data.List
 import Control.Parallel
 
-data Matrix a = Matrix [[a]] Bool Int Int
+data Matrix a = Matrix [[a]] Bool Int Int deriving Show
 
 getElems (Matrix elems _ _ _) = elems --elements of the matrix
 isMod2 (Matrix _ modulo2 _ _) = modulo2 --modulus of the elements
@@ -183,7 +183,8 @@ getUnsignedDiagonal matrix =
   let f = if isMod2 matrix then \n -> mod n 2 else abs
       helper _ []     = []
       helper i (x:xs) =
-        (f $ x !! i) : (helper (i + 1) xs) in
+        if i > getMaxpIndex matrix then []
+        else (f $ x !! i) : (helper (i + 1) xs) in
   helper 0 (getElems matrix)
 
 --switch two columns or
@@ -196,11 +197,21 @@ moveAllZeroRowsBack (Matrix elems o i m) =
   let zeroes = filterAndCount (\row -> forall (\x -> x == 0) row) elems in
   (length elems - (fst zeroes + 1), Matrix ((snd zeroes) ++ (replicate (fst zeroes) (replicate (length $ head elems) 0))) o i m)
 
+findGaussianPivot :: Integral a => Matrix a -> Maybe (Int, Int, a, Matrix a)
+findGaussianPivot (Matrix elems ismod2 index max) =
+  let helper _ []     = Nothing
+      helper i (x:xs) =
+        if i > max then Nothing else
+        case indexAndElem (\a -> a /= 0) x of
+          Nothing     -> helper (i + 1) xs
+          Just (e, j) -> Just (i, j, e, Matrix elems ismod2 i max) in
+  helper index elems
+
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernel :: Integral a => Matrix a -> Matrix a
 findKernel (Matrix elems ord index max) =
-  if index == max then Matrix elems ord index max
+  if index > max then Matrix elems ord index max
   else
-    case choosePivot $ Matrix elems ord index max of
-      (Nothing, _)  -> findKernel $ Matrix elems ord (index + 1) max
-      (Just p, mat) -> (findKernel . incrementIndex . eliminateEntries . improvePivot) (p, mat)
+    case findGaussianPivot $ Matrix elems ord index max of
+      Nothing                    -> Matrix elems ord index max
+      Just (row, col, elem, mat) -> (findKernel . incrementIndex . eliminateEntries . improvePivot) (elem, mat)
