@@ -129,23 +129,23 @@ caclulateNthHomology n sc =
         (getUnsignedDiagonal . getSmithNormalForm . (multiply kernel)) m
         --otherwise multiply the image by the kernel matrix to get the project the vectors in the image onto the ones in the kernel
 {--
-caclulateNthHomologyParallel :: Integral a => Int -> SimplicialComplex a -> [a]
-caclulateNthHomologyParallel n sc =
+caclulateNthHomologyPar :: Integral a => Int -> SimplicialComplex a -> [a]
+caclulateNthHomologyPar n sc =
   let boundOps = getBoundaries sc
       parN1    =
         if n == (getDimension sc) then Nothing
         else Just $ boundOps !! n
       kernel  =
         if n == 0 then Nothing
-        else Just $ findKernelParallel (boundOps !! n) in
+        else Just $ findKernelPar (boundOps !! n) in
   case parN1 of
     Nothing ->
-      let kernel = findKernelParallel (boundOps !! n) in
+      let kernel = findKernelPar (boundOps !! n) in
       replicate (length $ getElems kernel) 0
     Just m  ->
-      if n == 0 then getUnsignedDiagonal $ getSmithNormalFormParallel m
-      else let kernel = findKernelParallel (boundOps !! n) in
-        (getUnsignedDiagonal . getSmithNormalFormParallel . (multiply kernel)) m
+      if n == 0 then getUnsignedDiagonal $ getSmithNormalFormPar m
+      else let kernel = findKernelPar (boundOps !! n) in
+        (getUnsignedDiagonal . getSmithNormalFormPar . (multiply kernel)) m
 --}
 calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomology sc =
@@ -154,11 +154,11 @@ calculateHomology sc =
         else (caclulateNthHomology i sc) : (calc $ i + 1) in
   calc 0
 {--
-calculateHomologyParallel :: Integral a => SimplicialComplex a -> [[a]]
-calculateHomologyParallel sc =
+calculateHomologyPar :: Integral a => SimplicialComplex a -> [[a]]
+calculateHomologyPar sc =
   let calc i =
         if i > getDimension sc then []
         else let rest = calc $ i + 1 in
-          par rest ((caclulateNthHomologyParallel i sc) : rest) in
+          par rest ((caclulateNthHomologyPar i sc) : rest) in
   calc 0
 --}

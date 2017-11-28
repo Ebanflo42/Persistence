@@ -171,6 +171,13 @@ indexAndElem p list =
         else helper (i + 1) xs in
   helper 0 list
 
+indexAndElems :: (a -> Bool) -> [a] -> [(a, Int)]
+indexAndElems p list =
+  let helper i =
+        if p $ list !! i then (list !! i, i) : (helper $ i + 1)
+        else helper $ i + 1 in
+  helper 0
+
 exactlyOneNonZero :: (Eq a, Num a) => [a] -> Bool
 exactlyOneNonZero list =
   let helper b []     = b
