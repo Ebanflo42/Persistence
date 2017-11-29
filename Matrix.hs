@@ -192,8 +192,8 @@ data ColumnOp a = Switch (Int, Int) | Combo ((Int, Int), (a, a))
 --preps the matrix for gauss-jordan and returns the index of the last non-zero row
 moveAllZeroRowsBack :: Integral a => Matrix a -> (Int, Matrix a)
 moveAllZeroRowsBack (Matrix elems o i m) =
-  let zeroes = filterAndCount (\row -> forall (\x -> x == 0) row) elems in
-  (length elems - (fst zeroes + 1), Matrix ((snd zeroes) ++ (replicate (fst zeroes) (replicate (length $ head elems) 0))) o i m)
+  let zeroes = myfilter (\row -> forall (\n -> n == 0) row) elems in
+    ((length elems) - (length $ two zeroes), Matrix ((thr zeroes) ++ (one zeroes)) o i m)
 
 {--
 findGaussianPivot :: Integral a => Matrix a -> Maybe (Int, Int, a, Matrix a)
@@ -209,29 +209,32 @@ findGaussianPivot (Matrix elems ismod2 index max) =
 
 improvePivotGauss :: Integral a => (a, Matrix a) -> Matrix a
 improvePivotGauss (pivot, Matrix elems ismod2 pIndex max) =
-  let helper ((n, i):xs) mat =
+  let improve ((n, i):xs) mat =
         let gcdTriple    = extEucAlg pivot n
             gcd          = one gcdTriple
             transform    = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
             newElems     = map (colOperationHelper pIndex transform) $ getElems mat in
-        helper xs $ Matrix newElems ismod2 pIndex max
-      helper [] mat          = mat in
-  helper (filter (\pair -> snd pair > pIndex) $ indexAndElems (\n -> n /= 0 && n `mod` pivot /=0) (elems !! pIndex)) $ Matrix elems ismod2 pIndex max
+        improve xs $ Matrix newElems ismod2 pIndex max
+      improve [] mat          = mat in
+  improve (filter (\pair -> snd pair > pIndex) $ indexAndElems (\n -> n /= 0 && n `mod` pivot /=0) (elems !! pIndex)) $ Matrix elems ismod2 pIndex max
 
 eliminateEntriesGauss :: Integral a => a -> Matrix a -> Matrix a
 eliminateEntriesGauss pivot (Matrix elems ismod2 pIndex max) =
   let row          = elems !! pIndex
+      len          = length elems
       helper i mat =
-        if i == length (head elems) - 1 then mat
+        if i == len then mat
         else let coeff = (row !! i) `div` pivot in
-        helper (i + 1) $ Matrix (map (\r -> (take i r) ++ (((r !! i) - coeff*(r !! pIndex)):(drop (i + 1) r))) (getElems mat)) ismod2 pIndex max in
-  helper pIndex $ Matrix elems ismod2 pIndex max
+             helper (i + 1) $
+               Matrix (map (\r -> (take i r) ++ (((r !! i) - coeff*(r !! pIndex)):(drop (i + 1) r))) (getElems mat)) ismod2 pIndex max in
+  helper (pIndex + 1) $ Matrix elems ismod2 pIndex max
 
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernel :: Integral a => Matrix a -> Matrix a
-findKernel (Matrix elems ord index max) =
-  if index > max then Matrix elems ord index max
-  else
-    case choosePivot $ Matrix elems ord index max of
-      (Nothing, m)  -> (findKernel . incrementIndex) m
-      (Just p, mat) -> (findKernel . incrementIndex . (eliminateEntriesGauss p) . improvePivot) (p, mat)
+findKernel matrix =
+  let doRowOps (Matrix elems ord index max) =
+        if index > max then Matrix elems ord index max
+        else case choosePivot $ Matrix elems ord index max of
+               (Nothing, m)  -> (findKernel . incrementIndex) m
+               (Just p, mat) -> (findKernel . incrementIndex . (eliminateEntriesGauss p) . improvePivot) (p, mat) in
+  (doRowOps . snd . moveAllZeroRowsBack) matrix
