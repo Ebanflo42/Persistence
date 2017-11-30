@@ -209,13 +209,15 @@ findGaussianPivot (Matrix elems ismod2 index max) =
 
 improvePivotGauss :: Integral a => (a, Matrix a) -> Matrix a
 improvePivotGauss (pivot, Matrix elems ismod2 pIndex max) =
-  let improve ((n, i):xs) mat =
-        let gcdTriple    = extEucAlg pivot n
-            gcd          = one gcdTriple
-            transform    = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
-            newElems     = map (colOperationHelper pIndex transform) $ getElems mat in
-        improve xs $ Matrix newElems ismod2 pIndex max
-      improve [] mat          = mat in
+  let improve list mat =
+        case list of
+          ((n, i):xs) ->
+            let gcdTriple    = extEucAlg pivot n
+                gcd          = one gcdTriple
+                transform    = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
+                newElems     = map (colOperationHelper pIndex transform) $ getElems mat in
+            improve xs $ Matrix newElems ismod2 pIndex max
+          []          -> mat in
   improve (filter (\pair -> snd pair > pIndex) $ indexAndElems (\n -> n /= 0 && n `mod` pivot /=0) (elems !! pIndex)) $ Matrix elems ismod2 pIndex max
 
 eliminateEntriesGauss :: Integral a => a -> Matrix a -> Matrix a
@@ -236,5 +238,5 @@ findKernel matrix =
         if index > max then Matrix elems ord index max
         else case choosePivot $ Matrix elems ord index max of
                (Nothing, m)  -> (findKernel . incrementIndex) m
-               (Just p, mat) -> (findKernel . incrementIndex . (eliminateEntriesGauss p) . improvePivot) (p, mat) in
+               (Just p, mat) -> (findKernel . incrementIndex . (eliminateEntriesGauss p) . improvePivotGauss) (p, mat) in
   (doRowOps . snd . moveAllZeroRowsBack) matrix
