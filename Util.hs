@@ -35,6 +35,12 @@ add [] y          = y
 add x []          = x
 add (x:xs) (y:ys) = (x + y) : (xs `add` ys)
 
+subtr :: Num a => [a] -> [a] -> [a]
+subtr [] []         = []
+subtr [] y          = y
+subtr x []          = x
+subtr (x:xs) (y:ys) = (x + y) : (xs `subtr` ys)
+
 dotProduct :: Num a => [a] -> [a] -> a
 dotProduct [] _          = error "Second vector too big"
 dotProduct _ []          = error "First vector too big"
@@ -173,10 +179,13 @@ indexAndElem p list =
 
 indexAndElems :: (a -> Bool) -> [a] -> [(a, Int)]
 indexAndElems p list =
-  let helper i =
-        if p $ list !! i then (list !! i, i) : (helper $ i + 1)
-        else helper $ i + 1 in
-  helper 0
+  let helper i l =
+        case l of
+          (x:xs) ->
+            if p x then (x, i) : (helper (i + 1) xs)
+            else helper (i + 1) xs
+          []     -> [] in
+  helper 0 list
 
 exactlyOneNonZero :: (Eq a, Num a) => [a] -> Bool
 exactlyOneNonZero list =
