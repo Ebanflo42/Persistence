@@ -93,6 +93,7 @@ rowOperationHelper pIndex ((gcd, c1, c2, q1, q2), index) elems =
       ++ (((q2 `mul` row1) `subtr` (q1 `mul` row2)) : third)
 
 --given the pivot of a matrix and the matrix itself to improve that row with column operations
+--makes every element in the row divisible by the pivot
 improveRowSmith :: Integral a => (a, Matrix a) -> Matrix a
 improveRowSmith (pivot, Matrix elems ord pIndex max) =
   let row          = elems !! pIndex
@@ -119,8 +120,9 @@ improveRowSmithPar (pivot, Matrix elems ord pIndex max) =
           newElems  = parMap (colOperationHelper pIndex transform) elems in
       improveRowSmith (newElems !! pIndex !! pIndex, Matrix newElems ord pIndex max)
 
-improveColSmith :: Integral a => (a, Matrix a) -> Matrix a
-improveColSmith (pivot, Matrix elems ord pIndex max) =
+--given pivot and matrix, improves pivot column with row operations
+improveCol :: Integral a => (a, Matrix a) -> Matrix a
+improveCol (pivot, Matrix elems ord pIndex max) =
   case indexAndElem (\row -> let n = row !! pIndex in n /= 0 && n `mod` pivot /= 0) elems of
      Nothing     -> Matrix elems ord pIndex max
      Just (r, i) ->
@@ -139,27 +141,13 @@ eliminateRow pivot (Matrix elems ord pIndex max) =
       newElems = map (\row -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs !! i)*(row !! pIndex)) row) elems in
   Matrix newElems ord pIndex max
 
-eliminateRowPar :: Integral a => a -> Matrix a -> Matrix a
-eliminateRowPar pivot (Matrix elems ord pIndex max) =
-  let row      = elems !! pIndex
-      coeffs   = map (\n -> if n == 0 then 0 else n `div` pivot) row
-      newElems = map (\row -> parMapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs !! i)*(row !! pIndex)) row) elems in
+eliminateCol :: Integral a => a -> Matrix a -> Matrix a
+eliminateCol pivot (Matrix elems ord pIndex max) =
+  let pRow     = elems !! pIndex
+      coeffs   = map (\row -> let n = row !! pIndex in if n == 0 then 0 else n `div` pivot) elems
+      newElems = mapWithIndex (\i row -> if i == pIndex then row else row `subtr` (((coeffs) !! i) `mul` pRow)) elems in
   Matrix newElems ord pIndex max
 
---attempt at eliminating the transpose at every step
-{--
-columnOperations :: Integral a => Matrix a -> Matrix a
-columnOperations (Matrix elems ord index max) =
-  if index == max then Matrix elems ord 0 max else
-  case choosePivot (Matrix elems ord index max) of
-    (Nothing, _)  -> columnOperations $ Matrix elems ord (index + 1) max
-    (Just p, mat) -> (columnOperations . eliminateRow . improveRowSmith) (p, mat)
-
-getSmithNormalForm :: Integral a => Matrix a -> Matrix a
-getSmithNormalForm matrix =
-  columnOperations $ Matrix ((transpose . getElems . columnOperations) matrix) (getOrder matrix) 0 (getMaxIndex matrix)
---}
-{--}
 --gets the smith normal form of a matrix
 getSmithNormalForm :: Integral a => Matrix a -> Matrix a
 getSmithNormalForm (Matrix elems ord index max) =
@@ -176,17 +164,6 @@ getSmithNormalForm (Matrix elems ord index max) =
         (Nothing, _)  -> (getSmithNormalForm . incrementIndex) tr
         (Just p, mat) -> (getSmithNormalForm . incrementIndex . (eliminateRow p) . improveRowSmith) (p, mat)
 --}
-{--
-getSmithNormalForm :: Integral a => Matrix a -> Matrix a
-getSmithNormalForm (Matrix elems ord 0 max) =
-  let eliminateRows (Matrix e o i m) =
-        if i > m then Matrix e o i m else
-        case choosePivot $ Matrix e o i m of
-          (Nothing, _)  -> eliminateRows $ Matrix e o (i + 1) m
-          (Just p, mat) -> (eliminateRows . incrementIndex . eliminateRow . improveRowSmith) (p, mat)
-      firstRound                     = eliminateRows $ Matrix elems ord 0 max in
-  eliminateRows $ Matrix (getElems firstRound) ord 0 max
---}
 getSmithNormalFormPar :: Integral a => Matrix a -> Matrix a
 getSmithNormalFormPar (Matrix elems ord index max) =
   if index == max then Matrix elems ord index max else
@@ -195,12 +172,45 @@ getSmithNormalFormPar (Matrix elems ord index max) =
       let tr = Matrix (transpose elems) ord index max in
       case choosePivot tr of
         (Nothing, _) -> (getSmithNormalFormPar . incrementIndex) tr
-        (Just p, mx) -> (getSmithNormalFormPar . incrementIndex . (eliminateRowPar p) . improveRowSmithPar) (p, mx)
+        (Just p, mx) -> (getSmithNormalFormPar . incrementIndex . (eliminateRow p) . improveRowSmithPar) (p, mx)
     (Just p, mat) ->
-      let tr = Matrix ((transpose . getElems . (eliminateRowPar p) . improveRowSmithPar) (p, mat)) ord index max in
+      let tr = Matrix ((transpose . getElems . (eliminateRow p) . improveRowSmithPar) (p, mat)) ord index max in
       case choosePivot tr of
         (Nothing, _)  -> (getSmithNormalFormPar . incrementIndex) tr
-        (Just p, mx) -> (getSmithNormalFormPar . incrementIndex . (eliminateRowPar p) . improveRowSmithPar) (p, mx)
+        (Just p, mx) -> (getSmithNormalFormPar . incrementIndex . (eliminateRow p) . improveRowSmithPar) (p, mx)
+
+columnPivotHelper :: Integral a => Int -> Int -> [[a]] -> Maybe (Either Int (Int, Int))
+columnPivotHelper _ _ []      = error "Empty matrix passed to columnPivotHelper."
+columnPivotHelper i max elems =
+  let col = map (\row -> row !! i) elems in
+  if elems !! i !! i == 0 then
+    case findIndex (\n -> n /= 0) col of
+      Nothing -> Nothing
+      Just x  -> Just $ Right (i, x)
+  else if exactlyOneNonZero col then Nothing
+  else Just $ Left i
+
+chooseColumnPivot :: Integral a => Matrix a -> (Maybe a, Matrix a)
+chooseColumnPivot (Matrix elems ismod2 index max) =
+  case columnPivotHelper index max elems of
+    Nothing             -> (Nothing, Matrix elems ismod2 index max)
+    Just (Left i)       -> (Just $ elems !! i !! i, Matrix elems ismod2 index max)
+    Just (Right (i, j)) ->
+      let newElems = switchElems i j elems in
+      (Just $ newElems !! i !! i, Matrix newElems ismod2 index max)
+
+getSmithNormalForm1 :: Integral a => Matrix a -> Matrix a
+getSmithNormalForm1 (Matrix elems ord index max) =
+  if index > max then Matrix elems ord index max else
+  case choosePivot $ Matrix elems ord index max of
+    (Nothing, mat)  ->
+      case chooseColumnPivot mat of
+        (Nothing, _)  -> (getSmithNormalForm1 . incrementIndex) mat
+        (Just p, mat) -> (getSmithNormalForm1 . incrementIndex . (eliminateCol p) . improveCol) (p, mat)
+    (Just p, mat)   ->
+      case (chooseColumnPivot . (eliminateRow p) . improveRowSmith) (p, mat) of
+        (Nothing, mat) -> (getSmithNormalForm1 . incrementIndex) mat
+        (Just p, mat)  -> (getSmithNormalForm1 . incrementIndex . (eliminateCol p) . improveCol) (p, mat)
 
 getUnsignedDiagonal :: Integral a => Matrix a -> [a]
 getUnsignedDiagonal matrix =
