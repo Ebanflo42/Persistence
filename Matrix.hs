@@ -131,7 +131,7 @@ improveCol (pivot, Matrix elems ord pIndex max) =
           gcd       = one gcdTriple
           transform = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
           newElems  = rowOperationHelper pIndex transform elems in
-      improveColSmith $ (newElems !! pIndex !! pIndex, Matrix newElems ord pIndex max)
+      improveCol $ (newElems !! pIndex !! pIndex, Matrix newElems ord pIndex max)
 
 --given a matrix whose pivot row has been improved, eliminates the entries in that row
 eliminateRow :: Integral a => a -> Matrix a -> Matrix a
@@ -238,7 +238,7 @@ improvePivotGauss (pivot, Matrix elems ismod2 pIndex max) =
           ((n, i):xs) ->
             let gcdTriple    = extEucAlg pivot n
                 gcd          = one gcdTriple
-                transform    = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
+                transform    = ((gcd, two gcdTriple, thr gcdTriple, pivot `div` gcd, n `div` gcd), i)
                 newElems     = map (colOperationHelper pIndex transform) $ getElems mat in
             improve xs $ Matrix newElems ismod2 pIndex max
           []          -> mat in
