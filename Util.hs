@@ -68,13 +68,6 @@ splitListHelper current (l1, e1, l2, e2, l3) i j (x:xs)
   | otherwise    = splitListHelper (current + 1) (l1, e1, l2, e2, x:l3) i j xs
 
 switchElems :: Int -> Int -> [a] -> [a]
-{--
-switchElems i j list =
-  if i == j then list
-  else let fstTwo = splitAt i list
-           sndTwo = splitAt (j - i) (snd fstTwo) in
-       (fst fstTwo) ++ ((head $ snd sndTwo) : (tail $ fst sndTwo)) ++ ((head $ fst sndTwo) : (tail $ snd sndTwo))
---}
 switchElems i j list
   | j == i              = list
   | j < i               =
@@ -87,6 +80,10 @@ switchElems i j list
         second = drop (i + 1) (take j list)
         third  = drop (j + 1) list in
     first ++ ((list !! j) : second) ++ ((list !! i) : third)
+
+switchConsecutive :: Int -> [a] -> [a]
+switchConsecutive i list =
+  (take i list) ++ ((list !! (i + 1)):(list !! i):(drop (i + 2) list))
 
 --extended Euclidean algorithm
 extEucAlg :: Integral a => a -> a -> (a, a, a)
@@ -103,7 +100,7 @@ extEucAlg a b = --eeaHelper (a, b) (0, 1) (1, 0)
                 nextr = r1 - q*r2
                 nexts = fst s - q*s2
                 nextt = fst t - q*t2 in
-            eeaHelper (par (s2, nexts) (r2, nextr)) (par (t2, nextt) (s2, nexts)) (t2, nextt) in
+            eeaHelper (r2, nextr) (s2, nexts) (t2, nextt) in
     eeaHelper (a, b) (0, 1) (1, 0)    
 
 --elimates duplicates in first argument, second argument is the result
@@ -143,7 +140,7 @@ parMap :: (a -> b) -> [a] -> [b]
 parMap f [] = []
 parMap f (x:xs) =
   let rest = parMap f xs in
-  par rest ((f x):rest)
+  par rest $ pseq rest ((f x):rest)
 
 mapWithIndex :: (Int -> a -> b) -> [a] -> [b]
 mapWithIndex f list =
@@ -153,10 +150,10 @@ mapWithIndex f list =
 
 parMapWithIndex :: (Int -> a -> b) -> [a] -> [b]
 parMapWithIndex f list =
-  let helper _ []        = []
+  let helper _ []     = []
       helper i (x:xs) =
         let rest = helper (i + 1) xs in
-        par rest ((f i x):rest) in
+        par rest $ pseq rest ((f i x):rest) in
   helper 0 list
 
 filterWithIndex :: (Int -> a -> Bool) -> [a] -> [a]

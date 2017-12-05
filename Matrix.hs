@@ -28,6 +28,26 @@ toString matrix =
   let mat = flatten $ map (\row -> '\n':(flatten $ map (\e -> ' ':(show e)) row)) (getElems matrix) in
   mat ++ (if isMod2 matrix then "\nmodulo 2" else "")
 
+--insert column at one index at a different index or
+--add two columns specified by indicies of fst field with coefficients from snd, destination row given by second index 
+data ColumnOp a = Insert Int Int | Combo (Int Int (a, a) (a, a) | Add (Int, Int) a
+
+applyColumnOps :: Integral a => [ColumnOp a] -> [[a]] -> [[a]]
+applyColumnOps operations matrix =
+  case operations of
+    (op:ops) ->
+      case op of
+        Insert i j                 ->
+          applyColumnOps ops
+            map (\row -> (take i row) ++ (drop (i + 1) row) ++ (drop i $ take j row) ++ ((row !! i):(drop j row))) matrix
+        Combo (i, j) (a, b) (c, d) ->
+          applyColumnOps ops
+            map (\row ->
+              (take i row) ++ (a*(row !! i) + b*(row !! j):(drop i $ take j row)) ++ ((c*(row !! i) + d*(row !! j)):(drop (j + 1) row)) matrix
+        Add (i, j) coeff            ->
+          map (\row -> (take j row) ++ ((coeff*(row !! i) + (row !! j)):(drop (j + 1) row))) matrix
+    []       -> matrix
+
 --multiply two matrices
 multiply :: Integral a => Matrix a -> Matrix a -> Matrix a
 multiply (Matrix e1 o1 _ _) (Matrix e2 o2 _ _) =
@@ -221,47 +241,69 @@ getUnsignedDiagonal matrix =
         else (f $ x !! i) : (helper (i + 1) xs) in
   helper 0 (getElems matrix)
 
---switch two columns or
---add two columns specified by indicies of fst field with coefficients from snd, destination row given by second index 
-data ColumnOp a = Switch (Int, Int) | Combo ((Int, Int), (a, a))
-
 --preps the matrix for gauss-jordan and returns the index of the last non-zero row
-moveAllZeroRowsBack :: Integral a => Matrix a -> (Int, Matrix a)
+moveAllZeroRowsBack :: Integral a => Matrix a -> (Int, Matrix a, [ColumnOp a])
 moveAllZeroRowsBack (Matrix elems o i m) =
-  let zeroes = myfilter (\row -> forall (\n -> n == 0) row) elems in
-    ((length elems) - (length $ two zeroes), Matrix ((thr zeroes) ++ (one zeroes)) o i m)
+  let zeroes = myfilter (\row -> forall (\n -> n == 0) row) elems
+      len    = length $ head elems in
+    (len - (length $ two zeroes), Matrix ((thr zeroes) ++ (one zeroes)) o i m, map (\i -> Insert i (len - 1)) $ two zeroes)
 
-improvePivotGauss :: Integral a => (a, Matrix a) -> Matrix a
-improvePivotGauss (pivot, Matrix elems ismod2 pIndex max) =
-  let improve list mat =
+{--
+choosePivotGauss :: Integral a => Matrix a -> (Maybe a, Matrix a)
+choosePivotGauss (Matrix elems ismod2 index max) =
+  let row = elems !! index; elem = row !! index in
+  if elem == 0 then
+    if index == 0 then
+      case indexAndElem (\n -> n /= 0) row of
+        Nothing      -> (Nothing, Matrix elems ismod2 index max)
+        Just (x, i)  -> (Just x, Matrix (map (switchElems i index) elems) ismod2 index max)
+    else if index == max then
+      let newElems = map (\row -> (take (max - 1) row) ++ [row !! max, row !! (max - 1)]) elems in
+        (Just $ newElems !! index !! index, Matrix newElems ismod2 index max)
+    else let newElems = map (switchConsecutive index) elems in
+      (Just $ newElems !! index !! index, Matrix newElems ismod2 index max)
+  else (Just elem, Matrix elems ismod2 index max)
+--}
+improveRowGauss :: Integral a => (a, Matrix a) -> ([ColumnOp a], Matrix a)
+improveRowGauss (pivot, Matrix elems ismod2 pIndex max) =
+  let improve ops list mat =
         case list of
           ((n, i):xs) ->
             let gcdTriple    = extEucAlg pivot n
                 gcd          = one gcdTriple
                 transform    = ((gcd, two gcdTriple, thr gcdTriple, pivot `div` gcd, n `div` gcd), i)
                 newElems     = map (colOperationHelper pIndex transform) $ getElems mat in
-            improve xs $ Matrix newElems ismod2 pIndex max
-          []          -> mat in
-  improve (filter (\pair -> snd pair > pIndex) $ indexAndElems (\n -> n /= 0 && n `mod` pivot /= 0) (elems !! pIndex)) $
+            improve ((Combo (pIndex, i) (two gcdTriple, thr gcdTriple) (five4 trasnform) (five5 transform):ops) xs $
+              Matrix newElems ismod2 pIndex max
+          []          -> (ops, mat) in
+  improve [] (filter (\pair -> snd pair > pIndex) $ indexAndElems (\n -> n /= 0 && n `mod` pivot /= 0) (elems !! pIndex)) $
          Matrix elems ismod2 pIndex max
 
-eliminateEntriesGauss :: Integral a => a -> Matrix a -> Matrix a
+eliminateEntriesGauss :: Integral a => a -> Matrix a -> ([ColumnOp a], Matrix a)
 eliminateEntriesGauss pivot (Matrix elems ismod2 pIndex max) =
-  let row          = elems !! pIndex
-      len          = length $ elems !! 0
-      helper i mat =
-        if i == len then mat
+  let row            = elems !! pIndex
+      len            = length $ elems !! 0
+      elim ops i mat =
+        if i == len then (ops, mat)
         else let coeff = (row !! i) `div` pivot in
-             helper (i + 1) $
+             elim ((Add ((pIndex, i), coeff)):ops) (i + 1) $
                Matrix (map (\r -> (take i r) ++ (((r !! i) - coeff*(r !! pIndex)):(drop (i + 1) r))) (getElems mat)) ismod2 pIndex max in
-  helper (pIndex + 1) $ Matrix elems ismod2 pIndex max
+  elim (pIndex + 1) $ Matrix elems ismod2 pIndex max
 
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernel :: Integral a => Matrix a -> Matrix a
 findKernel matrix =
-  let doRowOps (Matrix elems ord index max) =
-        if index > max then Matrix elems ord index max
+  let doColOps opList (Matrix elems ord index max) i =
+        if index == i || index == max then (opList, Matrix elems ord index max)
         else case choosePivot $ Matrix elems ord index max of
-               (Nothing, m) -> (findKernel . incrementIndex) m
-               (Just p, mx) -> (findKernel . incrementIndex . (eliminateEntriesGauss p) . improvePivotGauss) (p, mx) in
-  (doRowOps . snd . moveAllZeroRowsBack) matrix
+               (Nothing, m) -> doColOps opList $ incrementIndex m
+               (Just p, mx) ->
+                let improved = improveRowGauss (p, mx)
+                    elim     = eliminateEntriesGauss p $ snd improved in
+                doColOps (opList ++ (fst improved) ++ (fst elim))
+                  (incrementIndex $ snd elim)
+      zeroData    = moveAllZeroRowsBack matrix
+      gaussElim   = doColOps (thr zeroData) matrix (one zeroData)
+      identity    = doColOps (fst gaussElim) $ replicate (length elems) (replicate (length $ head elems) 0)
+      elems       = getElems $ snd gaussElim in
+  map (\i -> map (\row -> row !! i) identity) $ filter (\i -> forall (\row -> row !! i == 0) elems) [0..length elems - 1]
