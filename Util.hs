@@ -1,3 +1,4 @@
+--most things in this file aren't used
 module Util where
 
 import Data.List

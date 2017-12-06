@@ -1,18 +1,37 @@
-module SimplicialComplex where
+module SimplicialComplex
+  ( getSimplices
+  , getBoundaries
+  , getDimension
+  , isMod2SC
+  , biggestSimplices
+  , nDimensionalSimplices
+  , makeNbrhdGraph
+  , makeVRComplex
+  , makeVRComplexFromGraph
+  , getEdgeBoundary
+  , getSimplexBoundary
+  , getBoundaryOperator
+  , makeBoundaryOperators
+  , calculateNthHomology
+  , calculateNthHomologyPar
+  , calculateHomology
+  , calculateHomologyPar
+  ) where
 
 import Util
 import Matrix
 import Data.List
 import Control.Parallel
 
---every element of this list is a list of simplices whose dimension is given by the index
---every simplex is paired with a list of indices pointing to its subsimplices
+--every element of the first list is a list of simplices whose dimension is given by the index
+--every simplex is paired with a list of indices pointing to its faces
+--second list is a list of boundary operators, the boolean is whether or not the homology is being calculated over F_2
 data SimplicialComplex a = SimplicialComplex [[([a], [Int])]] [Matrix a] Bool
 
 getSimplices (SimplicialComplex simplices _ _) = simplices
 getBoundaries (SimplicialComplex _ matrices _) = matrices
 getDimension (SimplicialComplex simplices _ _) = length simplices
-isMod2 (SimplicialComplex _ _ modulo2)         = modulo2
+isMod2SC (SimplicialComplex _ _ modulo2)         = modulo2
 
 biggestSimplices :: Integral a => SimplicialComplex a -> [([a], [Int])]
 biggestSimplices (SimplicialComplex simplices _ _) = last simplices
@@ -32,7 +51,6 @@ makeNbrhdGraph scale metric list =
               else (helper2 (j + 1) ys) in
         helper2 (i + 1) xs in
   (map (\n -> ([n], [])) [0..length list - 1]) : [helper 0 list]
-
 
 --this function is passed the dimension, a simplex, the rest of the simplices maybe differ by exactly one element
 --if a simplex does differ from the argument by one point it searches for all other simplices differing by that point
@@ -61,7 +79,7 @@ findHigherSimplices dim simplices =
     (x:xs) ->
       (checkAdjacentSimplices 0 dim x xs (map (diffByOneElem $ fst x) $ map fst xs) []) ++ (findHigherSimplices dim xs)
 
---given the neighborhood graph, constructs the clique complex
+--given graph, constructs the clique complex
 constructSimplices :: Int -> [[([Int], [Int])]] -> [[([Int], [Int])]]
 constructSimplices dim result =
   let currentSimplices = last result in
@@ -70,16 +88,20 @@ constructSimplices dim result =
     _  ->
       constructSimplices (dim + 1) (result ++ [findHigherSimplices dim (mapWithIndex (\i e -> (e, i)) $ map fst currentSimplices)])
 
---may need to start dimension higher or lower, line 76 first arg of constructSimplices
+--makes the Vietoris-Rips complex given a scale, metric, and data set
+--may need to start dimension higher or lower, first arg of constructSimplices
 makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> Bool -> SimplicialComplex Int
 makeVRComplex scale metric list =
   SimplicialComplex (constructSimplices 2 $ makeNbrhdGraph scale metric list) []
 
+makeVRComplexFromGraph :: [[([Int], [Int])]] -> Bool -> SimplicialComplex Int
+makeVRComplexFromGraph graph = SimplicialComplex (constructSimplices 2 graph) []
+
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
 getEdgeBoundary :: Integral a => SimplicialComplex a -> Matrix a
-getEdgeBoundary (SimplicialComplex simplices _ ismod2) =
-  let makeCoeff = \n -> if ismod2 || n `mod` 2 == 0 then 1 else -1 in
-  initializeMatrix ismod2 $ transpose $
+getEdgeBoundary (SimplicialComplex simplices _ isMod2SC) =
+  let makeCoeff = \n -> if isMod2SC || n `mod` 2 == 0 then 1 else -1 in
+  initializeMatrix isMod2SC $ transpose $
     map (\edge ->
       map (\vert -> let v = head vert in
                     if v == head edge || v == last edge then makeCoeff v
@@ -87,9 +109,9 @@ getEdgeBoundary (SimplicialComplex simplices _ ismod2) =
 
 --gets the boundary coefficients for a simplex of dimension 2 or greater
 getSimplexBoundary :: Integral a => Int -> SimplicialComplex a -> ([a], [Int]) -> [a]
-getSimplexBoundary dim (SimplicialComplex simplices _ ismod2) (simplex, indices) =
+getSimplexBoundary dim (SimplicialComplex simplices _ isMod2SC) (simplex, indices) =
   let makeCoeff s  =
-        if ismod2 then 1
+        if isMod2SC then 1
         else if (findMissing s simplex) `mod` 2 == 0 then 1
         else -1 in
   mapWithIndex (\i s -> if exists i indices then makeCoeff s else 0) (map fst $ simplices !! (dim - 1))
@@ -98,7 +120,7 @@ getSimplexBoundary dim (SimplicialComplex simplices _ ismod2) (simplex, indices)
 getBoundaryOperator :: Integral a => Int -> SimplicialComplex a -> Matrix a
 getBoundaryOperator dim sc =
   initializeMatrix
-    (SimplicialComplex.isMod2 sc) $ transpose $
+    (SimplicialComplex.isMod2SC sc) $ transpose $
       (map (SimplicialComplex.getSimplexBoundary dim sc) $ (getSimplices sc) !! dim)
 
 --makes all the boundary operators, should always be called before calculating homology
@@ -109,10 +131,10 @@ makeBoundaryOperators sc =
         if i > dim then []
         else if i == 1 then (getEdgeBoundary sc) : (calc 2)
         else (getBoundaryOperator i sc) : (calc (i + 1)) in
-  SimplicialComplex (getSimplices sc) (calc 1) (SimplicialComplex.isMod2 sc)
+  SimplicialComplex (getSimplices sc) (calc 1) (SimplicialComplex.isMod2SC sc)
 
-caclulateNthHomology :: Integral a => Int -> SimplicialComplex a -> [a]
-caclulateNthHomology n sc =
+calculateNthHomology :: Integral a => Int -> SimplicialComplex a -> [a]
+calculateNthHomology n sc =
   let boundOps = getBoundaries sc
       parN1    =
         if n == (getDimension sc) then Nothing --boundary operators higher than the dimension of the complex always return identity
@@ -128,37 +150,37 @@ caclulateNthHomology n sc =
       else let kernel = findKernel (boundOps !! n) in
         (getUnsignedDiagonal . getSmithNormalForm . (multiply kernel)) m
         --otherwise multiply the image by the kernel matrix to get the project the vectors in the image onto the ones in the kernel
-{--
-caclulateNthHomologyPar :: Integral a => Int -> SimplicialComplex a -> [a]
-caclulateNthHomologyPar n sc =
+{--}
+calculateNthHomologyPar :: Integral a => Int -> SimplicialComplex a -> [a]
+calculateNthHomologyPar n sc =
   let boundOps = getBoundaries sc
       parN1    =
         if n == (getDimension sc) then Nothing
         else Just $ boundOps !! n
       kernel  =
         if n == 0 then Nothing
-        else Just $ findKernelPar (boundOps !! n) in
+        else Just $ findKernel (boundOps !! n) in
   case parN1 of
     Nothing ->
-      let kernel = findKernelPar (boundOps !! n) in
+      let kernel = findKernel (boundOps !! n) in
       replicate (length $ getElems kernel) 0
     Just m  ->
       if n == 0 then getUnsignedDiagonal $ getSmithNormalFormPar m
-      else let kernel = findKernelPar (boundOps !! n) in
+      else let kernel = findKernel (boundOps !! n) in
         (getUnsignedDiagonal . getSmithNormalFormPar . (multiply kernel)) m
 --}
 calculateHomology :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomology sc =
   let calc i =
         if i > getDimension sc then []
-        else (caclulateNthHomology i sc) : (calc $ i + 1) in
+        else (calculateNthHomology i sc) : (calc $ i + 1) in
   calc 0
-{--
+{--}
 calculateHomologyPar :: Integral a => SimplicialComplex a -> [[a]]
 calculateHomologyPar sc =
   let calc i =
         if i > getDimension sc then []
         else let rest = calc $ i + 1 in
-          par rest ((caclulateNthHomologyPar i sc) : rest) in
+          par rest $ pseq rest ((calculateNthHomologyPar i sc) : rest) in
   calc 0
 --}
