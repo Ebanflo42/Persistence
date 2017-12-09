@@ -3,6 +3,7 @@ module Util where
 
 import Data.List
 import Control.Parallel
+import Control.Parallel.Strategies
 
 one (a, _, _) = a
 two (_, b, _) = b
@@ -47,27 +48,6 @@ dotProduct [] _          = error "Second vector too big"
 dotProduct _ []          = error "First vector too big"
 dotProduct (x:xs) (y:ys) = x*y + dotProduct xs ys
 
---first argument is current index, third argument is the two indices to split at, second argument is which index is greater,
---fourth arg is the list to be split
-getSubLists :: Int -> (Int, Int) -> [a] -> ([a], [a], [a])
-getSubLists _ _ []          = ([], [], [])
-getSubLists i (a, b) (x:xs) =
-  if i < a then let sublists = getSubLists (i + 1) (a, b) xs in
-    (x : (one sublists), two sublists, thr sublists)
-  else if i < b then let sublists = getSubLists (i + 1) (a, b) xs in
-    (one sublists, x : (two sublists), thr sublists)
-  else let sublists = getSubLists (i + 1) (a, b) xs in
-    (one sublists, two sublists, x : (thr sublists))
-
-splitListHelper :: Int -> ([a], Maybe a, [a], Maybe a, [a]) -> Int -> Int -> [a] -> ([a], Maybe a, [a], Maybe a, [a])
-splitListHelper _ result _ _ []  = result
-splitListHelper current (l1, e1, l2, e2, l3) i j (x:xs)
-  | current < i  = splitListHelper (current + 1) (x:l1, e1, l2, e2, l3) i j xs
-  | current == i = splitListHelper (current + 1) (l1, Just x, l2, e2, l3) i j xs
-  | current < j  = splitListHelper (current + 1) (l1, e1, x:l2, e2, l3) i j xs
-  | current == j = splitListHelper (current + 1) (l1, e1, l2, Just x, l3) i j xs
-  | otherwise    = splitListHelper (current + 1) (l1, e1, l2, e2, x:l3) i j xs
-
 switchElems :: Int -> Int -> [a] -> [a]
 switchElems i j list
   | j == i              = list
@@ -102,24 +82,7 @@ extEucAlg a b = --eeaHelper (a, b) (0, 1) (1, 0)
                 nexts = fst s - q*s2
                 nextt = fst t - q*t2 in
             eeaHelper (r2, nextr) (s2, nexts) (t2, nextt) in
-    eeaHelper (a, b) (0, 1) (1, 0)    
-
---elimates duplicates in first argument, second argument is the result
-regroupElems :: Eq a => [[a]] -> [[a]] -> [[a]]
-regroupElems arg res =
-    case arg of
-        []     -> res
-        (x:xs) ->
-          if exists x res then regroupElems xs res
-          else regroupElems xs (x : res)
-
-collect :: Eq a => [[[a]]] -> [[a]]
-collect block =
-  let helper result arg =
-        case arg of
-          []     -> result
-          (x:xs) -> helper (regroupElems x result) xs in
-  helper [] block
+    eeaHelper (a, b) (0, 1) (1, 0)
 
 forall :: (a -> Bool) -> [a] -> Bool
 forall _ []     = True
@@ -137,24 +100,10 @@ existsPredicate p (x:xs) =
   if p x then True
   else existsPredicate p xs
 
-parMap :: (a -> b) -> [a] -> [b]
-parMap f [] = []
-parMap f (x:xs) =
-  let rest = parMap f xs in
-  par rest $ pseq rest ((f x):rest)
-
 mapWithIndex :: (Int -> a -> b) -> [a] -> [b]
 mapWithIndex f list =
   let helper _ []     = []
       helper n (x:xs) = (f n x):(helper (n + 1) xs) in
-  helper 0 list
-
-parMapWithIndex :: (Int -> a -> b) -> [a] -> [b]
-parMapWithIndex f list =
-  let helper _ []     = []
-      helper i (x:xs) =
-        let rest = helper (i + 1) xs in
-        par rest $ pseq rest ((f i x):rest) in
   helper 0 list
 
 filterWithIndex :: (Int -> a -> Bool) -> [a] -> [a]
@@ -207,7 +156,8 @@ diffByOneElem list1 list2 =
             if x == y then helper (Just x) xs ys
             else helper (Just y) xs ys in
   helper Nothing list1 list2
-  
+
+--from rosetta code
 levenshtein :: String -> String -> Int
 levenshtein s1 s2 = last $ foldl transform [0 .. length s1] s2
   where
@@ -220,12 +170,6 @@ findMissing (x:xs) sup =
   case elemIndex x sup of
     Nothing -> x
     Just _  -> findMissing xs sup
-
-minusOnePow :: Integral a => a -> a
-minusOnePow x =
-  case x `mod` 2 of
-    0 -> 1
-    1 -> -1
 
 filterAndCount :: (a -> Bool) -> [a] -> (Int, [a])
 filterAndCount p list =

@@ -2,9 +2,10 @@ module Matrix
   ( Matrix
   , ColumnOp
   , initializeMatrix
-  , multiply
   , getElems
   , isMod2
+  , incrementIndex
+  , multiply
   , getSmithNormalForm
   , getSmithNormalFormPar
   , getSmithNormalForm1 --not working
@@ -14,7 +15,7 @@ module Matrix
 --Par suffix means that function can run in parallel
 import Util
 import Data.List
-import Control.Parallel
+import Control.Parallel.Strategies
 
 data Matrix a = Matrix [[a]] Bool Int Int deriving Show
 
@@ -152,7 +153,7 @@ improveRowSmithPar (pivot, Matrix elems ord pIndex max) =
       let gcdTriple = extEucAlg pivot n
           gcd       = one gcdTriple
           transform = ((gcd, two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd), i)
-          newElems  = parMap (colOperationHelper pIndex transform) elems in
+          newElems  = parMap rpar (colOperationHelper pIndex transform) elems in
       improveRowSmith (newElems !! pIndex !! pIndex, Matrix newElems ord pIndex max)
 
 --given pivot and matrix, improves pivot column with row operations

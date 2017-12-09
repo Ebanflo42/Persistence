@@ -21,7 +21,7 @@ module SimplicialComplex
 import Util
 import Matrix
 import Data.List
-import Control.Parallel
+import Control.Parallel.Strategies
 
 --every element of the first list is a list of simplices whose dimension is given by the index
 --every simplex is paired with a list of indices pointing to its faces
@@ -181,6 +181,11 @@ calculateHomologyPar sc =
   let calc i =
         if i > getDimension sc then []
         else let rest = calc $ i + 1 in
-          par rest $ pseq rest ((calculateNthHomologyPar i sc) : rest) in
+          runEval $ do
+            r       <- rpar rest
+            current <- rpar $ calculateNthHomologyPar i sc
+            rseq current
+            rseq r
+            return $ current:r in
   calc 0
 --}
