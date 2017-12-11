@@ -1,6 +1,5 @@
 module Matrix 
   ( Matrix
-  , ColumnOp
   , initializeMatrix
   , getElems
   , isMod2
