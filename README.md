@@ -5,3 +5,5 @@ There are two functions for finding smith normal form - one is working but has t
 The other doesn't do this but currently isn't working.
 
 The construction of the VR complex has not been tested and neither has the function for finding the kernel of a matrix.
+
+View the (incomplete) documentation here: ebencowley.com/resources/docs/projects/Persistence/documentation.html
