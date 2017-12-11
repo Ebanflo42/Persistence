@@ -40,7 +40,7 @@ subtr :: Num a => [a] -> [a] -> [a]
 subtr [] []         = []
 subtr [] y          = y
 subtr x []          = x
-subtr (x:xs) (y:ys) = (x + y) : (xs `subtr` ys)
+subtr (x:xs) (y:ys) = (x - y) : (xs `subtr` ys)
 
 dotProduct :: Num a => [a] -> [a] -> a
 dotProduct [] _          = error "Second vector too big"
