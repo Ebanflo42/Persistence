@@ -143,6 +143,16 @@ exactlyOneNonZero list =
         else helper b xs in
   helper False list
 
+exactlyOneTrue :: [Bool] -> Bool
+exactlyOneTrue list =
+  let helper b []     = b
+      helper b (x:xs) =
+        if x then
+          if b then False
+          else helper True xs
+        else helper b xs in
+  helper False list
+
 diffByOneElem :: Eq a => [a] -> [a] -> Maybe a
 diffByOneElem list1 list2 =
   let helper a [] []         = a
@@ -191,3 +201,23 @@ myfilter p list =
             if p x then (x:(one rest), i:(two rest), thr rest)
             else (one rest, two rest, x:(thr rest)) in
   helper 0 list
+
+xor :: Bool -> Bool -> Bool
+xor False False = False
+xor True False  = True
+xor False True  = True
+xor True True   = False
+
+instance Num Bool where
+  p + q  = p `xor` q
+  p * q  = p && q
+  p - q  = p `xor` (not q)
+  negate = not
+  abs    = id
+  fromInteger 0 = False
+  fromInteger _ = True
+
+minMax :: Ord a => a -> a -> (a, a)
+minMax a b =
+  if a > b then (b, a)
+  else (a, b)

@@ -4,10 +4,14 @@ module SimplicialComplex
   , makeNbrhdGraph
   , makeVRComplex
   , makeVRComplexFromGraph
-  , calculateNthHomology
-  , calculateNthHomologyPar
-  , calculateHomology
-  , calculateHomologyPar
+  , calculateNthHomologyInt
+  , calculateNthHomologyIntPar
+  , calculateNthHomologyBool
+  , calculateNthHomologyBoolPar
+  , calculateHomologyInt
+  , calculateHomologyIntPar
+  , calculateHomologyBool
+  , calculateHomologyBoolPar
   ) where
 
 import Util
@@ -80,97 +84,196 @@ makeVRComplexFromGraph :: SimplicialComplex -> SimplicialComplex
 makeVRComplexFromGraph = constructSimplices 2
 
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
-makeEdgeBoundary :: Bool -> SimplicialComplex -> Matrix Int
-makeEdgeBoundary ismod2 simplices =
-  let makeCoeff = \n -> if ismod2 || n `mod` 2 == 0 then 1 else -1 in
-  initializeMatrix ismod2 $ transpose $
-    map (\edge ->
-      map (\vert -> let v = head vert in
-                    if v == head edge || v == last edge then makeCoeff v
-                    else 0) $ map fst $ head simplices) $ map fst (simplices !! 1)
+makeEdgeBoundaryInt :: SimplicialComplex -> IMatrix
+makeEdgeBoundaryInt simplices =
+  let makeCoeff = \n -> if n `mod` 2 == 0 then 1 else -1 in
+  transpose $ map (\edge ->
+    map (\vert -> let v = head vert in
+                  if v == head edge || v == last edge then makeCoeff v
+                  else 0) $ map fst $ head simplices) $ map fst (simplices !! 1)
+
+makeEdgeBoundaryBool :: SimplicialComplex -> BMatrix
+makeEdgeBoundaryBool simplices =
+  let makeCoeff = \n -> if n `mod` 2 == 0 then 1 else -1 in
+  transpose $ map (\edge ->
+    map (\vert -> let v = head vert in v == head edge || v == last edge) $
+      map fst $ head simplices) $ map fst (simplices !! 1)
 
 --gets the boundary coefficients for a simplex of dimension 2 or greater
-makeSimplexBoundary :: Bool -> Int -> SimplicialComplex -> ([Int], [Int]) -> [Int]
-makeSimplexBoundary ismod2 dim simplices (simplex, indices) =
+makeSimplexBoundaryInt :: Int -> SimplicialComplex -> ([Int], [Int]) -> [Int]
+makeSimplexBoundaryInt dim simplices (simplex, indices) =
   let makeCoeff s  =
-        if ismod2 then 1
-        else if (findMissing s simplex) `mod` 2 == 0 then 1
+        if (findMissing s simplex) `mod` 2 == 0 then 1
         else -1 in
   mapWithIndex (\i s -> if exists i indices then makeCoeff s else 0) (map fst $ simplices !! (dim - 1))
 
+makeSimplexBoundaryBool :: Int -> SimplicialComplex -> ([Int], [Int]) -> [Bool]
+makeSimplexBoundaryBool dim simplices (simplex, indices) =
+  mapWithIndex (\i s -> exists i indices) (map fst $ simplices !! (dim - 1))
+
 --makes boundary operator for all simplices of dimension 2 or greater
-makeBoundaryOperator :: Bool -> Int -> SimplicialComplex -> Matrix Int
-makeBoundaryOperator ismod2 dim sc =
-  initializeMatrix ismod2 $ transpose $
-    map (makeSimplexBoundary ismod2 dim sc) $ sc !! dim
+makeBoundaryOperatorInt :: Int -> SimplicialComplex -> IMatrix
+makeBoundaryOperatorInt dim sc = transpose $ map (makeSimplexBoundaryInt dim sc) $ sc !! dim
+
+makeBoundaryOperatorBool :: Int -> SimplicialComplex -> BMatrix
+makeBoundaryOperatorBool dim sc = transpose $ map (makeSimplexBoundaryBool dim sc) $ sc !! dim
 
 --makes all the boundary operators, should always be called before calculating homology
-makeBoundaryOperators :: Bool -> SimplicialComplex -> [Matrix Int]
-makeBoundaryOperators ismod2 sc =
+makeBoundaryOperatorsInt :: SimplicialComplex -> [IMatrix]
+makeBoundaryOperatorsInt sc =
   let dim    = getDimension sc
       calc i =
         if i > dim then []
-        else if i == 1 then (makeEdgeBoundary ismod2 sc) : (calc 2)
-        else (makeBoundaryOperator ismod2 i sc) : (calc (i + 1)) in
- calc 1
+        else if i == 1 then (makeEdgeBoundaryInt sc) : (calc 2)
+        else (makeBoundaryOperatorInt i sc) : (calc (i + 1)) in
+  calc 1
 
-calculateNthHomology :: Bool -> Int -> SimplicialComplex -> [Int]
-calculateNthHomology ismod2 n sc =
-  if n == 0 then (getUnsignedDiagonal . getSmithNormalForm . (makeEdgeBoundary ismod2)) sc
+makeBoundaryOperatorsBool :: SimplicialComplex -> [BMatrix]
+makeBoundaryOperatorsBool sc =
+  let dim    = getDimension sc
+      calc i =
+        if i > dim then []
+        else if i == 1 then (makeEdgeBoundaryBool sc) : (calc 2)
+        else (makeBoundaryOperatorBool i sc) : (calc (i + 1)) in
+  calc 1
+
+calculateNthHomologyInt :: Int -> SimplicialComplex -> [Int]
+calculateNthHomologyInt n sc =
+  if n == 0 then
+    getUnsignedDiagonal $ getSmithNormalFormInt $ makeEdgeBoundaryInt sc
   else
     let dim = getDimension sc
         boundOps =
           case n of
-            x | x == dim -> (Nothing, Just $ makeBoundaryOperator ismod2 n sc)
+            x | x == dim -> (Nothing, Just $ makeBoundaryOperatorInt n sc)
             x | x > dim  -> (Nothing, Nothing)
-            _            -> (Just $ makeBoundaryOperator ismod2 (n + 1) sc, Just $ makeBoundaryOperator ismod2 n sc) in
+            _            -> (Just $ makeBoundaryOperatorInt (n + 1) sc, Just $ makeBoundaryOperatorInt n sc) in
     case boundOps of
       (Nothing, Nothing) -> []
-      (Nothing, Just mx) -> replicate (length $ getElems $ findKernel mx) 0
-      (Just m1, Just m2) -> (getUnsignedDiagonal . getSmithNormalForm . (multiply $ findKernel m2)) m1
+      (Nothing, Just mx) -> replicate (length $ findKernelInt mx) 0
+      (Just m1, Just m2) -> getUnsignedDiagonal $ getSmithNormalFormInt $ multiply (findKernelInt m2) m1
 
-calculateNthHomologyPar :: Bool -> Int -> SimplicialComplex -> [Int]
-calculateNthHomologyPar ismod2 n sc =
-  if n == 0 then (getUnsignedDiagonal . getSmithNormalFormPar . (makeEdgeBoundary ismod2)) sc
+calculateNthHomologyBool :: Int -> SimplicialComplex -> [Int]
+calculateNthHomologyBool n sc =
+  if n == 0 then
+    map (\b -> if b then 1 else 0 ) $ getUnsignedDiagonal $ getSmithNormalFormBool $ makeEdgeBoundaryBool sc
   else
     let dim = getDimension sc
         boundOps =
           case n of
-            x | x == dim -> (Nothing, Just $ makeBoundaryOperator ismod2 n sc)
+            x | x == dim -> (Nothing, Just $ makeBoundaryOperatorBool n sc)
             x | x > dim  -> (Nothing, Nothing)
-            _            -> (Just $ makeBoundaryOperator ismod2 (n + 1) sc, Just $ makeBoundaryOperator ismod2 n sc) in
+            _            -> (Just $ makeBoundaryOperatorBool (n + 1) sc, Just $ makeBoundaryOperatorBool n sc) in
     case boundOps of
       (Nothing, Nothing) -> []
-      (Nothing, Just mx) -> replicate (length $ getElems $ findKernel mx) 0
-      (Just m1, Just m2) -> (getUnsignedDiagonal . getSmithNormalFormPar . (multiply $ findKernel m2)) m1
+      (Nothing, Just mx) -> replicate (length $ findKernelBool mx) 0
+      (Just m1, Just m2) -> map (\b -> if b then 1 else 0) $ getUnsignedDiagonal $ getSmithNormalFormBool $ multiply (findKernelBool m2) m1
 
-calculateHomology :: Bool -> SimplicialComplex -> [[Int]]
-calculateHomology ismod2 sc =
+calculateNthHomologyIntPar :: Int -> SimplicialComplex -> [Int]
+calculateNthHomologyIntPar n sc =
+  if n == 0 then
+    getUnsignedDiagonal $ getSmithNormalFormIntPar $ makeEdgeBoundaryInt sc
+  else
+    let dim = getDimension sc
+        boundOps =
+          case n of
+            x | x == dim -> (Nothing, Just $ makeBoundaryOperatorInt n sc)
+            x | x > dim  -> (Nothing, Nothing)
+            _            -> (Just $ makeBoundaryOperatorInt (n + 1) sc, Just $ makeBoundaryOperatorInt n sc) in
+    case boundOps of
+      (Nothing, Nothing) -> []
+      (Nothing, Just mx) -> replicate (length $ findKernelInt mx) 0
+      (Just m1, Just m2) -> (getUnsignedDiagonal . getSmithNormalFormIntPar . (multiplyPar $ findKernelInt m2)) m1
+
+calculateNthHomologyBoolPar :: Int -> SimplicialComplex -> [Int]
+calculateNthHomologyBoolPar n sc =
+  if n == 0 then
+    getUnsignedDiagonal $ getSmithNormalFormIntPar $ makeEdgeBoundaryInt sc
+  else
+    let dim = getDimension sc
+        boundOps =
+          case n of
+            x | x == dim -> (Nothing, Just $ makeBoundaryOperatorInt n sc)
+            x | x > dim  -> (Nothing, Nothing)
+            _            -> (Just $ makeBoundaryOperatorInt (n + 1) sc, Just $ makeBoundaryOperatorInt n sc) in
+    case boundOps of
+      (Nothing, Nothing) -> []
+      (Nothing, Just mx) -> replicate (length $ findKernelInt mx) 0
+      (Just m1, Just m2) -> (getUnsignedDiagonal . getSmithNormalFormIntPar . (multiply $ findKernelInt m2)) m1
+
+calculateHomologyInt :: SimplicialComplex -> [[Int]]
+calculateHomologyInt sc =
   let dim      = getDimension sc
-      boundOps = makeBoundaryOperators ismod2 sc
+      boundOps = makeBoundaryOperatorsInt sc
       calc i
-        | i == 0    = (getUnsignedDiagonal $ getSmithNormalFormPar $ head boundOps) : (calc 1)
-        | i == dim  = [replicate (length $ getElems $ findKernel $ boundOps !! i) 0]
+        | i == 0    = (getUnsignedDiagonal $ getSmithNormalFormInt $ head boundOps) : (calc 1)
+        | i == dim  = [replicate (length $ findKernelInt $ boundOps !! i) 0]
         | otherwise =
-          ((getUnsignedDiagonal . getSmithNormalFormPar . (multiply $ findKernel (boundOps !! i))) (boundOps !! (i + 1))) : (calc (i + 1)) in
-  calc 0        
+          (getUnsignedDiagonal $ getSmithNormalFormInt $ multiplyPar (findKernelInt (boundOps !! i)) (boundOps !! (i + 1))) : (calc (i + 1)) in
+  calc 0
 
-calculateHomologyPar :: Bool -> SimplicialComplex -> [[Int]]
-calculateHomologyPar ismod2 sc =
+calculateHomologyBool :: SimplicialComplex -> [[Int]]
+calculateHomologyBool sc =
   let dim      = getDimension sc
-      boundOps = makeBoundaryOperators ismod2 sc
+      boundOps = makeBoundaryOperatorsBool sc
       calc i
         | i == 0    =
-          let rest = calc 1
-              current = getUnsignedDiagonal $ getSmithNormalFormPar $ head boundOps in
+          (map (\b -> if b then 1 else 0) $
+            getUnsignedDiagonal $ getSmithNormalFormBool $
+              head boundOps) : (calc 1)
+        | i == dim  = [replicate (length $ findKernelBool $ boundOps !! i) 0]
+        | otherwise =
+          (map (\b -> if b then 1 else 0) $
+            getUnsignedDiagonal $ getSmithNormalFormBool $
+              multiply (findKernelBool (boundOps !! i)) (boundOps !! (i + 1)))
+                : (calc (i + 1)) in
+  calc 0
+
+calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
+calculateHomologyIntPar sc =
+  let dim      = getDimension sc
+      boundOps = makeBoundaryOperatorsInt sc
+      calc i
+        | i == 0    =
+          let rest    = calc 1
+              current = getUnsignedDiagonal $ getSmithNormalFormIntPar $ head boundOps in
           runEval $ do
             c <- rpar current
             r <- rpar rest
             return (c:r)
-        | i == dim  = [replicate (length $ getElems $ findKernel $ boundOps !! i) 0]
+        | i == dim  = [replicate (length $ findKernelInt $ boundOps !! i) 0]
         | otherwise =
-          let rest = calc $ i + 1
-              current = (getUnsignedDiagonal . getSmithNormalFormPar . (multiply $ findKernel (boundOps !! i))) (boundOps !! (i + 1)) in
+          let rest    = calc $ i + 1
+              current = 
+                getUnsignedDiagonal $ getSmithNormalFormIntPar $
+                  multiplyPar (findKernelInt (boundOps !! i)) (boundOps !! (i + 1)) in
+          runEval $ do
+            c <- rpar current
+            r <- rpar rest
+            return (c:r) in
+  calc 0
+
+calculateHomologyBoolPar :: SimplicialComplex -> [[Int]]
+calculateHomologyBoolPar sc =
+  let dim      = getDimension sc
+      boundOps = makeBoundaryOperatorsBool sc
+      calc i
+        | i == 0    =
+          let rest    = calc 1
+              current =
+                map (\b -> if b then 1 else 0) $
+                  getUnsignedDiagonal $ getSmithNormalFormBool $ head boundOps in
+          runEval $ do
+            c <- rpar current
+            r <- rpar rest
+            return (c:r)
+        | i == dim  = [replicate (length $ findKernelBool $ boundOps !! i) 0]
+        | otherwise =
+          let rest    = calc $ i + 1
+              current =
+                map (\b -> if b then 1 else 0) $
+                  getUnsignedDiagonal $ getSmithNormalFormBool $
+                    multiply (findKernelBool (boundOps !! i)) (boundOps !! (i + 1)) in
           runEval $ do
             c <- rpar current
             r <- rpar rest
