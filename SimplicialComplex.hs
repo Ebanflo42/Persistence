@@ -156,7 +156,7 @@ calculateNthHomologyInt n sc =
 calculateNthHomologyBool :: Int -> SimplicialComplex -> [Int]
 calculateNthHomologyBool n sc =
   if n == 0 then
-    map (\b -> if b then 1 else 0 ) $ getUnsignedDiagonal $ getSmithNormalFormBool $ makeEdgeBoundaryBool sc
+    map (\b -> if b then 1 else 0) $ getUnsignedDiagonal $ getSmithNormalFormBool $ makeEdgeBoundaryBool sc
   else
     let dim = getDimension sc
         boundOps =

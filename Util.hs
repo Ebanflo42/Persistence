@@ -1,8 +1,7 @@
+--many of the things in this file aren't used
 module Util where
 
 import Data.List
-import Control.Parallel
-import Control.Parallel.Strategies
 
 one (a, _, _) = a
 two (_, b, _) = b
@@ -67,7 +66,7 @@ switchConsecutive i list =
 
 --extended Euclidean algorithm
 extEucAlg :: Integral a => a -> a -> (a, a, a)
-extEucAlg a b = --eeaHelper (a, b) (0, 1) (1, 0)
+extEucAlg a b =
   let eeaHelper r s t =
         case snd r of
           0 -> (fst r, fst s, fst t)
@@ -153,6 +152,8 @@ exactlyOneTrue list =
         else helper b xs in
   helper False list
 
+--if the lists differ by one element, returns that element
+--otherwise returns nothing
 diffByOneElem :: Eq a => [a] -> [a] -> Maybe a
 diffByOneElem list1 list2 =
   let helper a [] []         = a
@@ -174,12 +175,15 @@ levenshtein s1 s2 = last $ foldl transform [0 .. length s1] s2
       where
         calc z (c1, x, y) = minimum [y + 1, z + 1, x + fromEnum (c1 /= c)]
 
-findMissing :: Eq a => [a] -> [a] -> a
+--finds the element of the first list that is missing in the second
+findMissing :: Eq a => [a] -> [a] -> Maybe a
 findMissing (x:xs) sup =
   case elemIndex x sup of
-    Nothing -> x
+    Nothing -> Just x
     Just _  -> findMissing xs sup
+findMissing [] sup     = Nothing
 
+--returns number of elements satisying the predicate and a list of the elements
 filterAndCount :: (a -> Bool) -> [a] -> (Int, [a])
 filterAndCount p list =
   let helper = \arg i result ->
@@ -190,7 +194,9 @@ filterAndCount p list =
            else helper xs (i + 1) result in
   helper list 0 []
 
---first list satisfies predicate, second does not
+--first list satisfies predicate,
+--second is the list of indices that satisfy the predicate
+--third list does not satisfy the predicate
 myfilter :: (a -> Bool) -> [a] -> ([a], [Int], [a])
 myfilter p list =
   let helper = \i l ->
@@ -216,6 +222,7 @@ instance Num Bool where
   abs    = id
   fromInteger 0 = False
   fromInteger _ = True
+  signum bool   = if bool then 1 else 0
 
 minMax :: Ord a => a -> a -> (a, a)
 minMax a b =
