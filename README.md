@@ -36,3 +36,24 @@ Since the image of the (n+1)th boundary operator is its column space, it is left
 to project the basis of the image onto the basis of the kernel, a change of coordinates. Once this is done,
 the Smith normal form of that matrix is computed so that we can see how the basis of one vector space fits into the other.
 The diagonal of the Smith normal form represents the nth homology group.
+
+Overview of Matrix
+
+Matrices are transformed by iterating through each row and selecting a pivot
+The pivot is the diagonal entry of the row, and must be non-zero
+If the diagonal entry is non-zero at first, a switch is performed so that it is
+
+To get the smith normal form, the entire pivot row and column is eliminated before continuing.
+To get the kernel, the matrix is first put into column eschelon form. To get column eschelon form,
+every element in the pivot row after the pivot is eliminated. All column operations to get the
+IMatrix this form are also performed on the identiy matrix. Once this is over, the columns of
+the former identity matrix corresponding to the zero columns of the column-eschelon form are the
+basis of the kernel, the basis vectors are then made into the rows of a matrix
+
+Eliminating elements is a slighltly more complicated process since integer operations are allowed only.
+First, every element that must be eliminated is made divisible by the pivt using the bezout coefficients
+from the extended Euclidean algorithm. Once this is done, integer division and subtraction can be used
+to eliminate the elements.
+
+Boolean matrices are regular matrices with elements modulo 2, Bool is an instance
+of Num here and the instance is given in Util.
