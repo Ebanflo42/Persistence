@@ -134,7 +134,7 @@ makeSimplexBoundaryInt dim simplices (simplex, indices) =
         case findMissing s simplex of
           Just x -> if x `mod` 2 == 0 then 1 else -1
           Nothing -> error "Something went terribly wrong, SimplicialComplex.makeSimplexBoundaryInt" in
-  mapWithIndexVec (\i s -> if existsVec i indices then makeCoeff s else 0) (V.map fst $ simplices !! (dim - 1))
+  mapWithIndex (\i s -> if existsVec i indices then makeCoeff s else 0) (V.map fst $ simplices !! (dim - 1))
 
 --makes boundary operator for all simplices of dimension 2 or greater
 --first argument is the dimension of the boundary operator, second is the simplicial complex
@@ -237,7 +237,7 @@ makeEdgeBoundaryBool sc =
 --third argument is the simplex paired with the indices of its faces
 makeSimplexBoundaryBool :: Int -> SimplicialComplex -> (Vector Int, Vector Int) -> Vector Bool
 makeSimplexBoundaryBool dim simplices (simplex, indices) =
-  mapWithIndexVec (\i s -> existsVec i indices) (V.map fst $ simplices !! (dim - 1))
+  mapWithIndex (\i s -> existsVec i indices) (V.map fst $ simplices !! (dim - 1))
 
 --makes boundary operator for all simplices of dimension 2 or greater
 --first argument is the dimension of the boundary operator, second is the simplicial complex

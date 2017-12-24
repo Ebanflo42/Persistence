@@ -105,14 +105,8 @@ existsPredicate p (x:xs) =
   if p x then True
   else existsPredicate p xs
 
-mapWithIndex :: (Int -> a -> b) -> [a] -> [b]
-mapWithIndex f list =
-  let helper _ []     = []
-      helper n (x:xs) = (f n x):(helper (n + 1) xs) in
-  helper 0 list
-
-mapWithIndexVec :: (Int -> a -> b) -> Vector a -> Vector b
-mapWithIndexVec f vector =
+mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
+mapWithIndex f vector =
   let helper i vec =
         if V.null vec then empty
         else cons (f i $ V.head vec) $ helper (i + 1) (V.tail vec) in
@@ -263,7 +257,7 @@ moveToBack (i:is) vector =
 moveToBack [] vector     = vector
 
 parMapVec :: (a -> b) -> Vector a -> Vector b
-parMapVec f = V.map (runEval . rpar . f)
+parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
 
 range :: Int -> Int -> Vector Int
 range x y

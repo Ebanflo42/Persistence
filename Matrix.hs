@@ -205,20 +205,6 @@ improveRowSmithIntPar pIndex (pivot, elems) =
             newElems     = parMapVec (colOperationHelperInt pIndex transform) elems in
         improveRowSmithInt pIndex (newElems ! pIndex ! pIndex, newElems)
 
---given pivot index and pivot paired with matrix whose pivot row has been improved, eliminates the entries in the pivot row
-eliminateRowInt :: Int -> (Int, IMatrix) -> IMatrix
-eliminateRowInt pIndex (pivot, elems) =
-  let row      = elems ! pIndex
-      coeffs   = V.map (\n -> if n == 0 then 0 else n `div` pivot) row in
-  V.map (\r -> mapWithIndexVec (\i elem -> if i == pIndex then elem else elem - (coeffs ! i)*(row ! pIndex)) r) elems
-
---same as above except it works on the pivot column
-eliminateColInt :: Int -> (Int, IMatrix) -> IMatrix
-eliminateColInt pIndex (pivot, elems) =
-  let pRow     = elems ! pIndex
-      coeffs   = V.map (\row -> let n = row ! pIndex in if n == 0 then 0 else n `div` pivot) elems in
-  mapWithIndexVec (\i row -> if i == pIndex then row else row `subtr` ((coeffs ! i) `mul` pRow)) elems
-
 --given pivot index and pivot paired with matrix, improves pivot column with row operations
 improveColInt :: Int -> (Int, IMatrix) -> (Int, IMatrix)
 improveColInt pIndex (pivot, elems) =
@@ -245,6 +231,22 @@ improveColIntPar pIndex (pivot, elems) =
             newElems  = rowOperationHelperPar pIndex transform elems in
         improveColIntPar pIndex (newElems ! pIndex ! pIndex, newElems)
 
+--given pivot index and pivot paired with matrix whose pivot row has been improved, eliminates the entries in the pivot row
+--the kinds of matrices that the functions work on will have lots of zeroes
+--better to catch that with a condition than perform an unnecessary division
+eliminateRowInt :: Int -> (Int, IMatrix) -> IMatrix
+eliminateRowInt pIndex (pivot, elems) =
+  let pCol     = V.map (\row -> row ! pIndex) elems
+      coeffs   = V.map (\n -> if n == 0 then 0 else n `div` pivot) (elems ! pIndex) in
+  V.map (\r -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs ! i)*(r ! pIndex)) r) elems
+
+--same as above except it works on the pivot column
+eliminateColInt :: Int -> (Int, IMatrix) -> IMatrix
+eliminateColInt pIndex (pivot, elems) =
+  let pRow     = elems ! pIndex
+      coeffs   = V.map (\row -> let n = row ! pIndex in if n == 0 then 0 else n `div` pivot) elems in
+  mapWithIndex (\i row -> if i == pIndex then row else row `subtr` ((coeffs ! i) `mul` pRow)) elems
+
 --gets the Smith normal form of an integer matrix
 getSmithNormalFormInt :: IMatrix -> IMatrix
 getSmithNormalFormInt matrix =
@@ -252,14 +254,14 @@ getSmithNormalFormInt matrix =
       calc i m mat =
         if i == m then mat else
           case choosePivotInt i mat of
-            (Nothing, _)  ->
-              case chooseColumnPivotInt i mat of
-                (Nothing, _)  -> calc (i + 1) m mat
-                (Just p, new) -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new)
             (Just p, new) ->
               case chooseColumnPivotInt i $ (eliminateRowInt i) $ improveRowSmithInt i (p, new) of
                 (Nothing, new') -> calc (i + 1) m new'
-                (Just p, new')  -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new') in
+                (Just p, new')  -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new')
+            (Nothing, _)  ->
+              case chooseColumnPivotInt i mat of
+                (Nothing, _)  -> calc (i + 1) m mat
+                (Just p, new) -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new) in
   calc 0 maxIndex matrix
 
 --gets the Smith normal form of a matrix, uses lots of parallelism if possible
@@ -269,14 +271,14 @@ getSmithNormalFormIntPar matrix =
       calc i m mat =
         if i == m then mat else
           case choosePivotInt i mat of
-            (Nothing, _)  ->
-              case chooseColumnPivotInt i mat of
-                (Nothing, _)  -> calc (i + 1) m mat
-                (Just p, new) -> calc (i + 1) m $ (eliminateColInt i) $ improveColIntPar i (p, new)
             (Just p, new)   ->
               case chooseColumnPivotInt i $ (eliminateRowInt i) $ improveRowSmithIntPar i (p, new) of
                 (Nothing, new')   -> calc (i + 1) m new'
-                (Just p, new') -> calc (i + 1) m $ (eliminateColInt i) $ improveColIntPar i (p, new') in
+                (Just p, new') -> calc (i + 1) m $ (eliminateColInt i) $ improveColIntPar i (p, new')
+            (Nothing, _)  ->
+              case chooseColumnPivotInt i mat of
+                (Nothing, _)  -> calc (i + 1) m mat
+                (Just p, new) -> calc (i + 1) m $ (eliminateColInt i) $ improveColIntPar i (p, new) in
     calc 0 maxIndex matrix
 
 --SMITH NORMAL FORM OF BOOLEAN MATRICES-----------------------------------
@@ -322,7 +324,7 @@ elimRowSmithBool pIndex mat =
 elimColBool :: Int -> BMatrix -> BMatrix
 elimColBool pIndex elems =
   let pRow     = elems ! pIndex in
-  mapWithIndexVec (\i row -> if (not $ row ! pIndex) || i == pIndex then row else row `add` pRow) elems
+  mapWithIndex (\i row -> if (not $ row ! pIndex) || i == pIndex then row else row `add` pRow) elems
 
 --gets the Smith normal form of a boolean (mod 2) matrix, no parallel version because its very cheap
 getSmithNormalFormBool :: BMatrix -> BMatrix
