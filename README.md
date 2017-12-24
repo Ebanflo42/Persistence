@@ -1,7 +1,9 @@
 # Persistence
 A topological data analysis library for Haskell.
 
-Relevant files: Util.hs, Matrix.hs, SimplicialComplex.hs
+Relevant files: Util.hs, Matrix.hs, SimplicialComplex.hs, Testing.hs
+
+Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with `./Testing +RTS -s -N<number of threads>`
 
 Major TODOs:
 1) Implement parallelism for finding the kernel of an integer matrix
