@@ -112,6 +112,17 @@ mapWithIndex f vector =
         else cons (f i $ V.head vec) $ helper (i + 1) (V.tail vec) in
   helper 0 vector
 
+parMapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
+parMapWithIndex f vector =
+  let helper i vec = runEval $
+        if V.null vec then return empty
+        else
+          let current = f i $ V.head vec; rest = helper (i + 1) $ V.tail vec in
+          rpar current
+            >> rseq rest
+              >> (return $ current `cons` rest) in
+  helper 0 vector
+
 filterWithIndex :: (Int -> a -> Bool) -> [a] -> [a]
 filterWithIndex p list =
   let helper = \i l ->

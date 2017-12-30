@@ -20,9 +20,9 @@ import Data.Vector as V
 import Control.Parallel.Strategies
 
 {--OVERVIEW---------------------------------------------------------------
-Simplicial complexes are represented as linked lists of vectors of pairs of integer vectors.
+Simplicial complexes are represented by linked lists of arrays of pairs of integer arrays.
 Each index of the list represents all simplices of that dimension.
-A simplex is represented by a pair - a vector with its veritces and a vector with the indices
+A simplex is represented by a pair - an array with its veritces and a vector with the indices
 of its faces in the next lowest index of the list.
 
 This module provides functions for constructing the Vietoris-Rips complex and calculating homology
@@ -37,12 +37,12 @@ of the infinite cyclic group in the homology group. An element k /= 0 represents
 cyclic group of order k in the homology group. So an element of 1 represents a factor of the trivial group, i.e. no factor.
 
 The nth homology group is the quotient of the kernel of the nth boundary operator by the image of the (n+1)th boundary operator.
-First, the kernel of the nth boundary operator is found (in Matrix) and its basis is arranged into the rows of a matrix.
+First, the kernel of the nth boundary operator is found (in Matrix.hs) and its basis is arranged into the rows of a matrix.
 Since the image of the (n+1)th boundary operator is its column space, it is left-multiplied by the kernel matrix
 to project the basis of the image onto the basis of the kernel, a change of coordinates. Once this is done,
 the Smith normal form of that matrix is computed so that we can see how the basis of one vector space fits into the other.
 The diagonal of the Smith normal form represents the nth homology group.
---}
+--------------------------------------------------------------------------}
 
 --CONSTRUCTION------------------------------------------------------------
 
@@ -183,7 +183,7 @@ calculateNthHomologyIntPar n sc =
     case boundOps of
       (Nothing, Nothing) -> []
       (Nothing, Just mx) -> L.replicate (V.length $ findKernelInt mx) 0
-      (Just m1, Just m2) -> (getUnsignedDiagonal . getSmithNormalFormIntPar . (multiplyPar $ findKernelInt m2)) m1
+      (Just m1, Just m2) -> (getUnsignedDiagonal . getSmithNormalFormIntPar . (multiplyPar $ findKernelIntPar m2)) m1
 
 --calculates all homology groups of the complex
 calculateHomologyInt :: SimplicialComplex -> [[Int]]
@@ -210,7 +210,7 @@ calculateHomologyIntPar sc =
             c <- rpar current
             r <- rpar rest
             return (c:r)
-        | i == dim  = [L.replicate (V.length $ findKernelInt $ boundOps !! i) 0]
+        | i == dim  = [L.replicate (V.length $ findKernelIntPar $ boundOps !! i) 0]
         | otherwise =
           let rest    = calc $ i + 1
               current = 

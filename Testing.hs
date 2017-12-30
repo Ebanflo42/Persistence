@@ -49,7 +49,9 @@ main = do
   putStrLn $ mat2String matrix1
   putStrLn "It's kernel is:"
   putStrLn $ mat2String $ findKernelInt matrix1
-  putStrLn "According to the internet, the kernel is:"
+  putStrLn "It's kernel computed in parallel is:"
+  putStrLn $ mat2String $ findKernelIntPar matrix1
+  putStrLn "The kernel should be:"
   putStrLn $ mat2String kernel1
   putStrLn "It's Smith normal form is:"
   putStrLn $ mat2String $ getSmithNormalFormInt matrix1
@@ -60,7 +62,9 @@ main = do
   putStrLn $ mat2String matrix2
   putStrLn "It's kernel is:"
   putStrLn $ mat2String $ findKernelInt matrix2
-  putStrLn "According to the internet, the kernel is:"
+  putStrLn "It's kernel computed in parallel is:"
+  putStrLn $ mat2String $ findKernelIntPar matrix2
+  putStrLn "The kernel should be:"
   putStrLn $ mat2String kernel2
   putStrLn "It's Smith normal form is:"
   putStrLn $ mat2String $ getSmithNormalFormInt matrix2
@@ -71,7 +75,9 @@ main = do
   putStrLn $ mat2String matrix3
   putStrLn "It's kernel is:"
   putStrLn $ mat2String $ findKernelInt matrix3
-  putStrLn "According to the internet, the kernel is:"
+  putStrLn "It's kernel computed in parallel is:"
+  putStrLn $ mat2String $ findKernelIntPar matrix3
+  putStrLn "The kernel should be:"
   putStrLn $ mat2String kernel3
   putStrLn "It's Smith normal form is:"
   putStrLn $ mat2String $ getSmithNormalFormInt matrix3
