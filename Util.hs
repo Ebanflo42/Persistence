@@ -5,6 +5,40 @@ import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies
 
+xor :: Bool -> Bool -> Bool
+xor False False = False
+xor True False  = True
+xor False True  = True
+xor True True   = False
+
+instance Num Bool where
+  p + q  = p `xor` q
+  p * q  = p && q
+  p - q  = p `xor` (not q)
+  negate = not
+  abs    = id
+  fromInteger 0 = False
+  fromInteger _ = True
+  signum bool   = if bool then 1 else 0
+
+--extended Euclidean algorithm
+extEucAlg :: Integral a => a -> a -> (a, a, a)
+extEucAlg a b =
+  let eeaHelper r s t =
+        case snd r of
+          0 -> (fst r, fst s, fst t)
+          _ ->
+            let r1    = fst r
+                r2    = snd r
+                s2    = snd s
+                t2    = snd t
+                q     = r1 `div` r2
+                nextr = r1 - q*r2
+                nexts = fst s - q*s2
+                nextt = fst t - q*t2 in
+            eeaHelper (r2, nextr) (s2, nexts) (t2, nextt) in
+  eeaHelper (a, b) (0, 1) (1, 0)
+
 one (a, _, _) = a
 two (_, b, _) = b
 thr (_, _, c) = c
@@ -13,20 +47,8 @@ not1 (_, b, c) = (b, c)
 not2 (a, _, c) = (a, c)
 not3 (a, b, _) = (a, b)
 
-five1 (a, _, _, _, _) = a
-five2 (_, b, _, _, _) = b
-five3 (_, _, c, _, _) = c
-five4 (_, _, _, d, _) = d
-five5 (_, _, _, _, e) = e
-
-four1 (a, _, _, _) = a
-four2 (_, b, _, _) = b
-four3 (_, _, c, _) = c
-four4 (_, _, _, d) = d
-
-flatten :: [[a]] -> [a]
-flatten []     = []
-flatten (x:xs) = x L.++ (flatten xs)
+flatten :: Vector (Vector a) -> Vector a
+flatten = V.foldl1 (V.++)
 
 mul :: Num a => a -> Vector a -> Vector a
 mul s = V.map (*s)
@@ -56,54 +78,25 @@ switchElems i j vector
         third  = V.drop (j + 1) vector in
     first V.++ (cons (vector ! j) second) V.++ (cons (vector ! i) third)
 
-switchConsecutive :: Int -> [a] -> [a]
-switchConsecutive i list =
-  (L.take i list) L.++ ((list !! (i + 1)):(list !! i):(L.drop (i + 2) list))
-
---extended Euclidean algorithm
-extEucAlg :: Integral a => a -> a -> (a, a, a)
-extEucAlg a b =
-  let eeaHelper r s t =
-        case snd r of
-          0 -> (fst r, fst s, fst t)
-          _ ->
-            let r1    = fst r
-                r2    = snd r
-                s2    = snd s
-                t2    = snd t
-                q     = r1 `div` r2
-                nextr = r1 - q*r2
-                nexts = fst s - q*s2
-                nextt = fst t - q*t2 in
-            eeaHelper (r2, nextr) (s2, nexts) (t2, nextt) in
-  eeaHelper (a, b) (0, 1) (1, 0)
-
-forall :: (a -> Bool) -> [a] -> Bool
-forall p (x:xs) = (p x) && (forall p xs)
-forall _ []     = True
+getCombos :: Vector a -> Vector (Vector a)
+getCombos vector =
+  let len    = V.length vector
+      calc i =
+        if i == len then empty
+        else let i1 = i + 1 in
+          ((V.take i vector) V.++ (V.drop i1 vector)) `cons` (calc i1) in
+  calc 0
 
 forallVec :: (a -> Bool) -> Vector a -> Bool
 forallVec p vector = 
   if V.null vector then True
   else (p $ V.head vector) && (forallVec p $ V.tail vector)
 
-exists :: Eq a => a -> [a] -> Bool
-exists elem list =
-  case list of
-    []       -> False
-    (x : xs) -> (x == elem) || (exists elem xs)
-
-existsVec :: Eq a => a -> Vector a -> Bool
-existsVec elem vector =
+exists :: Eq a => a -> Vector a -> Bool
+exists elem vector =
   if V.null vector then False
   else let x = V.head vector; xs = V.tail vector in
-    (x == elem) || (existsVec elem xs)
-
-existsPredicate :: (a -> Bool) -> [a] -> Bool
-existsPredicate p []     = False
-existsPredicate p (x:xs) =
-  if p x then True
-  else existsPredicate p xs
+    (x == elem) || (exists elem xs)
 
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 mapWithIndex f vector =
@@ -118,19 +111,17 @@ parMapWithIndex f vector =
         if V.null vec then return empty
         else
           let current = f i $ V.head vec; rest = helper (i + 1) $ V.tail vec in
-          rpar current
-            >> rseq rest
-              >> (return $ current `cons` rest) in
+          rpar current >> rseq rest >> (return $ current `cons` rest) in
   helper 0 vector
 
-filterWithIndex :: (Int -> a -> Bool) -> [a] -> [a]
-filterWithIndex p list =
-  let helper = \i l ->
-        case l of
-          []     -> []
-          (x:xs) ->
-            if p i x  then x : (helper (i + 1) xs)
-            else helper (i + 1) xs in
+parMapWithIndexList :: (Int -> a -> b) -> [a] -> Vector b
+parMapWithIndexList f list =
+  let helper i l = runEval $
+        if L.null l then return empty
+        else
+          let current = f i $ L.head l; rest = helper (i + 1) $ L.tail l in
+          rpar current >> rseq rest
+              >> (return $ current `cons` rest) in
   helper 0 list
 
 elemAndIndex :: (a -> Bool) -> Vector a -> Maybe (a, Int)
@@ -185,14 +176,6 @@ diffByOneElem list1 list2 =
               else helper (Just y) xs ys in
   helper Nothing list1 list2
 
---from rosetta code
-levenshtein :: String -> String -> Int
-levenshtein s1 s2 = L.last $ L.foldl transform [0 .. L.length s1] s2
-  where
-    transform ns@(n:ns1) c = L.scanl calc (n + 1) $ L.zip3 s1 ns ns1
-      where
-        calc z (c1, x, y) = L.minimum [y + 1, z + 1, x + fromEnum (c1 /= c)]
-
 --finds the element of the first list that is missing in the second
 findMissing :: Eq a => Vector a -> Vector a -> Maybe a
 findMissing vec1 vec2 =
@@ -213,20 +196,6 @@ filterAndCount p list =
            else helper xs (i + 1) result in
   helper list 0 []
 
---first list satisfies predicate,
---second is the list of indices that satisfy the predicate
---third list does not satisfy the predicate
-myfilter :: (a -> Bool) -> [a] -> ([a], [Int], [a])
-myfilter p list =
-  let helper = \i l ->
-        case l of
-          []     -> ([],[],[])
-          (x:xs) ->
-            let rest = helper (i + 1) xs in
-            if p x then (x:(one rest), i:(two rest), thr rest)
-            else (one rest, two rest, x:(thr rest)) in
-  helper 0 list
-
 myfilterVec :: (a -> Bool) -> Vector a -> (Vector a, Vector Int, Vector a)
 myfilterVec p vector =
   let helper = \i v ->
@@ -237,30 +206,14 @@ myfilterVec p vector =
           else (one rest, two rest, cons x (thr rest)) in
   helper 0 vector
 
-xor :: Bool -> Bool -> Bool
-xor False False = False
-xor True False  = True
-xor False True  = True
-xor True True   = False
-
-instance Num Bool where
-  p + q  = p `xor` q
-  p * q  = p && q
-  p - q  = p `xor` (not q)
-  negate = not
-  abs    = id
-  fromInteger 0 = False
-  fromInteger _ = True
-  signum bool   = if bool then 1 else 0
-
-vectorFromList :: [a] -> Vector a
-vectorFromList (x:xs) = cons x $ vectorFromList xs
-vectorFromList []     = empty
-
-listFromVector :: Vector a -> [a]
-listFromVector vector =
-  if V.null vector then []
-  else (V.head vector):(listFromVector $ V.tail vector)
+--orders a list of vectors from greatest to least length
+sortVecs :: [Vector a] -> [Vector a]
+sortVecs []     = []
+sortVecs (v:vs) =
+  let len  = V.length v
+      less = sortVecs $ L.filter (\u -> V.length u < len) vs
+      more = sortVecs $ L.filter (\u -> V.length u >= len) vs in
+  more L.++ [v] L.++ less
 
 moveToBack :: [Int] -> Vector a -> Vector a
 moveToBack (i:is) vector =
@@ -275,3 +228,26 @@ range x y
   | x == y = x `cons` empty
   | x < y  = x `cons` (range (x + 1) y)
   | x > y  = (range x (y + 1)) `snoc` y
+
+vecConcat :: Vector (Vector a) -> Vector a
+vecConcat v =
+  if V.null v then empty
+  else V.head v V.++ (vecConcat $ V.tail v)
+
+--union of two vectors
+(##) :: Eq a => Vector a -> Vector a -> Vector a
+a ## b =
+  let check u v =
+        if V.null u then v
+        else let h = V.head u in
+          if exists h v then check (V.tail u) v
+          else h `cons` (check (V.tail u) v) in
+  if V.null b then a
+  else check a b
+
+--union of many vectors
+bigU :: Eq a => Vector (Vector a) -> Vector a
+bigU = V.foldl1 (##)
+
+replaceElem :: Int -> a -> [a] -> [a]
+replaceElem i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))

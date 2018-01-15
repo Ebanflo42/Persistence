@@ -2,6 +2,7 @@ import Util
 import Matrix
 import SimplicialComplex
 import Data.Vector as V
+import Data.List as L
 
 matrix1 :: IMatrix
 matrix1 = cons (cons 2 $ cons 3 $ cons 5 empty) (cons (cons (-4) $ cons 2 $ cons 3 empty) empty )
@@ -42,6 +43,81 @@ mat2String matrix =
         else let x = V.head mat; xs = V.tail mat in
           (show x) Prelude.++ ('\n':(helper xs)) in
   helper matrix
+
+pointCloud :: [(Float, Float)]
+pointCloud =
+  [ ( -7, -19)
+  , ( -6, -16)
+  , (  2, -16)
+  , ( 11, -16)
+  , ( 11, -11)
+  , ( -6,  -9)
+  , (  2,  -9)
+  , ( 11,  -6)
+  , (-11,  -5)
+  , (  6,  -3)
+  , (  0,   0)
+  , ( -2,   3)
+  , ( 11,   3)
+  , (-14,   8)
+  , (  1,   8)
+  , ( -8,  14)
+  , ( 10,  19)
+  , ( 17,  20)
+  ]
+
+metric :: (Float, Float) -> (Float, Float) -> Float
+metric (a, b) (c, d) =
+  let x = a - c; y = b - d in
+  sqrt (x * x + y * y)
+
+vr10 :: SimplicialComplex
+vr10 =
+  (18,
+    [
+      V.fromList $
+        L.map V.fromList $
+          [
+            [16,17],
+            [13,15],
+            [2,6],
+            [5,8],
+            [5,6],
+            [1,5],
+            [3,4],
+            [2,3],
+            [11,14],
+            [10,14],
+            [10,11],
+            [9,12],
+            [7,12],
+            [9,10],
+            [6,10],
+            [1,2],
+            [0,2],
+            [0,1],
+            [7,9],
+            [6,9],
+            [4,9],
+            [6,7],
+            [4,7],
+            [4,6]
+          ],
+    V.fromList $
+      L.map V.fromList $
+        [
+          [10,11,14],
+          [7,9,12],
+          [6,9,10],
+          [0,1,2],
+          [6,7,9],
+          [4,7,9],
+          [4,6,9],
+          [4,6,7]
+        ],
+    cons (V.fromList [4,6,7,9]) empty
+    ]
+  )
 
 main = do
 
@@ -90,3 +166,9 @@ main = do
   putStrLn $ mat2String $ getSmithNormalFormInt matrix4
   putStrLn "It's Smith normal form computed in parallel is:"
   putStrLn $ mat2String $ getSmithNormalFormIntPar matrix4
+
+  putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
+  putStrLn $ sc2String $ makeVRComplex 10.0 metric pointCloud
+
+  putStrLn "The Vietoris-Rips complex, scale 10.0, should be:"
+  putStrLn $ sc2String $ vr10

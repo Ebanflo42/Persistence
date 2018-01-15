@@ -1,9 +1,11 @@
 module SimplicialComplex
   ( SimplicialComplex
+  , gr2String
+  , sc2String
   , getDimension
   , makeNbrhdGraph
   , makeVRComplex
-  , makeVRComplexFromGraph
+  {--
   , calculateNthHomologyInt
   , calculateNthHomologyIntPar
   , calculateNthHomologyBool
@@ -11,12 +13,15 @@ module SimplicialComplex
   , calculateHomologyIntPar
   , calculateHomologyBool
   , calculateHomologyBoolPar
+  --}
   ) where
 
 import Util
 import Matrix
+import MaximalCliques
 import Data.List as L
 import Data.Vector as V
+import Data.IntSet as S
 import Control.Parallel.Strategies
 
 {--OVERVIEW---------------------------------------------------------------
@@ -46,72 +51,84 @@ The diagonal of the Smith normal form represents the nth homology group.
 
 --CONSTRUCTION------------------------------------------------------------
 
---every element of the list is a vector of simplices whose dimension is given by the index
---the vertcies of the simplex are in the fst vector
---the indices of its subsimplices in the next lowest list are in the snd vector, except for dimension 2
---vertices are not in the list, only a pair with a vector containing the number of vertices - 1 and an empty vector
-type SimplicialComplex = [Vector (Vector Int, Vector Int)]
+--number of vertices, array with all connections between vertices
+type Graph = (Int, Vector (Int, Int))
+
+--the first component of the pair is the number of vertices
+--every element of the list is a vector of simplices whose dimension is given by the index +2
+type SimplicialComplex = (Int, [Vector (Vector Int)])
+
+gr2String :: Graph -> String
+gr2String (i, v) =
+  let showVertices verts =
+        if V.null verts then ""
+        else (show $ V.head verts) L.++ '\n':(showVertices $ V.tail verts) in
+  show i L.++ ('\n':(showVertices v))
+
+sc2String :: SimplicialComplex -> String
+sc2String (v, sc) =
+  let showSimplex s     =
+        '\n':(intercalate "\n" $ V.toList $ V.map show s)
+      showAll simplices =
+        case simplices of
+          (s:ss) -> showSimplex s L.++ ('\n':(showAll ss))
+          []     -> '\n':(show v) in
+  showAll sc
 
 getDimension :: SimplicialComplex -> Int
-getDimension simplices = L.length simplices - 1
+getDimension simplices = L.length simplices + 1
 
 --given a scale, a metric, and a data set this constructs a graph out of the points in the data set
 --two points share an edge iff the distance between them is less than the scale
-makeNbrhdGraph :: Ord a => a -> (b -> b -> a) -> [b] -> SimplicialComplex
+makeNbrhdGraph :: Ord a => a -> (b -> b -> a) -> [b] -> Graph
 makeNbrhdGraph scale metric list =
-  let helper _ []     = empty
-      helper i (x:xs) =
-        let helper2 _ []     = empty
-            helper2 j (y:ys) =
-              if metric x y < scale then cons (cons i (cons j empty), empty) (helper2 (j + 1) ys)
-              else helper2 (j + 1) ys in
-        helper2 (i + 1) xs V.++ helper (i + 1) xs in
-  (cons (cons (L.length list - 1) empty, empty) empty):[helper 0 list]
+  let helper i (x:xs) result =
+        let helper2 j (y:ys) r =
+              if metric x y < scale then helper2 (j + 1) ys $ cons (i, j) r
+              else helper2 (j + 1) ys r
+            helper2 _ [] r   = r in
+        helper (i + 1) xs $ helper2 (i + 1) xs result
+      helper _ [] r   = r in
+  (L.length list - 1, helper 0 list V.empty)
 
---this function is passed the dimension, a simplex, the rest of the simplices maybe differ by exactly one element
---if a simplex does differ from the argument by one point it searches for all other simplices differing by that point
---and tries to make a higher simplex out of them
-checkAdjacentSimplices :: Int -> Int -> (Vector Int, Vector Int)
-  -> Vector (Vector Int, Vector Int) -> Vector (Maybe Int)
-    -> Vector (Vector Int, Vector Int) -> Vector (Vector Int, Vector Int)
-checkAdjacentSimplices index dim simplex simplices adjacency result =
-  if V.null adjacency then result
-  else let x = V.head adjacency; xs = V.tail adjacency in
-    case x of
-      Nothing -> checkAdjacentSimplices (index + 1) dim simplex simplices xs result
-      Just v  ->
-        let common = myfilterVec (\a -> a == x) xs
-            len    = V.length $ one common in
-        if len == dim then
-          checkAdjacentSimplices (index + 1) dim simplex simplices (thr common)
-            ((v `cons` (fst simplex), index `cons` (snd simplex)) `cons` result)
-        else if len < dim then
-          checkAdjacentSimplices (index + 1) dim simplex simplices xs result
-        else error "Neighborhood graph was a multigraph, or this algorithm isn't working."
-
---given a dimension and all simplices of that dimension, finds simplices one dimension higher
-findHigherSimplices :: Int -> Vector (Vector Int, Vector Int) -> Vector (Vector Int, Vector Int)
-findHigherSimplices dim simplices =
-  if V.null simplices then empty
-  else let x = V.head simplices; xs = V.tail simplices in
-    (checkAdjacentSimplices 0 dim x xs (V.map (diffByOneElem $ fst x) $ V.map fst xs) empty) V.++ (findHigherSimplices dim xs)
-
---given graph, constructs the clique complex
-constructSimplices :: Int -> SimplicialComplex -> SimplicialComplex
-constructSimplices dim result =
-  let currentSimplices = L.last result in
-  if V.null currentSimplices then L.init result --if there are no higher simplices to be found, return
-  else constructSimplices (dim + 1) (result L.++ [findHigherSimplices dim currentSimplices])
+neighborhood :: Int -> Graph -> Vector Int
+neighborhood vertex graph =
+  let returnOther x (a, b) =
+        if x == a then Just b
+        else if x == b then Just a
+        else Nothing
+      filterNothings vec
+        | V.null vec = V.empty
+        | otherwise  =
+          case V.head vec of
+            Nothing -> filterNothings $ V.tail vec
+            Just x  -> x `cons` (filterNothings $ V.tail vec) in
+  filterNothings $ V.map (returnOther vertex) $ snd graph
 
 --makes the Vietoris-Rips complex given a scale, metric, and data set
---may need to start dimension higher or lower, first arg of constructSimplices
-makeVRComplex :: Ord a => a -> (b -> b -> a) -> [b] -> SimplicialComplex
+--uses Bron-Kerbosch algorithm to find maximal cliques and then enumerates faces
+--need to research Makino and Uno algorithm: http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.138.705
+makeVRComplex :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
 makeVRComplex scale metric list =
-  constructSimplices 2 $ makeNbrhdGraph scale metric list
-
-makeVRComplexFromGraph :: SimplicialComplex -> SimplicialComplex
-makeVRComplexFromGraph = constructSimplices 2
-
+  let organizeCliques dim simplices = --make a list with an entry for every dimension
+        case L.findIndex (\v -> (V.length v) /= dim) simplices of
+          Just i  ->
+            let diff = (V.length $ simplices !! i) - dim in
+            if diff == 1 then (V.fromList $ L.take i simplices):(organizeCliques (dim - 1) $ L.drop i simplices)
+            else (V.fromList $ L.take i simplices):((L.replicate (diff - 1) V.empty) L.++ (organizeCliques (dim - 1) $ L.drop i simplices))
+          Nothing -> [V.fromList simplices]
+      makeGood simplices = --pair the organized list of maximal cliques with its dimension
+        let dim = V.length $ L.head simplices in
+        (dim, organizeCliques dim simplices)
+      maxCliques =
+        makeGood $ sortVecs $ L.map (V.fromList . (L.map (\x -> L.head $ L.elemIndices x list))) $
+          getMaximalCliques (\x y -> metric x y < scale) list
+      combos i max sc =
+        if i == max then sc
+        else let i1 = i + 1 in
+          combos i1 max $ replaceElem i1 (sc !! i1 V.++ (bigU $ V.map getCombos $ sc !! i)) sc in
+  (L.length list, L.reverse $ combos 0 (fst maxCliques - 2) (snd maxCliques))
+{--
 --INTEGER HOMOLOGY--------------------------------------------------------
 
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
@@ -316,3 +333,4 @@ calculateHomologyBoolPar sc =
             r <- rpar rest
             return (c:r) in
   calc 0
+--}

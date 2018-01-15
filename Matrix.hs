@@ -51,12 +51,12 @@ type BMatrix = Vector (Vector Bool)
 
 transposeMat :: Vector (Vector a) -> Vector (Vector a)
 transposeMat mat =
-  vectorFromList $ L.map (\i -> V.map (\row -> row ! i) mat) [0..(V.length $ V.head mat) - 1]
+  fromList $ L.map (\i -> V.map (\row -> row ! i) mat) [0..(V.length $ V.head mat) - 1]
 
 --takes the transpose of a matrix in parallel
 transposePar :: Vector (Vector a) -> Vector (Vector a)
 transposePar mat =
-  vectorFromList $ parMap rpar (\i -> V.map (\row -> row ! i) mat) [0..(V.length $ V.head mat) - 1]
+  fromList $ parMap rpar (\i -> V.map (\row -> row ! i) mat) [0..(V.length $ V.head mat) - 1]
 
 --multiply matrices
 multiply :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
@@ -379,9 +379,9 @@ chooseGaussPivotInt i mat = --assumes that i is a legal index for mat
       elem = row ! i
       pos  =
         if elem == 0 then
-        case L.filter (\index -> index > i) $ L.findIndices (\n -> n /= 0) $ listFromVector row of
-          (x:_)  -> Just $ Right (i, x)
-          []     -> Nothing
+        case V.filter (\index -> index > i) $ V.findIndices (\n -> n /= 0) row of
+          v | V.null v -> Nothing
+          v            -> Just $ Right (i, V.head v)
         else if exactlyOneNonZero row then Nothing
         else Just $ Left i in
   case pos of
@@ -456,7 +456,7 @@ findKernelInt matrix =
       len0     = V.length $ V.head matrix
       len01    = len0 - 1
       maxIndex = if len > len0 then len0 else len
-      identity = vectorFromList $ L.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (len01 - i) 0))) [0..len01]
+      identity = fromList $ L.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (len01 - i) 0))) [0..len01]
       zeroData = moveAllZeroColsBackInt matrix identity
       doColOps index (elems, ide) =
         if index == (one zeroData) || index == maxIndex then (elems, ide) else 
@@ -477,7 +477,7 @@ findKernelIntPar matrix =
       len0     = V.length $ V.head matrix
       len01    = len0 - 1
       maxIndex = if len > len0 then len0 else len
-      identity = vectorFromList $ L.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (len01 - i) 0))) [0..len01]
+      identity = fromList $ L.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (len01 - i) 0))) [0..len01]
       zeroData = moveAllZeroColsBackInt matrix identity
       doColOps index (elems, ide) =
         if index == (one zeroData) || index == maxIndex then (elems, ide) else 
@@ -514,9 +514,9 @@ chooseGaussPivotBool i mat = --assumes that i is a legal index for mat
       elem = row ! i
       pos  =
         if not elem then
-        case L.filter (\index -> index > i) $ L.findIndices (\n -> n /= 0) $ listFromVector row of
-          (x:_)  -> Just $ Right (i, x)
-          []     -> Nothing
+        case V.filter (\index -> index > i) $ V.findIndices id row of
+          v | V.null v -> Nothing
+          v            -> Just $ Right (i, V.head v)
         else if exactlyOneTrue row then Nothing
         else Just $ Left i in
   case pos of
@@ -545,7 +545,7 @@ findKernelBool matrix =
       len0     = V.length $ V.head matrix
       len01    = len0 - 1
       maxIndex = if len > len0 then len0 else len
-      identity = vectorFromList $ L.map (\i -> (V.replicate i False) V.++ (cons True (V.replicate (len01 - i) False))) [0..len01]
+      identity = fromList $ L.map (\i -> (V.replicate i False) V.++ (cons True (V.replicate (len01 - i) False))) [0..len01]
       zeroData = moveAllZeroColsBackBool matrix identity
       doColOps index (elems, ide) =
         if index == (one zeroData) || index == maxIndex then (elems, ide) else 
@@ -558,4 +558,4 @@ findKernelBool matrix =
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
       ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> not $ row ! i) elems) $ vectorFromList [0..len01]
+  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> not $ row ! i) elems) $ fromList [0..len01]
