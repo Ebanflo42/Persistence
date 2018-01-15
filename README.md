@@ -8,8 +8,10 @@ Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with
     ./Testing +RTS -s -N<number of threads>
 
 Major TODOs:
-1) Test the construction of the Vietoris-Rips Complex
-2) Implement persistence modules.
+1) Continue testing the construction of the Vietoris-Rips Complex.
+2) Implement and test homology algorithms.
+3) Implement persistence modules.
+4) Investigate Makino and Uno's algorithm for finding maximal cliques http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.138.705
 
 Papers for learning about topological data analysis:
 
@@ -19,17 +21,16 @@ http://geometry.stanford.edu/papers/zc-cph-05/zc-cph-05.pdf
 
 Overview of SimplicialComplex
 
-Simplicial complexes are represented by linked lists of arrays of pairs of integer arrays.
-Each index of the list represents all simplices of that dimension.
-A simplex is represented by a pair - an array with its veritces and a vector with the indices
-of its faces in the next lowest index of the list.
+Simplicial complexes are represented as a pair. The first component is an integer
+indicating the number of vertices (might remove that) and the second is a list
+of arrays of simplices whose dimension is given by the index in the list +2.
 
 This module provides functions for constructing the Vietoris-Rips complex and calculating homology
 over both the integers and the integers modulo 2 (represented with booleans).
 
-The construction of the Vietoris-Rips complex has two steps when starting from a metric data set:
-1) Construct the neighborhood graph, simply make an edge between any two points that fall within the given distance
-2) Construct the clique complex of the neighborhood graph. This is far more complicated and the current algorithm is untested
+The Vietoris-Rips complex is constructed by first finding all maximal cliques of the data set given
+the metric and scale (all arrras of points which fall within the scale of each other) and then
+enumerating all the faces of the cliques.
 
 Homology groups are represented by integer lists. An element being 0 in the list represents a factor
 of the infinite cyclic group in the homology group. An element k /= 0 represents a factor of the
