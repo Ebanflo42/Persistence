@@ -8,10 +8,8 @@ Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with
     ./Testing +RTS -s -N<number of threads>
 
 Major TODOs:
-1) Continue testing the construction of the Vietoris-Rips Complex.
-2) Implement and test homology algorithms.
-3) Implement persistence modules.
-4) Investigate Makino and Uno's algorithm for finding maximal cliques http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.138.705
+1) Debug homology computation.
+2) Implement persistence modules.
 
 Papers for learning about topological data analysis:
 
