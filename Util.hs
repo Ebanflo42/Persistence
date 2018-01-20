@@ -36,8 +36,10 @@ extEucAlg a b =
                 nextr = r1 - q*r2
                 nexts = fst s - q*s2
                 nextt = fst t - q*t2 in
-            eeaHelper (r2, nextr) (s2, nexts) (t2, nextt) in
-  eeaHelper (a, b) (0, 1) (1, 0)
+            eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
+      gcdTriple = eeaHelper (a, b) (0, 1) (1, 0) in
+  if one gcdTriple < 0 then (-(one gcdTriple), -(two gcdTriple), -(thr gcdTriple))
+  else gcdTriple
 
 one (a, _, _) = a
 two (_, b, _) = b
@@ -91,12 +93,6 @@ forallVec :: (a -> Bool) -> Vector a -> Bool
 forallVec p vector = 
   if V.null vector then True
   else (p $ V.head vector) && (forallVec p $ V.tail vector)
-
-exists :: Eq a => a -> Vector a -> Bool
-exists elem vector =
-  if V.null vector then False
-  else let x = V.head vector; xs = V.tail vector in
-    (x == elem) || (exists elem xs)
 
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 mapWithIndex f vector =
@@ -180,10 +176,10 @@ diffByOneElem list1 list2 =
 findMissing :: Eq a => Vector a -> Vector a -> Maybe a
 findMissing vec1 vec2 =
   if V.null vec1 then Nothing
-  else let x = V.head vec1; xs = V.tail vec1 in
+  else let x = V.head vec1 in
     case V.elemIndex x vec2 of
       Nothing -> Just x
-      Just _  -> findMissing xs vec2
+      Just _  -> findMissing (V.tail vec1) vec2
 
 --returns number of elements satisying the predicate and a list of the elements
 filterAndCount :: (a -> Bool) -> [a] -> (Int, [a])
@@ -215,11 +211,6 @@ sortVecs (v:vs) =
       more = sortVecs $ L.filter (\u -> V.length u >= len) vs in
   more L.++ [v] L.++ less
 
-moveToBack :: [Int] -> Vector a -> Vector a
-moveToBack (i:is) vector =
-  moveToBack is $ ((V.take i vector) V.++ (V.drop (i + 1) vector)) `snoc` (vector ! i)
-moveToBack [] vector     = vector
-
 parMapVec :: (a -> b) -> Vector a -> Vector b
 parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
 
@@ -240,7 +231,7 @@ a ## b =
   let check u v =
         if V.null u then v
         else let h = V.head u in
-          if exists h v then check (V.tail u) v
+          if V.elem h v then check (V.tail u) v
           else h `cons` (check (V.tail u) v) in
   if V.null b then a
   else check a b
@@ -251,3 +242,6 @@ bigU = V.foldl1 (##)
 
 replaceElem :: Int -> a -> [a] -> [a]
 replaceElem i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
+
+evalPar :: a -> [a] -> [a]
+evalPar c r = runEval $ rpar c >> rseq r >> return (c:r)

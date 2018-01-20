@@ -9,6 +9,7 @@ module Matrix
   , getSmithNormalFormInt
   , getSmithNormalFormIntPar
   , getSmithNormalFormBool
+  , getDiagonal
   , getUnsignedDiagonal
   , findKernelInt
   , findKernelIntPar
@@ -51,12 +52,12 @@ type BMatrix = Vector (Vector Bool)
 
 transposeMat :: Vector (Vector a) -> Vector (Vector a)
 transposeMat mat =
-  fromList $ L.map (\i -> V.map (\row -> row ! i) mat) [0..(V.length $ V.head mat) - 1]
+  V.map (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
 
 --takes the transpose of a matrix in parallel
 transposePar :: Vector (Vector a) -> Vector (Vector a)
 transposePar mat =
-  fromList $ parMap rpar (\i -> V.map (\row -> row ! i) mat) [0..(V.length $ V.head mat) - 1]
+  parMapVec (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
 
 --multiply matrices
 multiply :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
@@ -71,10 +72,15 @@ multiplyPar mat1 mat2 = runEval $ do
   rseq t
   return $ parMapVec (\row -> V.map (dotProduct row) t) mat1
 
---gets the absolute value of every diagonal element, absolute value is identity for booleans in this case
+getDiagonal :: Vector (Vector a) -> [a]
+getDiagonal matrix =
+  if V.null matrix then []
+  else L.map (\i -> matrix ! i ! i) [0..(min (V.length matrix) (V.length $ V.head matrix)) - 1]
+
 getUnsignedDiagonal :: Num a => Vector (Vector a) -> [a]
 getUnsignedDiagonal matrix =
-  L.map (\i -> abs $ matrix ! i ! i) [0..(min (V.length matrix) (V.length $ V.head matrix)) - 1]
+  if V.null matrix then []
+  else L.map (\i -> abs $ matrix ! i ! i) [0..(min (V.length matrix) (V.length $ V.head matrix)) - 1]
 
 --SMITH NORMAL FORM OF INTEGER MATRICES-----------------------------------
 
@@ -85,9 +91,9 @@ choosePivotInt i mat = --assumes that i is a legal index for mat
   let pos = --Nothing if pivot is found, Right if a column switch needs to be performed, Left otherwise
         let row = mat ! i in
         if row ! i == 0 then
-        case V.findIndex (\n -> n /= 0) row of
-          Just x  -> Just $ Right (i, x)
-          Nothing -> Nothing
+          case V.findIndex (\n -> n /= 0) row of
+            Just x  -> Just $ Right (i, x)
+            Nothing -> Nothing
         else if exactlyOneNonZero row then Nothing
         else Just $ Left i in
   case pos of
@@ -160,7 +166,7 @@ rowOperationHelperPar pIndex (c1, c2, q1, q2, index) elems =
         second = V.drop (index + 1) (V.take pIndex elems)
         third  = V.drop (pIndex + 1) elems
         res    = runEval $ do
-          a <- rpar $ (q2 `mul` row1) `subtr` (q1 `mul` row2)
+          a <- rpar $ (q1 `mul` row2) `subtr` (q2 `mul` row1)
           b <- rpar $ (c1 `mul` row2) `add` (c2 `mul` row1)
           rseq a
           rseq b
@@ -172,7 +178,7 @@ rowOperationHelperPar pIndex (c1, c2, q1, q2, index) elems =
         third  = V.drop (index + 1) elems
         res    = runEval $ do
           a <- rpar $ (c1 `mul` row1) `add` (c2 `mul` row2)
-          b <- rpar $ (q2 `mul` row1) `subtr` (q1 `mul` row2)
+          b <- rpar $ (q1 `mul` row2) `subtr` (q2 `mul` row1)
           rseq a
           rseq b
           return (a, b) in
@@ -277,7 +283,7 @@ getSmithNormalFormInt matrix =
               case chooseColumnPivotInt i mat of
                 (Nothing, _)  -> calc (i + 1) m mat
                 (Just p, new) -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new) in
-  calc 0 maxIndex matrix
+  if V.null matrix then empty else calc 0 maxIndex matrix
 
 --gets the Smith normal form of a matrix, uses lots of parallelism if possible
 getSmithNormalFormIntPar :: IMatrix -> IMatrix
@@ -294,7 +300,7 @@ getSmithNormalFormIntPar matrix =
               case chooseColumnPivotInt i mat of
                 (Nothing, _)  -> calc (i + 1) m mat
                 (Just p, new) -> calc (i + 1) m $ (eliminateColIntPar i) $ improveColIntPar i (p, new) in
-    calc 0 maxIndex matrix
+  if V.null matrix then empty else calc 0 maxIndex matrix
 
 --SMITH NORMAL FORM OF BOOLEAN MATRICES-----------------------------------
 
@@ -344,19 +350,19 @@ elimColBool pIndex elems =
 --gets the Smith normal form of a boolean (mod 2) matrix, no parallel version because its very cheap
 getSmithNormalFormBool :: BMatrix -> BMatrix
 getSmithNormalFormBool matrix =
-    let maxIndex     = min (V.length matrix) (V.length $ V.head matrix)
-        calc i m mat =
-            if i == m then mat else
-            case choosePivotBool i mat of
-                (False, new)  ->
-                  case chooseColumnPivotBool i new of
-                    (False, _)   -> calc (i + 1) m new
-                    (True, new') -> calc (i + 1) m $ elimColBool i new'
-                (True, new)   ->
-                  case chooseColumnPivotBool i $ elimRowSmithBool i new of
-                    (False, new') -> calc (i + 1) m new'
-                    (True, new')  -> calc (i + 1) m $ elimColBool i new' in
-    calc 0 maxIndex matrix
+  let maxIndex     = min (V.length matrix) (V.length $ V.head matrix)
+      calc i m mat =
+          if i == m then mat else
+          case choosePivotBool i mat of
+              (False, new)  ->
+                case chooseColumnPivotBool i new of
+                  (False, _)   -> calc (i + 1) m new
+                  (True, new') -> calc (i + 1) m $ elimColBool i new'
+              (True, new)   ->
+                case chooseColumnPivotBool i $ elimRowSmithBool i new of
+                  (False, new') -> calc (i + 1) m new'
+                  (True, new')  -> calc (i + 1) m $ elimColBool i new' in
+  if V.null matrix then empty else calc 0 maxIndex matrix
 
 --KERNEL OF INTEGER MATRICES----------------------------------------------
 
@@ -367,8 +373,11 @@ moveAllZeroColsBackInt :: IMatrix -> IMatrix -> (Int, IMatrix, IMatrix)
 moveAllZeroColsBackInt elems identity =
   let len    = (V.length $ V.head elems) - 1
       zeroes = L.filter (\i -> forallVec (\row -> row ! i == 0) elems) [0..len]
+      moveToBack (i:is) vector =
+        moveToBack is $ ((V.take i vector) V.++ (V.drop (i + 1) vector)) `snoc` (vector ! i)
+      moveToBack [] vector     = vector
       op     = V.map (moveToBack zeroes) in
-  (len - (L.length zeroes), op elems, op identity)
+  (len - (L.length zeroes) + 1, op elems, op identity)
 
 --given the index of the pivot row and the matrix
 --determines whether there is a non-zero element in the row, does necessary rearranging
@@ -379,16 +388,14 @@ chooseGaussPivotInt i mat = --assumes that i is a legal index for mat
       elem = row ! i
       pos  =
         if elem == 0 then
-        case V.filter (\index -> index > i) $ V.findIndices (\n -> n /= 0) row of
-          v | V.null v -> Nothing
-          v            -> Just $ Right (i, V.head v)
+          case V.filter (\index -> index > i) $ V.findIndices (\n -> n /= 0) row of
+            v | V.null v -> Nothing
+            v            -> Just $ Right (i, V.head v)
         else if exactlyOneNonZero row then Nothing
         else Just $ Left i in
   case pos of
     Just (Left x)       -> (True, mat, Nothing)
-    Just (Right (x, y)) ->
-      let newElems = V.map (switchElems x y) mat in
-      (True, newElems, Just (x, y))
+    Just (Right (x, y)) -> (True, V.map (switchElems x y) mat, Just (x, y))
     Nothing             -> (False, mat, Nothing)
 
 --makes every element after the pivot in the pivot row divisible by the pivot
@@ -452,45 +459,45 @@ eliminateEntriesGaussIntPar pIndex maxIndex (elems, pivot, identity) =
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernelInt :: IMatrix -> IMatrix
 findKernelInt matrix =
-  let len      = V.length matrix
-      len0     = V.length $ V.head matrix
-      len01    = len0 - 1
-      maxIndex = if len > len0 then len0 else len
-      identity = fromList $ L.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (len01 - i) 0))) [0..len01]
+  let rows     = V.length matrix
+      cols     = V.length $ V.head matrix
+      cols1    = cols - 1
+      diag     = min rows cols
+      identity = V.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
       zeroData = moveAllZeroColsBackInt matrix identity
       doColOps index (elems, ide) =
-        if index == (one zeroData) || index == maxIndex then (elems, ide) else 
+        if index == (one zeroData) || index == diag then (elems, ide) else 
           case chooseGaussPivotInt index elems of
-            (True, _, Nothing)  ->
-              doColOps (index + 1) $ eliminateEntriesGaussInt index len0 $ improveRowGaussInt index len0 elems ide
+            (True, _, Nothing)      ->
+              doColOps (index + 1) $ eliminateEntriesGaussInt index cols $ improveRowGaussInt index cols elems ide
             (True, mx, Just (i, j)) ->
-              doColOps (index + 1) $ eliminateEntriesGaussInt index len0 $ improveRowGaussInt index len0 mx $ V.map (switchElems i j) ide
-            (False, _, _)       -> doColOps (index + 1) (elems, ide)
+              doColOps (index + 1) $ eliminateEntriesGaussInt index cols $ improveRowGaussInt index cols mx $ V.map (switchElems i j) ide
+            (False, _, _)           -> doColOps (index + 1) (elems, ide)
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
       ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` len01
+  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
 
 findKernelIntPar :: IMatrix -> IMatrix
 findKernelIntPar matrix =
-  let len      = V.length matrix
-      len0     = V.length $ V.head matrix
-      len01    = len0 - 1
-      maxIndex = if len > len0 then len0 else len
-      identity = fromList $ L.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (len01 - i) 0))) [0..len01]
+  let rows     = V.length matrix
+      cols     = V.length $ V.head matrix
+      cols1    = cols - 1
+      diag     = min rows cols
+      identity = V.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
       zeroData = moveAllZeroColsBackInt matrix identity
       doColOps index (elems, ide) =
-        if index == (one zeroData) || index == maxIndex then (elems, ide) else 
+        if index == (one zeroData) || index == diag then (elems, ide) else 
           case chooseGaussPivotInt index elems of
             (True, _, Nothing)  ->
-              doColOps (index + 1) $ eliminateEntriesGaussIntPar index len0 $ improveRowGaussIntPar index len0 elems ide
+              doColOps (index + 1) $ eliminateEntriesGaussIntPar index cols $ improveRowGaussIntPar index cols elems ide
             (True, mx, Just (i, j)) ->
-              doColOps (index + 1) $ eliminateEntriesGaussIntPar index len0 $ improveRowGaussIntPar index len0 mx $ V.map (switchElems i j) ide
+              doColOps (index + 1) $ eliminateEntriesGaussIntPar index cols $ improveRowGaussIntPar index cols mx $ V.map (switchElems i j) ide
             (False, _, _)       -> doColOps (index + 1) (elems, ide)
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
       ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` len01
+  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
   
 
 --KERNEL OF BOOLEAN MATRICES----------------------------------------------
@@ -502,8 +509,11 @@ moveAllZeroColsBackBool :: BMatrix -> BMatrix -> (Int, BMatrix, BMatrix)
 moveAllZeroColsBackBool elems identity =
   let len    = (V.length $ V.head elems) - 1
       zeroes = L.filter (\i -> forallVec (\row -> not $ row ! i) elems) [0..len]
+      moveToBack (i:is) vector =
+        moveToBack is $ ((V.take i vector) V.++ (V.drop (i + 1) vector)) `snoc` (vector ! i)
+      moveToBack [] vector     = vector
       op     = V.map (moveToBack zeroes) in
-  (len - (L.length zeroes), op elems, op identity)
+  (len - (L.length zeroes) + 1, op elems, op identity)
 
 --given the index of the pivot row and the matrix
 --determines whether there is a non-zero element in the row, does necessary rearranging
@@ -514,9 +524,9 @@ chooseGaussPivotBool i mat = --assumes that i is a legal index for mat
       elem = row ! i
       pos  =
         if not elem then
-        case V.filter (\index -> index > i) $ V.findIndices id row of
-          v | V.null v -> Nothing
-          v            -> Just $ Right (i, V.head v)
+          case V.filter (\index -> index > i) $ V.findIndices id row of
+            v | V.null v -> Nothing
+            v            -> Just $ Right (i, V.head v)
         else if exactlyOneTrue row then Nothing
         else Just $ Left i in
   case pos of
@@ -541,21 +551,21 @@ eliminateEntriesGaussBool pIndex maxIndex elems identity =
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernelBool :: BMatrix -> BMatrix
 findKernelBool matrix =
-  let len      = V.length matrix
-      len0     = V.length $ V.head matrix
-      len01    = len0 - 1
-      maxIndex = if len > len0 then len0 else len
-      identity = fromList $ L.map (\i -> (V.replicate i False) V.++ (cons True (V.replicate (len01 - i) False))) [0..len01]
+  let rows     = V.length matrix
+      cols     = V.length $ V.head matrix
+      cols1    = cols - 1
+      diag     = min rows cols
+      identity = V.map (\i -> (V.replicate i False) V.++ (cons True (V.replicate (cols1 - i) False))) $ 0 `range` cols1
       zeroData = moveAllZeroColsBackBool matrix identity
       doColOps index (elems, ide) =
-        if index == (one zeroData) || index == maxIndex then (elems, ide) else 
+        if index == (one zeroData) || index == diag then (elems, ide) else 
           case chooseGaussPivotBool index elems of
             (True, _, Nothing)  ->
-              doColOps (index + 1) $ eliminateEntriesGaussBool index len0 elems ide
+              doColOps (index + 1) $ eliminateEntriesGaussBool index cols elems ide
             (True, mx, Just (i, j)) ->
-              doColOps (index + 1) $ eliminateEntriesGaussBool index len0 mx $ V.map (switchElems i j) ide
+              doColOps (index + 1) $ eliminateEntriesGaussBool index cols mx $ V.map (switchElems i j) ide
             (False, _, _)       -> doColOps (index + 1) (elems, ide)
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
       ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> not $ row ! i) elems) $ fromList [0..len01]
+  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> not $ row ! i) elems) $ 0 `range` cols1
