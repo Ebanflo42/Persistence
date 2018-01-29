@@ -1,15 +1,19 @@
 # Persistence
 A topological data analysis library for Haskell.
 
-Relevant files: Util.hs, Matrix.hs, SimplicialComplex.hs, Testing.hs
+Relevant files: Util.hs, Matrix.hs, SimplicialComplex.hs, Persistence.hs, Testing.hs
 
 Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with 
 
     ./Testing +RTS -s -N<number of threads>
 
+The objective of the library is to provide users with functions for computing simplicial and persistent homology. These two are very related to each other, but the computation is very different (persistent homology doesn't use matrices, but simplicial homology doesn't use polynomials).
+
 Major TODOs:
-1) Debug homology computation.
-2) Implement persistence modules.
+
+1) Implement barcode computation. (Persistence.hs)
+2) Optimize filtration construction. (Persistence.hs)
+3) Debug Smith normal form. (Matrix.hs)
 
 Papers for learning about topological data analysis:
 
