@@ -62,8 +62,8 @@ transposePar mat =
 --multiply matrices
 multiply :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
 multiply mat1 mat2 =
-  let t = transposeMat mat2 in
-  V.map (\row -> V.map (dotProduct row) t) mat1
+  let t = transposeMat mat2
+  in V.map (\row -> V.map (dotProduct row) t) mat1
 
 --multiply matrices, evaluate rows in parallel if processors are available
 multiplyPar :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
@@ -89,18 +89,18 @@ getUnsignedDiagonal matrix =
 choosePivotInt :: Int -> IMatrix -> (Maybe Int, IMatrix)
 choosePivotInt i mat = --assumes that i is a legal index for mat
   let pos = --Nothing if pivot is found, Right if a column switch needs to be performed, Left otherwise
-        let row = mat ! i in
-        if row ! i == 0 then
+        let row = mat ! i
+        in if row ! i == 0 then
           case V.findIndex (\n -> n /= 0) row of
             Just x  -> Just $ Right (i, x)
             Nothing -> Nothing
         else if exactlyOneNonZero row then Nothing
-        else Just $ Left i in
-  case pos of
+        else Just $ Left i
+  in case pos of
     Just (Left x)       -> (Just $ mat ! x ! x, mat)
     Just (Right (x, y)) ->
-      let newElems = V.map (switchElems x y) mat in
-      (Just $ newElems ! x ! x, newElems)
+      let newElems = V.map (switchElems x y) mat
+      in (Just $ newElems ! x ! x, newElems)
     Nothing             -> (Nothing, mat)
 
 --does a column operation specific to Smith Normal Form algo on a single row
@@ -109,59 +109,59 @@ choosePivotInt i mat = --assumes that i is a legal index for mat
 --the quotients of the two elements by their gcd, and the index of the non-pivot element
 colOperationHelperInt :: Int -> (Int, Int, Int, Int, Int) -> Vector Int -> Vector Int
 colOperationHelperInt pIndex (c1, c2, q1, q2, index) row =
-  let elem1 = row ! index; elem2 = row ! pIndex in
-  if index < pIndex then
-  let first  = V.take index row
-      second = V.drop (index + 1) (V.take pIndex row)
-      third  = V.drop (pIndex + 1) row in
-  first V.++ (cons (q2*elem1 - q1*elem2) second) V.++ (cons (c1*elem2 + c2*elem1) third)
-  else
-  let first  = V.take pIndex row
-      second = V.drop (pIndex + 1) (V.take index row)
-      third  = V.drop (index + 1) row in
-  first V.++ (cons (c1*elem1 + c2*elem2) second) V.++ (cons (q2*elem1 - q1*elem2) third)
+  let elem1 = row ! index; elem2 = row ! pIndex
+  in if index < pIndex then
+    let first  = V.take index row
+        second = V.drop (index + 1) (V.take pIndex row)
+        third  = V.drop (pIndex + 1) row
+    in first V.++ (cons (q2*elem1 - q1*elem2) second) V.++ (cons (c1*elem2 + c2*elem1) third)
+    else
+      let first  = V.take pIndex row
+          second = V.drop (pIndex + 1) (V.take index row)
+          third  = V.drop (index + 1) row
+      in first V.++ (cons (c1*elem1 + c2*elem2) second) V.++ (cons (q2*elem1 - q1*elem2) third)
 
 --does necessary rearranging if pivot is found
 --returns pivot if it is found with the new matrix
 chooseColumnPivotInt :: Int -> IMatrix -> (Maybe Int, IMatrix)
 chooseColumnPivotInt index elems =
   let pos =
-        let col = V.map (\row -> row ! index) elems in
-        if elems ! index ! index == 0 then
+        let col = V.map (\row -> row ! index) elems
+        in if elems ! index ! index == 0 then
           case V.findIndex (\n -> n /= 0) col of
             Just x  -> Just $ Right (index, x)
             Nothing -> Nothing
-        else if exactlyOneNonZero col then Nothing
-        else Just $ Left index in
-  case pos of
+          else if exactlyOneNonZero col then Nothing
+          else Just $ Left index
+  in case pos of
     Just (Left i)       -> (Just $ elems ! i ! i, elems)
     Just (Right (i, j)) ->
-      let newElems = switchElems i j elems in
-      (Just $ newElems ! i ! i, newElems)
+      let newElems = switchElems i j elems
+      in (Just $ newElems ! i ! i, newElems)
     Nothing             -> (Nothing, elems)
     
 --does the same thing as colOperationHelper except with rows, operates on the whole matrix
 rowOperationHelper :: Int -> (Int, Int, Int, Int, Int) -> IMatrix -> IMatrix
 rowOperationHelper pIndex (c1, c2, q1, q2, index) elems =
-  let row1 = elems ! index; row2 = elems ! pIndex in
-  if index < pIndex then
+  let row1 = elems ! index; row2 = elems ! pIndex
+  in if index < pIndex then
     let first  = V.take index elems
         second = V.drop (index + 1) (V.take pIndex elems)
-        third  = V.drop (pIndex + 1) elems in
-    first V.++ (cons ((q2 `mul` row1) `subtr` (q1 `mul` row2)) second)
-     V.++ (cons ((c1 `mul` row2) `add` (c2 `mul` row1)) third)
+        third  = V.drop (pIndex + 1) elems
+    in first V.++ (cons ((q2 `mul` row1) `subtr` (q1 `mul` row2)) second)
+      V.++ (cons ((c1 `mul` row2) `add` (c2 `mul` row1)) third)
   else
     let first  = V.take pIndex elems
         second = V.drop (pIndex + 1) (V.take index elems)
-        third  = V.drop (index + 1) elems in
-    first V.++ (cons ((c1 `mul` row1) `add` (c2 `mul` row2)) second)
+        third  = V.drop (index + 1) elems
+    in first V.++ (cons ((c1 `mul` row1) `add` (c2 `mul` row2)) second)
       V.++ (cons ((q2 `mul` row1) `subtr` (q1 `mul` row2)) third)
 
 --same as rowOperationHelperPar except linear combinations of rows can be computed in parallel
 rowOperationHelperPar :: Int -> (Int, Int, Int, Int, Int) -> IMatrix -> IMatrix
 rowOperationHelperPar pIndex (c1, c2, q1, q2, index) elems =
-  let row1 = elems ! index; row2 = elems ! pIndex in
-  if index < pIndex then
+  let row1 = elems ! index; row2 = elems ! pIndex
+  in if index < pIndex then
     let first  = V.take index elems
         second = V.drop (index + 1) (V.take pIndex elems)
         third  = V.drop (pIndex + 1) elems
@@ -170,8 +170,8 @@ rowOperationHelperPar pIndex (c1, c2, q1, q2, index) elems =
           b <- rpar $ (c1 `mul` row2) `add` (c2 `mul` row1)
           rseq a
           rseq b
-          return (a, b) in
-    first V.++ (cons (fst res) second) V.++ (cons (snd res) third)
+          return (a, b)
+    in first V.++ (cons (fst res) second) V.++ (cons (snd res) third)
   else
     let first  = V.take pIndex elems
         second = V.drop (pIndex + 1) (V.take index elems)
@@ -181,38 +181,52 @@ rowOperationHelperPar pIndex (c1, c2, q1, q2, index) elems =
           b <- rpar $ (q1 `mul` row2) `subtr` (q2 `mul` row1)
           rseq a
           rseq b
-          return (a, b) in
-    first V.++ (cons (fst res) second) V.++ (cons (snd res) third)
+          return (a, b)
+    in first V.++ (cons (fst res) second) V.++ (cons (snd res) third)
 
 --given the pivot of a matrix and the matrix itself to improve that row with column operations
 --makes every element in the row divisible by the pivot
 --returns the new matrix paired with the new pivot
+{--
 improveRowSmithInt :: Int -> (Int, IMatrix) -> (Int, IMatrix)
 improveRowSmithInt pIndex (pivot, elems) =
   let row          = elems ! pIndex
-      nonDivis     = elemAndIndex (\n -> n /= 0 && n `mod` pivot /= 0) row in
-  case nonDivis of
+      nonDivis     = elemAndIndex (\n -> n /= 0 && n `mod` pivot /= 0) row
+  in case nonDivis of
     Just (n, i) ->
       let gcdTriple    = extEucAlg pivot n --extended Euclidean algorithm, returns gcd tupled with coefficients that combine the args to get the gcd
           gcd          = one gcdTriple
           transform    = (two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd, i)
-          newElems     = V.map (colOperationHelperInt pIndex transform) elems in
-      improveRowSmithInt pIndex (newElems ! pIndex ! pIndex, newElems)
+          newElems     = V.map (colOperationHelperInt pIndex transform) elems
+      in improveRowSmithInt pIndex (newElems ! pIndex ! pIndex, newElems)
+    Nothing     -> (elems ! pIndex ! pIndex, elems)
+--}
+improveRowSmithInt :: Int -> (Int, IMatrix) -> (Int, IMatrix)
+improveRowSmithInt pIndex (pivot, elems) =
+  let row          = elems ! pIndex
+      nonDivis     = elemAndIndex (\n -> n /= 0 && n `mod` pivot /= 0) row
+  in case nonDivis of
+    Just (n, i) ->
+      let gcdTriple    = extEucAlg pivot n --extended Euclidean algorithm, returns gcd tupled with coefficients that combine the args to get the gcd
+          gcd          = one gcdTriple
+          transform    = (two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd, i)
+          newElems     = V.map (colOperationHelperInt pIndex transform) elems
+      in improveRowSmithInt pIndex (newElems ! pIndex ! pIndex, newElems)
     Nothing     -> (elems ! pIndex ! pIndex, elems)
 
 --same as above except row operations can be performed in parallel
 improveRowSmithIntPar :: Int -> (Int, IMatrix) -> (Int, IMatrix)
 improveRowSmithIntPar pIndex (pivot, elems) =
     let row          = elems ! pIndex
-        nonDivis     = elemAndIndex (\n -> n /= 0 && n `mod` pivot /= 0) row in
-    case nonDivis of
+        nonDivis     = elemAndIndex (\n -> n /= 0 && n `mod` pivot /= 0) row
+    in case nonDivis of
       Nothing     -> (elems ! pIndex ! pIndex, elems)
       Just (n, i) ->
         let gcdTriple    = extEucAlg pivot n
             gcd          = one gcdTriple
             transform    = (two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd, i)
-            newElems     = parMapVec (colOperationHelperInt pIndex transform) elems in
-        improveRowSmithInt pIndex (newElems ! pIndex ! pIndex, newElems)
+            newElems     = parMapVec (colOperationHelperInt pIndex transform) elems
+        in improveRowSmithIntPar pIndex (newElems ! pIndex ! pIndex, newElems)
 
 --given pivot index and pivot paired with matrix, improves pivot column with row operations
 improveColInt :: Int -> (Int, IMatrix) -> (Int, IMatrix)
@@ -224,8 +238,8 @@ improveColInt pIndex (pivot, elems) =
            gcdTriple = extEucAlg pivot n
            gcd       = one gcdTriple
            transform = (two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd, i)
-           newElems  = rowOperationHelper pIndex transform elems in
-       improveColInt pIndex (newElems ! pIndex ! pIndex, newElems)
+           newElems  = rowOperationHelper pIndex transform elems
+       in improveColInt pIndex (newElems ! pIndex ! pIndex, newElems)
 
 --same as above except it uses rowOperationHelperPar
 improveColIntPar :: Int -> (Int, IMatrix) -> (Int, IMatrix)
@@ -237,8 +251,8 @@ improveColIntPar pIndex (pivot, elems) =
             gcdTriple = extEucAlg pivot n
             gcd       = one gcdTriple
             transform = (two gcdTriple, thr gcdTriple, n `div` gcd, pivot `div` gcd, i)
-            newElems  = rowOperationHelperPar pIndex transform elems in
-        improveColIntPar pIndex (newElems ! pIndex ! pIndex, newElems)
+            newElems  = rowOperationHelperPar pIndex transform elems
+        in improveColIntPar pIndex (newElems ! pIndex ! pIndex, newElems)
 
 --given pivot index and pivot paired with matrix whose pivot row has been improved, eliminates the entries in the pivot row
 --the kinds of matrices that the functions work on will have lots of zeroes
@@ -246,61 +260,61 @@ improveColIntPar pIndex (pivot, elems) =
 eliminateRowInt :: Int -> (Int, IMatrix) -> IMatrix
 eliminateRowInt pIndex (pivot, elems) =
   let pCol     = V.map (\row -> row ! pIndex) elems
-      coeffs   = V.map (\n -> if n == 0 then 0 else n `div` pivot) (elems ! pIndex) in
-  V.map (\r -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs ! i)*(r ! pIndex)) r) elems
+      coeffs   = V.map (\n -> if n == 0 then 0 else n `div` pivot) (elems ! pIndex)
+  in V.map (\r -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs ! i)*(r ! pIndex)) r) elems
 
 eliminateRowIntPar :: Int -> (Int, IMatrix) -> IMatrix
 eliminateRowIntPar pIndex (pivot, elems) =
   let pCol     = V.map (\row -> row ! pIndex) elems
-      coeffs   = V.map (\n -> if n == 0 then 0 else n `div` pivot) (elems ! pIndex) in
-  parMapVec (\r -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs ! i)*(r ! pIndex)) r) elems
+      coeffs   = V.map (\n -> if n == 0 then 0 else n `div` pivot) (elems ! pIndex)
+  in parMapVec (\r -> mapWithIndex (\i elem -> if i == pIndex then elem else elem - (coeffs ! i)*(r ! pIndex)) r) elems
 
 --same as above except it works on the pivot column
 eliminateColInt :: Int -> (Int, IMatrix) -> IMatrix
 eliminateColInt pIndex (pivot, elems) =
   let pRow     = elems ! pIndex
-      coeffs   = V.map (\row -> let n = row ! pIndex in if n == 0 then 0 else n `div` pivot) elems in
-  mapWithIndex (\i row -> if i == pIndex then row else row `subtr` ((coeffs ! i) `mul` pRow)) elems
+      coeffs   = V.map (\row -> let n = row ! pIndex in if n == 0 then 0 else n `div` pivot) elems
+  in mapWithIndex (\i row -> if i == pIndex then row else row `subtr` ((coeffs ! i) `mul` pRow)) elems
 
 eliminateColIntPar :: Int -> (Int, IMatrix) -> IMatrix
 eliminateColIntPar pIndex (pivot, elems) =
   let pRow     = elems ! pIndex
-      coeffs   = V.map (\row -> let n = row ! pIndex in if n == 0 then 0 else n `div` pivot) elems in
-  parMapWithIndex (\i row -> if i == pIndex then row else row `subtr` ((coeffs ! i) `mul` pRow)) elems
+      coeffs   = V.map (\row -> let n = row ! pIndex in if n == 0 then 0 else n `div` pivot) elems
+  in parMapWithIndex (\i row -> if i == pIndex then row else row `subtr` ((coeffs ! i) `mul` pRow)) elems
 
 --gets the Smith normal form of an integer matrix
 getSmithNormalFormInt :: IMatrix -> IMatrix
 getSmithNormalFormInt matrix =
   let maxIndex     = min (V.length matrix) (V.length $ V.head matrix)
-      calc i m mat =
-        if i == m then mat else
+      calc i mat =
+        if i == maxIndex then mat else
           case choosePivotInt i mat of
             (Just p, new) ->
               case chooseColumnPivotInt i $ (eliminateRowInt i) $ improveRowSmithInt i (p, new) of
-                (Nothing, new') -> calc (i + 1) m new'
-                (Just p, new')  -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new')
+                (Nothing, new') -> calc (i + 1) new'
+                (Just p, new')  -> calc (i + 1) $ (eliminateColInt i) $ improveColInt i (p, new')
             (Nothing, _)  ->
               case chooseColumnPivotInt i mat of
-                (Nothing, _)  -> calc (i + 1) m mat
-                (Just p, new) -> calc (i + 1) m $ (eliminateColInt i) $ improveColInt i (p, new) in
-  if V.null matrix then empty else calc 0 maxIndex matrix
+                (Nothing, _)  -> calc (i + 1) mat
+                (Just p, new) -> calc (i + 1) $ (eliminateColInt i) $ improveColInt i (p, new)
+  in if V.null matrix then empty else calc 0 matrix
 
 --gets the Smith normal form of a matrix, uses lots of parallelism if possible
 getSmithNormalFormIntPar :: IMatrix -> IMatrix
 getSmithNormalFormIntPar matrix =
   let maxIndex     = min (V.length matrix) (V.length $ V.head matrix)
-      calc i m mat =
-        if i == m then mat else
+      calc i mat =
+        if i == maxIndex then mat else
           case choosePivotInt i mat of
             (Just p, new)   ->
               case chooseColumnPivotInt i $ (eliminateRowIntPar i) $ improveRowSmithIntPar i (p, new) of
-                (Nothing, new')   -> calc (i + 1) m new'
-                (Just p, new') -> calc (i + 1) m $ (eliminateColIntPar i) $ improveColIntPar i (p, new')
+                (Nothing, new')   -> calc (i + 1) new'
+                (Just p, new') -> calc (i + 1) $ (eliminateColIntPar i) $ improveColIntPar i (p, new')
             (Nothing, _)  ->
               case chooseColumnPivotInt i mat of
-                (Nothing, _)  -> calc (i + 1) m mat
-                (Just p, new) -> calc (i + 1) m $ (eliminateColIntPar i) $ improveColIntPar i (p, new) in
-  if V.null matrix then empty else calc 0 maxIndex matrix
+                (Nothing, _)  -> calc (i + 1) mat
+                (Just p, new) -> calc (i + 1) $ (eliminateColIntPar i) $ improveColIntPar i (p, new)
+  in if V.null matrix then empty else calc 0 matrix
 
 --SMITH NORMAL FORM OF BOOLEAN MATRICES-----------------------------------
 
@@ -309,14 +323,14 @@ getSmithNormalFormIntPar matrix =
 choosePivotBool :: Int -> BMatrix -> (Bool, BMatrix)
 choosePivotBool i mat =
   let pos =
-        let row = mat ! i in
-        if not $ row ! i then
+        let row = mat ! i
+        in if not $ row ! i then
           case V.findIndex id row of
             Just x  -> Just $ Right (i, x)
             Nothing -> Nothing
         else if exactlyOneTrue row then Nothing
-        else Just $ Left i in
-  case pos of
+        else Just $ Left i
+  in case pos of
     Just (Left x)       -> (True, mat)
     Just (Right (x, y)) -> (True, V.map (switchElems x y) mat)
     Nothing             -> (False, mat)
@@ -336,16 +350,17 @@ elimRowSmithBool pIndex mat =
       indices      = V.elemIndices True row
       calc is m    =
         if V.null is then m else
-          let x = V.head is; xs = V.tail is in
-          if x == pIndex then calc xs m
-          else calc xs $ V.map (\r -> (V.take x r) V.++ (cons ((r ! x) + (r ! pIndex)) (V.drop (x + 1) r))) mat in
-  calc indices mat
+          let x = V.head is; xs = V.tail is
+          in
+            if x == pIndex then calc xs m
+            else calc xs $ V.map (\r -> (V.take x r) V.++ (cons ((r ! x) + (r ! pIndex)) (V.drop (x + 1) r))) mat
+  in calc indices mat
 
 --eliminates pivot column of a boolean matrix
 elimColBool :: Int -> BMatrix -> BMatrix
 elimColBool pIndex elems =
-  let pRow     = elems ! pIndex in
-  mapWithIndex (\i row -> if (not $ row ! pIndex) || i == pIndex then row else row `add` pRow) elems
+  let pRow     = elems ! pIndex
+  in mapWithIndex (\i row -> if (not $ row ! pIndex) || i == pIndex then row else row `add` pRow) elems
 
 --gets the Smith normal form of a boolean (mod 2) matrix, no parallel version because its very cheap
 getSmithNormalFormBool :: BMatrix -> BMatrix
@@ -361,8 +376,8 @@ getSmithNormalFormBool matrix =
               (True, new)   ->
                 case chooseColumnPivotBool i $ elimRowSmithBool i new of
                   (False, new') -> calc (i + 1) m new'
-                  (True, new')  -> calc (i + 1) m $ elimColBool i new' in
-  if V.null matrix then empty else calc 0 maxIndex matrix
+                  (True, new')  -> calc (i + 1) m $ elimColBool i new'
+  in if V.null matrix then empty else calc 0 maxIndex matrix
 
 --KERNEL OF INTEGER MATRICES----------------------------------------------
 
@@ -376,8 +391,8 @@ moveAllZeroColsBackInt elems identity =
       moveToBack (i:is) vector =
         moveToBack is $ ((V.take i vector) V.++ (V.drop (i + 1) vector)) `snoc` (vector ! i)
       moveToBack [] vector     = vector
-      op     = V.map (moveToBack zeroes) in
-  (len - (L.length zeroes) + 1, op elems, op identity)
+      op     = V.map (moveToBack zeroes)
+  in (len - (L.length zeroes) + 1, op elems, op identity)
 
 --given the index of the pivot row and the matrix
 --determines whether there is a non-zero element in the row, does necessary rearranging
@@ -392,8 +407,8 @@ chooseGaussPivotInt i mat = --assumes that i is a legal index for mat
             v | V.null v -> Nothing
             v            -> Just $ Right (i, V.head v)
         else if exactlyOneNonZero row then Nothing
-        else Just $ Left i in
-  case pos of
+        else Just $ Left i
+  in case pos of
     Just (Left x)       -> (True, mat, Nothing)
     Just (Right (x, y)) -> (True, V.map (switchElems x y) mat, Just (x, y))
     Nothing             -> (False, mat, Nothing)
@@ -407,14 +422,14 @@ improveRowGaussInt pIndex maxIndex elems identity =
           let row   = mat ! pIndex
               pivot = row ! pIndex
               x     = row ! i
-              next  = i + 1 in
-          if x == 0 || (x `mod` pivot == 0) then
+              next  = i + 1
+          in if x == 0 || (x `mod` pivot == 0) then
             improve next mat ide else
             let gcdTriple = extEucAlg pivot x
                 gcd       = one gcdTriple
-                transform = V.map (colOperationHelperInt pIndex (two gcdTriple, thr gcdTriple, pivot `div` gcd, x `div` gcd, i)) in
-            improve next (transform mat) (transform ide) in
-  improve (pIndex + 1) elems identity
+                transform = V.map (colOperationHelperInt pIndex (two gcdTriple, thr gcdTriple, pivot `div` gcd, x `div` gcd, i))
+            in improve next (transform mat) (transform ide)
+  in improve (pIndex + 1) elems identity
 
 improveRowGaussIntPar :: Int -> Int -> IMatrix -> IMatrix -> (IMatrix, Int, IMatrix)
 improveRowGaussIntPar pIndex maxIndex elems identity =
@@ -423,14 +438,14 @@ improveRowGaussIntPar pIndex maxIndex elems identity =
           let row   = mat ! pIndex
               pivot = row ! pIndex
               x     = row ! i
-              next  = i + 1 in
-          if x == 0 || (x `mod` pivot == 0) then
+              next  = i + 1
+          in if x == 0 || (x `mod` pivot == 0) then
             improve next mat ide else
             let gcdTriple = extEucAlg pivot x
                 gcd       = one gcdTriple
-                transform = parMapVec (colOperationHelperInt pIndex (two gcdTriple, thr gcdTriple, pivot `div` gcd, x `div` gcd, i)) in
-            improve next (transform mat) (transform ide) in
-  improve (pIndex + 1) elems identity
+                transform = parMapVec (colOperationHelperInt pIndex (two gcdTriple, thr gcdTriple, pivot `div` gcd, x `div` gcd, i))
+            in improve next (transform mat) (transform ide)
+  in improve (pIndex + 1) elems identity
 
 --eliminates all the entries in the pivot row that come after the pivot, after the matrix has been improved
 --returns the new matrix (fst) paired with the identity with whatever column operations were performed (snd)
@@ -441,9 +456,9 @@ eliminateEntriesGaussInt pIndex maxIndex (elems, pivot, identity) =
         if i == maxIndex then (mat, ide)
         else 
           let coeff     = (row ! i) `div` pivot
-              transform = V.map (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! pIndex)) (V.drop (i + 1) r))) in
-          elim (i + 1) (transform mat) (transform ide) in
-  elim (pIndex + 1) elems identity
+              transform = V.map (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! pIndex)) (V.drop (i + 1) r)))
+          in elim (i + 1) (transform mat) (transform ide)
+  in elim (pIndex + 1) elems identity
 
 eliminateEntriesGaussIntPar :: Int -> Int -> (IMatrix, Int, IMatrix) -> (IMatrix, IMatrix)
 eliminateEntriesGaussIntPar pIndex maxIndex (elems, pivot, identity) =
@@ -452,9 +467,9 @@ eliminateEntriesGaussIntPar pIndex maxIndex (elems, pivot, identity) =
         if i == maxIndex then (mat, ide)
         else 
           let coeff     = (row ! i) `div` pivot
-              transform = parMapVec (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! pIndex)) (V.drop (i + 1) r))) in
-          elim (i + 1) (transform mat) (transform ide) in
-  elim (pIndex + 1) elems identity
+              transform = parMapVec (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! pIndex)) (V.drop (i + 1) r)))
+          in elim (i + 1) (transform mat) (transform ide)
+  in elim (pIndex + 1) elems identity
 
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernelInt :: IMatrix -> IMatrix
@@ -475,8 +490,8 @@ findKernelInt matrix =
             (False, _, _)           -> doColOps (index + 1) (elems, ide)
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
-      ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
+      ide      = snd result
+  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
 
 findKernelIntPar :: IMatrix -> IMatrix
 findKernelIntPar matrix =
@@ -496,8 +511,8 @@ findKernelIntPar matrix =
             (False, _, _)       -> doColOps (index + 1) (elems, ide)
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
-      ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
+      ide      = snd result
+  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
   
 
 --KERNEL OF BOOLEAN MATRICES----------------------------------------------
@@ -512,8 +527,8 @@ moveAllZeroColsBackBool elems identity =
       moveToBack (i:is) vector =
         moveToBack is $ ((V.take i vector) V.++ (V.drop (i + 1) vector)) `snoc` (vector ! i)
       moveToBack [] vector     = vector
-      op     = V.map (moveToBack zeroes) in
-  (len - (L.length zeroes) + 1, op elems, op identity)
+      op     = V.map (moveToBack zeroes)
+  in (len - (L.length zeroes) + 1, op elems, op identity)
 
 --given the index of the pivot row and the matrix
 --determines whether there is a non-zero element in the row, does necessary rearranging
@@ -528,12 +543,12 @@ chooseGaussPivotBool i mat = --assumes that i is a legal index for mat
             v | V.null v -> Nothing
             v            -> Just $ Right (i, V.head v)
         else if exactlyOneTrue row then Nothing
-        else Just $ Left i in
-  case pos of
+        else Just $ Left i
+  in case pos of
     Just (Left x)       -> (True, mat, Nothing)
     Just (Right (x, y)) ->
-      let newElems = V.map (switchElems x y) mat in
-      (True, newElems, Just (x, y))
+      let newElems = V.map (switchElems x y) mat
+      in (True, newElems, Just (x, y))
     Nothing             -> (False, mat, Nothing)
 
 --eliminates all the entries in the pivot row that come after the pivot, after the matrix has been improved
@@ -544,9 +559,9 @@ eliminateEntriesGaussBool pIndex maxIndex elems identity =
       len            = V.length $ V.head elems
       elim i mat ide =
           if i == len then (mat, ide)
-          else let transform = V.map (\row -> (V.take i row) V.++ (cons ((row ! i) + (row ! pIndex)) (V.drop (i + 1) row))) in
-            elim (i + 1) (transform mat) (transform ide) in
-  elim (pIndex + 1) elems identity
+          else let transform = V.map (\row -> (V.take i row) V.++ (cons ((row ! i) + (row ! pIndex)) (V.drop (i + 1) row)))
+          in elim (i + 1) (transform mat) (transform ide)
+  in elim (pIndex + 1) elems identity
 
 --finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
 findKernelBool :: BMatrix -> BMatrix
@@ -567,5 +582,5 @@ findKernelBool matrix =
             (False, _, _)       -> doColOps (index + 1) (elems, ide)
       result   = doColOps 0 (not1 zeroData)
       elems    = fst result
-      ide      = snd result in
-  V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> not $ row ! i) elems) $ 0 `range` cols1
+      ide      = snd result
+  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> not $ row ! i) elems) $ 0 `range` cols1

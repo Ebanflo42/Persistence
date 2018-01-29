@@ -1,18 +1,15 @@
 module SimplicialComplex
-{--
   ( SimplicialComplex
-  , gr2String
   , sc2String
   , getDimension
   , makeVRComplex
-  , calculateNthHomologyInt
-  , calculateNthHomologyIntPar
-  , calculateNthHomologyBool
+  , makeBoundaryOperatorsInt
   , calculateHomologyInt
   , calculateHomologyIntPar
+  , makeBoundaryOperatorsBool
   , calculateHomologyBool
   , calculateHomologyBoolPar
-  )--} where
+  ) where
 
 import Util
 import Matrix
@@ -50,53 +47,46 @@ The diagonal of the Smith normal form represents the nth homology group.
 
 --CONSTRUCTION------------------------------------------------------------
 
---number of vertices, array with all connections between vertices
-type Graph = (Int, Vector (Int, Int))
-
 --the first component of the pair is the number of vertices
 --every element of the list is a vector of simplices whose dimension is given by the index +2
+--a simplex is represented by a pair: the indices of its vertices and the indices of the faces in the previous entry of the list
+--this is to speed up construction of the boundary operators
+--the first entry in the list, the edges, do not point to their faces because that would be trivial
 type SimplicialComplex = (Int, [Vector (Vector Int, Vector Int)])
 
-gr2String :: Graph -> String
-gr2String (i, v) =
-  let showVertices verts =
-        if V.null verts then ""
-        else (show $ V.head verts) L.++ '\n':(showVertices $ V.tail verts) in
-  show i L.++ ('\n':(showVertices v))
-
 sc2String :: SimplicialComplex -> String
-sc2String (v, sc) =
+sc2String (v, edges:simplices) =
   let showSimplex s     =
         '\n':(intercalate "\n" $ V.toList $ V.map show s)
-      showAll simplices =
-        case simplices of
+      showAll sc =
+        case sc of
           (s:ss) -> showSimplex s L.++ ('\n':(showAll ss))
-          []     -> '\n':(show v) L.++ " vertices" in
-  showAll sc
+          []     -> '\n':(show v) L.++ " vertices"
+  in (intercalate "\n" $ V.toList $ V.map (show . fst) edges) L.++ ('\n':(showAll simplices))
 
 getDimension :: SimplicialComplex -> Int
 getDimension = L.length . snd
 
 --makes the Vietoris-Rips complex given a scale, metric, and data set
 --uses Bron-Kerbosch algorithm to find maximal cliques and then enumerates faces
---need to research Makino and Uno algorithm: http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.138.705
 makeVRComplex :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
-makeVRComplex scale metric list =
-  let numVerts = L.length list
-      organizeCliques dim simplices = --make a list with an entry for every dimension
+makeVRComplex scale metric dataSet =
+  let numVerts = L.length dataSet
+      organizeCliques dim simplices = --make a dataSet with an entry for every dimension
         case L.findIndex (\v -> (V.length v) /= dim) simplices of
           Just i  ->
-            let diff = (V.length $ simplices !! i) - dim in
-            if diff == 1 then (V.fromList $ L.take i simplices):(organizeCliques (dim - 1) $ L.drop i simplices)
-            else (V.fromList $ L.take i simplices):((L.replicate (diff - 1) V.empty)
-              L.++ (organizeCliques (dim - 1) $ L.drop i simplices))
+            let diff = (V.length $ simplices !! i) - dim
+            in
+              if diff == 1 then (V.fromList $ L.take i simplices):(organizeCliques (dim - 1) $ L.drop i simplices)
+              else (V.fromList $ L.take i simplices):((L.replicate (diff - 1) V.empty)
+                L.++ (organizeCliques (dim - 1) $ L.drop i simplices))
           Nothing -> [V.fromList simplices]
-      makePair simplices = --pair the organized list of maximal cliques with its dimension
-        let dim = V.length $ L.head simplices in
-        (dim, organizeCliques dim simplices)
+      makePair simplices = --pair the organized dataSet of maximal cliques with its dimension
+        let dim = V.length $ L.head simplices
+        in (dim, organizeCliques dim simplices)
       maxCliques =
         makePair $ sortVecs $ L.map V.fromList $
-          L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (list !! i) (list !! j) < scale) [0..numVerts - 1]
+          L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (dataSet !! i) (dataSet !! j) < scale) [0..numVerts - 1]
       combos i max sc result =
         if i == max then --don't need to record boundary indices for edges
           (V.map (\s -> (s, V.empty)) $ L.last sc):result
@@ -107,9 +97,9 @@ makeVRComplex scale metric list =
               len       = V.length next
               allCombos = V.map getCombos current
               uCombos   = bigU allCombos
-              indices   = V.map (V.map (\face -> len + (V.head $ V.elemIndices face uCombos))) allCombos in
-          combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices):result in
-  (L.length list, combos 0 (fst maxCliques - 2) (snd maxCliques) [])
+              indices   = V.map (V.map (\face -> len + (V.head $ V.elemIndices face uCombos))) allCombos
+          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices):result
+  in (L.length dataSet, combos 0 (fst maxCliques - 2) (snd maxCliques) [])
 
 --INTEGER HOMOLOGY--------------------------------------------------------
 
@@ -117,8 +107,8 @@ makeVRComplex scale metric list =
 makeEdgeBoundariesInt :: SimplicialComplex -> IMatrix
 makeEdgeBoundariesInt sc =
   let makeCoeff = \n -> if n `mod` 2 == 0 then 1 else -1
-      verts     = 0 `range` (fst sc - 1) in
-  transposeMat $ V.map (\edge -> V.map (\vert ->
+      verts     = 0 `range` (fst sc - 1)
+  in transposeMat $ V.map (\edge -> V.map (\vert ->
     if vert == V.head edge || vert == V.last edge then makeCoeff vert
     else 0) verts) $ V.map fst $ L.head $ snd sc
 
@@ -131,8 +121,8 @@ makeSimplexBoundaryInt dim simplices (simplex, indices) =
   let makeCoeff s =
         case findMissing simplex s of
           Just x  -> if x `mod` 2 == 0 then 1 else -1
-          Nothing -> error "Something went terribly wrong, SimplicialComplex.makeSimplexBoundaryInt.makeCoeff" in
-  mapWithIndex (\i s -> if V.elem i indices then makeCoeff s else 0) (V.map fst $ (snd simplices) !! (dim - 2))
+          Nothing -> error "Something went terribly wrong, SimplicialComplex.makeSimplexBoundaryInt.makeCoeff"
+  in mapWithIndex (\i s -> if V.elem i indices then makeCoeff s else 0) (V.map fst $ (snd simplices) !! (dim - 2))
 
 --makes boundary operator for all simplices of dimension 2 or greater
 --first argument is the dimension of the boundary operator, second is the simplicial complex
@@ -146,36 +136,38 @@ makeBoundaryOperatorsInt sc =
       calc i
         | i > dim   = V.empty
         | i == 1    = (makeEdgeBoundariesInt sc) `cons` (calc 2)
-        | otherwise = (makeBoundaryOperatorInt i sc) `cons` (calc (i + 1)) in
-  calc 1
+        | otherwise = (makeBoundaryOperatorInt i sc) `cons` (calc (i + 1))
+  in calc 1
 
 --calculates all homology groups of the complex
 calculateHomologyInt :: SimplicialComplex -> [[Int]]
 calculateHomologyInt sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
-      calc 0   = [(getUnsignedDiagonal $ getSmithNormalFormInt $ V.head boundOps)]
+      calc 0   = [(getDiagonal $ getSmithNormalFormInt $ V.head boundOps)]
       calc i   =
         if i == dim then (L.replicate (V.length $ findKernelInt $ V.last boundOps) 0):(calc $ dim - 1)
-        else let i1 = i - 1 in
-          (getUnsignedDiagonal $ getSmithNormalFormInt $ (findKernelInt (boundOps ! i1)) `multiply` (boundOps ! i))
-            :(calc i1) in
-  L.map (L.filter (/=1)) $ calc dim
+        else
+          let i1 = i - 1
+          in (getDiagonal $ getSmithNormalFormInt $ (findKernelInt (boundOps ! i1)) `multiply` (boundOps ! i))
+            :(calc i1)
+  in calc dim
 
 --calculates all homology groups of the complex in parallel using parallel matrix functions
 calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
 calculateHomologyIntPar sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
-      calc 0   = [getUnsignedDiagonal $ getSmithNormalFormIntPar $ V.head boundOps]
+      calc 0   = [getDiagonal $ getSmithNormalFormIntPar $ V.head boundOps]
       calc i   =
         if i == dim then
           evalPar (L.replicate (V.length $ findKernelIntPar $ V.last boundOps) 0) $ calc $ i - 1
-        else let i1 = i - 1 in
-          evalPar (getUnsignedDiagonal $ getSmithNormalFormIntPar $
+        else
+          let i1 = i - 1
+          in evalPar (getDiagonal $ getSmithNormalFormIntPar $
             (findKernelIntPar (boundOps ! i1)) `multiply` (boundOps ! i)) $
-              calc $ i1 in
-  L.map (L.filter (/=1)) $ calc dim
+              calc $ i1
+  in calc dim
 
 --BOOLEAN HOMOLOGY--------------------------------------------------------
 
@@ -206,8 +198,8 @@ makeBoundaryOperatorsBool sc =
       calc i
         | i > dim   = V.empty
         | i == 1    = (makeEdgeBoundariesBool sc) `cons` (calc 2)
-        | otherwise = (makeBoundaryOperatorBool i sc) `cons` (calc (i + 1)) in
-  calc 1
+        | otherwise = (makeBoundaryOperatorBool i sc) `cons` (calc (i + 1))
+  in calc 1
 
 --calculate all homology groups
 calculateHomologyBool :: SimplicialComplex -> [[Int]]
@@ -221,8 +213,8 @@ calculateHomologyBool sc =
         else let i1 = i - 1 in
           (L.map (\b -> if b then 1 else 0) $ getDiagonal $
             getSmithNormalFormBool $ (findKernelBool (boundOps ! i1)) `multiply` (boundOps ! i))
-                :(calc i1) in
-  L.map (L.filter (/=1)) $ calc dim
+                :(calc i1)
+  in calc dim
 
 --calculate all homology groups in parallel
 calculateHomologyBoolPar :: SimplicialComplex -> [[Int]]
@@ -234,8 +226,9 @@ calculateHomologyBoolPar sc =
       calc i   =
         if i == dim then
           evalPar (L.replicate (V.length $ findKernelBool $ V.last boundOps) 0) $ calc $ i - 1
-        else let i1 = i - 1 in
-          evalPar (L.map (\b -> if b then 1 else 0) $ getDiagonal $
+        else
+          let i1 = i - 1
+          in evalPar (L.map (\b -> if b then 1 else 0) $ getDiagonal $
             getSmithNormalFormBool $ (findKernelBool (boundOps ! i1)) `multiply` (boundOps ! i)) $
-              calc $ i1 in
-  L.map (L.filter (/=1)) $ calc dim
+              calc $ i1
+  in calc dim
