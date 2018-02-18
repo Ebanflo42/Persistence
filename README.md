@@ -7,7 +7,7 @@ Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with
 
     ./Testing +RTS -s -N<number of threads>
 
-The objective of the library is to provide users with functions for computing simplicial and persistent homology. These two are very related to each other, but the computation is very different (persistent homology doesn't use matrices, but simplicial homology doesn't use polynomials).
+The objective of the library is to provide users with functions for computing simplicial and persistent homology. These two are very related to each other, but the computation is very different.
 
 Major TODOs:
 
