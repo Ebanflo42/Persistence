@@ -98,45 +98,49 @@ makeVRComplex scale metric dataSet =
               allCombos = V.map getCombos current
               uCombos   = bigU allCombos
               indices   = V.map (V.map (\face -> len + (V.head $ V.elemIndices face uCombos))) allCombos
-          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices):result
+          in combos i1 max (replaceElemList i1 (next V.++ uCombos) sc) $ (V.zip current indices):result
   in (L.length dataSet, combos 0 (fst maxCliques - 2) (snd maxCliques) [])
 
 --INTEGER HOMOLOGY--------------------------------------------------------
 
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
+
 makeEdgeBoundariesInt :: SimplicialComplex -> IMatrix
 makeEdgeBoundariesInt sc =
-  let makeCoeff = \n -> if n `mod` 2 == 0 then 1 else -1
-      verts     = 0 `range` (fst sc - 1)
-  in transposeMat $ V.map (\edge -> V.map (\vert ->
-    if vert == V.head edge || vert == V.last edge then makeCoeff vert
-    else 0) verts) $ V.map fst $ L.head $ snd sc
+  transposeMat $
+    V.map (\e -> let edge = fst e in
+      replaceElem (V.head edge) (-1) $
+        replaceElem (V.last edge) 1 $
+          V.replicate (fst sc) 0) $
+            L.head $ snd sc
 
 --gets the boundary coefficients for a simplex of dimension 2 or greater
 --first argument is dimension of the simplex
 --second argument is the simplicial complex
 --third argument is the simplex paired with the indices of its faces
-makeSimplexBoundaryInt :: Int -> SimplicialComplex -> (Vector Int, Vector Int) -> Vector Int
-makeSimplexBoundaryInt dim simplices (simplex, indices) =
-  let makeCoeff s =
-        case findMissing simplex s of
-          Just x  -> if x `mod` 2 == 0 then 1 else -1
-          Nothing -> error "Something went terribly wrong, SimplicialComplex.makeSimplexBoundaryInt.makeCoeff"
-  in mapWithIndex (\i s -> if V.elem i indices then makeCoeff s else 0) (V.map fst $ (snd simplices) !! (dim - 2))
+makeSimplexBoundaryInt :: Vector (Vector Int, Vector Int) -> (Vector Int, Vector Int) -> Vector Int
+makeSimplexBoundaryInt simplices (_, indices) =
+  let calc1 ixs result =
+        if V.null ixs then result
+        else calc2 (V.tail ixs) $ replaceElem (V.head ixs) (-1) result
+      calc2 ixs result =
+        if V.null ixs then result
+        else calc1 (V.tail ixs) $ replaceElem (V.head ixs) 1 result
+  in calc1 indices $ V.replicate (V.length simplices) 0
 
 --makes boundary operator for all simplices of dimension 2 or greater
 --first argument is the dimension of the boundary operator, second is the simplicial complex
 makeBoundaryOperatorInt :: Int -> SimplicialComplex -> IMatrix
-makeBoundaryOperatorInt dim sc = transposeMat $ V.map (makeSimplexBoundaryInt dim sc) $ (snd sc) !! (dim - 1)
+makeBoundaryOperatorInt dim sc = transposeMat $ V.map (makeSimplexBoundaryInt ((snd sc) !! (dim - 2))) $ (snd sc) !! (dim - 1)
 
 --makes all the boundary operators
 makeBoundaryOperatorsInt :: SimplicialComplex -> Vector IMatrix
 makeBoundaryOperatorsInt sc =
-  let dim    = getDimension sc
-      calc i
-        | i > dim   = V.empty
-        | i == 1    = (makeEdgeBoundariesInt sc) `cons` (calc 2)
-        | otherwise = (makeBoundaryOperatorInt i sc) `cons` (calc (i + 1))
+  let dim = getDimension sc
+      calc 1 = (makeEdgeBoundariesInt sc) `cons` (calc 2)
+      calc i =
+        if i > dim then V.empty
+        else (makeBoundaryOperatorInt i sc) `cons` (calc $ i + 1)
   in calc 1
 
 --calculates all homology groups of the complex
@@ -144,13 +148,14 @@ calculateHomologyInt :: SimplicialComplex -> [[Int]]
 calculateHomologyInt sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
-      calc 0   = [(getDiagonal $ getSmithNormalFormInt $ V.head boundOps)]
+      calc 1   = [getDiagonal $ normalFormInt $ imgInKerInt (boundOps ! 0) (boundOps ! 1)]
       calc i   =
-        if i == dim then (L.replicate (V.length $ findKernelInt $ V.last boundOps) 0):(calc $ dim - 1)
+        if i == dim then
+          (L.replicate (V.length $ kernelInt$ V.last boundOps) 0):(calc $ i - 1)
         else
           let i1 = i - 1
-          in (getDiagonal $ getSmithNormalFormInt $ (findKernelInt (boundOps ! i1)) `multiply` (boundOps ! i))
-            :(calc i1)
+          in (getDiagonal $ normalFormInt $
+            imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in calc dim
 
 --calculates all homology groups of the complex in parallel using parallel matrix functions
@@ -158,15 +163,14 @@ calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
 calculateHomologyIntPar sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
-      calc 0   = [getDiagonal $ getSmithNormalFormIntPar $ V.head boundOps]
+      calc 1   = [getDiagonal $ normalFormIntPar $ imgInKerIntPar (boundOps ! 0) (boundOps ! 1)]
       calc i   =
         if i == dim then
-          evalPar (L.replicate (V.length $ findKernelIntPar $ V.last boundOps) 0) $ calc $ i - 1
+          evalPar (L.replicate (V.length $ kernelIntPar $ V.last boundOps) 0) $ calc $ i - 1
         else
           let i1 = i - 1
-          in evalPar (getDiagonal $ getSmithNormalFormIntPar $
-            (findKernelIntPar (boundOps ! i1)) `multiply` (boundOps ! i)) $
-              calc $ i1
+          in evalPar (getDiagonal $ normalFormIntPar $ --see Util for evalPar
+            imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
   in calc dim
 
 --BOOLEAN HOMOLOGY--------------------------------------------------------
@@ -201,34 +205,32 @@ makeBoundaryOperatorsBool sc =
         | otherwise = (makeBoundaryOperatorBool i sc) `cons` (calc (i + 1))
   in calc 1
 
---calculate all homology groups
-calculateHomologyBool :: SimplicialComplex -> [[Int]]
+--calculate the ranks of all homology groups
+calculateHomologyBool :: SimplicialComplex -> [Int]
 calculateHomologyBool sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsBool sc
-      calc 0   =
-        [L.map (\b -> if b then 1 else 0) $ getDiagonal $ getSmithNormalFormBool $ V.head boundOps]
+      calc 1   = [rankBool $ imgInKerBool (boundOps ! 0) (boundOps ! 1)]
       calc i   =
-        if i == dim then (L.replicate (V.length $ findKernelBool $ V.last boundOps) 0):(calc $ dim - 1)
-        else let i1 = i - 1 in
-          (L.map (\b -> if b then 1 else 0) $ getDiagonal $
-            getSmithNormalFormBool $ (findKernelBool (boundOps ! i1)) `multiply` (boundOps ! i))
-                :(calc i1)
+        if i == dim then
+          ((V.length $ V.head $ V.last boundOps) - (rankBool $ V.last boundOps)):(calc $ i - 1)
+        else
+          let i1 = i - 1
+          in (rankBool $ imgInKerBool (boundOps ! i1) (boundOps ! i)):(calc i1)
   in calc dim
 
---calculate all homology groups in parallel
-calculateHomologyBoolPar :: SimplicialComplex -> [[Int]]
+--calculate ranks of all homology groups in parallel
+calculateHomologyBoolPar :: SimplicialComplex -> [Int]
 calculateHomologyBoolPar sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsBool sc
-      calc 0   =
-        [L.map (\b -> if b then 1 else 0) $ getDiagonal $ getSmithNormalFormBool $ V.head boundOps]
+      ranks    = --dimension of image paired with dimension of kernel
+        (0, V.length $ V.head boundOps) `cons`
+          (parMapVec (\op -> let rank = rankBool op in (rank, (V.length $ V.head op) - rank)) $ V.tail boundOps)
+      calc 0   = [(snd $ V.head ranks) - (fst $ ranks ! 1)]
       calc i   =
-        if i == dim then
-          evalPar (L.replicate (V.length $ findKernelBool $ V.last boundOps) 0) $ calc $ i - 1
-        else
-          let i1 = i - 1
-          in evalPar (L.map (\b -> if b then 1 else 0) $ getDiagonal $
-            getSmithNormalFormBool $ (findKernelBool (boundOps ! i1)) `multiply` (boundOps ! i)) $
-              calc $ i1
+        let i1 = i - 1
+        in
+          if i == dim then evalPar (snd $ V.last ranks) (calc i1) --see Util for evalPar
+          else evalPar ((snd $ ranks ! i) - (fst $ ranks ! i1)) (calc i1)
   in calc dim

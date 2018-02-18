@@ -75,6 +75,16 @@ printMat mat  =
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
   in print mat
 
+printMatBool :: BMatrix -> String
+printMatBool mat  =
+  let printVec vec =
+        if V.null vec then ""
+        else(if V.head vec then "1" else "0") L.++ (printVec $ V.tail vec)
+      print m =
+        if V.null m then ""
+        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
+  in print mat
+
 pointCloud :: [(Float, Float)]
 pointCloud =
   [ ( -7, -19)
@@ -107,58 +117,77 @@ main = do
   putStrLn "The first matrix is:"
   putStrLn $ printMat matrix1
   putStrLn "It's kernel is:"
-  putStrLn $ printMat $ findKernelInt matrix1
+  putStrLn $ printMat $ kernelInt matrix1
   putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ printMat $ findKernelIntPar matrix1
+  putStrLn $ printMat $ kernelIntPar matrix1
   putStrLn "The kernel should be:"
   putStrLn $ printMat kernel1
 
   putStrLn "The second matrix is:"
   putStrLn $ printMat matrix2
   putStrLn "It's kernel is:"
-  putStrLn $ printMat $ findKernelInt matrix2
+  putStrLn $ printMat $ kernelInt matrix2
   putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ printMat $ findKernelIntPar matrix2
+  putStrLn $ printMat $ kernelIntPar matrix2
   putStrLn "The kernel should be:"
   putStrLn $ printMat kernel2
 
   putStrLn "The third matrix is:"
   putStrLn $ printMat matrix3
   putStrLn "It's kernel is:"
-  putStrLn $ printMat $ findKernelInt matrix3
+  putStrLn $ printMat $ kernelInt matrix3
   putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ printMat $ findKernelIntPar matrix3
+  putStrLn $ printMat $ kernelIntPar matrix3
   putStrLn "The kernel should be:"
   putStrLn $ printMat kernel3
 
   putStrLn "The fourth matrix is:"
   putStrLn $ printMat matrix4
   putStrLn "It's Smith normal form is:"
-  putStrLn $ printMat $ getSmithNormalFormInt matrix4
+  putStrLn $ printMat $ normalFormInt matrix4
   putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ printMat $ getSmithNormalFormIntPar matrix4
+  putStrLn $ printMat $ normalFormIntPar matrix4
   putStrLn "The Smith Normal form should be:"
   putStrLn $ printMat $ snf4
 
   putStrLn "The fifth matrix is:"
   putStrLn $ printMat matrix5
   putStrLn "It's Smith normal form is:"
-  putStrLn $ printMat $ getSmithNormalFormInt matrix5
+  putStrLn $ printMat $ normalFormInt matrix5
   putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ printMat $ getSmithNormalFormIntPar matrix5
+  putStrLn $ printMat $ normalFormIntPar matrix5
   putStrLn "The Smith Normal form should be:"
   putStrLn $ printMat $ snf5
 
   let testVR = makeVRComplex 10.0 metric pointCloud
   putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
   putStrLn $ sc2String testVR
-  putStrLn "The homology groups are:"
-  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyIntPar testVR
   putStrLn "The boundary operators are:"
   let boundOps = makeBoundaryOperatorsInt testVR
       strMat   = V.toList $ V.map printMat boundOps
   putStrLn $ intercalate "\n" $ strMat
+  putStrLn "The homology groups are:"
+  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyInt testVR
 
+  putStrLn "Boundary operator 0 times boundary operator 1:"
+  putStrLn $ printMat $ (boundOps ! 0) `multiply` (boundOps ! 1)
+
+  putStrLn "Boundary operator 1 times boundary operator 2:"
+  putStrLn $ printMat $ (boundOps ! 1) `multiply` (boundOps ! 2)
+{--}
+  putStrLn "Ranks of the boolean homology groups:"
+  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyBoolPar testVR
+  let boolOps = makeBoundaryOperatorsBool testVR
+  putStrLn "Boolean boundary operators:"
+  putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps 
+
+  putStrLn "Boundary operator 0 times boundary operator 1:"
+  putStrLn $ printMatBool $ (boolOps ! 0) `multiply` (boolOps ! 1)
+
+  putStrLn "Boundary operator 1 times boundary operator 2:"
+  putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
+{-
   let filtration = makeFiltration [10.0] metric pointCloud
   putStrLn "The filtration is:"
   putStrLn $ filtr2String filtration
+  --}

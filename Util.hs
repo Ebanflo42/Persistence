@@ -36,10 +36,7 @@ extEucAlg a b =
                 nexts = fst s - q*s2
                 nextt = fst t - q*t2
             in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
-      gcdTriple = eeaHelper (a, b) (0, 1) (1, 0)
-  in gcdTriple
-    --if one gcdTriple < 0 then (-(one gcdTriple), -(two gcdTriple), -(thr gcdTriple))
-    --else gcdTriple
+  in (\(x, y, z) -> if x < 0 then (-x, -y, -z) else (x, y, z)) $ eeaHelper (a, b) (0, 1) (1, 0)
 
 one (a, _, _) = a
 two (_, b, _) = b
@@ -62,7 +59,12 @@ subtr :: Num a => Vector a -> Vector a -> Vector a
 subtr = V.zipWith (\x y -> x - y)
 
 dotProduct :: Num a => Vector a -> Vector a -> a
-dotProduct vec1 vec2 = V.sum $ V.zipWith (*) vec1 vec2
+dotProduct vec1 vec2
+  | a && b = fromIntegral 0
+  | a      = error "First vector passed to dotProduct too short."
+  | b      = error "Second vector passed to dotProduct too short."
+  | otherwise   = (V.head vec1)*(V.head vec2) + (dotProduct (V.tail vec1) (V.tail vec2))
+    where a = V.null vec1; b = V.null vec2
 
 switchElems ::Int -> Int -> Vector a -> Vector a
 switchElems i j vector
@@ -228,22 +230,8 @@ vecConcat v =
   if V.null v then empty
   else V.head v V.++ (vecConcat $ V.tail v)
 
---union of two vectors
-(##) :: Eq a => Vector a -> Vector a -> Vector a
-a ## b =
-  let check u v =
-        if V.null u then v
-        else 
-          let h = V.head u
-          in if V.elem h v then check (V.tail u) v else h `cons` (check (V.tail u) v)
-  in if V.null b then a else check a b
-
---union of many vectors
-bigU :: Eq a => Vector (Vector a) -> Vector a
-bigU = V.foldl1 (##)
-
-replaceElemVec :: Int -> a -> Vector a -> Vector a
-replaceElemVec i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
+replaceElem :: Int -> a -> Vector a -> Vector a
+replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 
 forallRelation :: (a -> a -> Bool) -> Vector a -> Bool
 forallRelation relation vector =
@@ -253,8 +241,39 @@ forallRelation relation vector =
         | otherwise                                = False
   in calc vector
 
-replaceElem :: Int -> a -> [a] -> [a]
-replaceElem i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
+quicksort :: Ord a => Vector a -> Vector a
+quicksort vector =
+  if V.null vector then empty
+  else
+    let x       = V.head vector
+        xs      = V.tail vector
+        lesser  = V.filter (< x) xs
+        greater = V.filter (>= x) xs
+    in (quicksort lesser) V.++ (x `cons` (quicksort greater))
+
+bigU :: Eq a => Vector (Vector a) -> Vector a
+bigU =
+  let exists x v =
+        if V.null v then False
+        else if V.head v == x then True
+        else exists x (V.tail v)
+      union v1 v2 =
+        if V.null v1 then v2
+        else
+          let x = V.head v1
+          in
+            if exists x v2 then union (V.tail v1) v2
+            else union (V.tail v1) (x `cons` v2)
+  in V.foldl1 union
+
+exists :: (a -> Bool) -> Vector a -> Bool
+exists p v
+  | V.null v     = False
+  | p $ V.head v = True
+  | otherwise    = exists p $ V.tail v
+
+replaceElemList :: Int -> a -> [a] -> [a]
+replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 
 evalPar :: a -> [a] -> [a]
 evalPar c r = runEval $ rpar c >> rseq r >> return (c:r)
