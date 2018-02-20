@@ -112,6 +112,12 @@ metric (a, b) (c, d) =
   let x = a - c; y = b - d in
   sqrt (x * x + y * y)
 
+testVR = makeVRComplex 10.0 metric pointCloud
+
+boundOps = makeBoundaryOperatorsInt testVR
+
+boolOps = makeBoundaryOperatorsBool testVR
+
 main = do
 
   putStrLn "The first matrix is:"
@@ -159,12 +165,10 @@ main = do
   putStrLn "The Smith Normal form should be:"
   putStrLn $ printMat $ snf5
 
-  let testVR = makeVRComplex 10.0 metric pointCloud
   putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
   putStrLn $ sc2String testVR
   putStrLn "The boundary operators are:"
-  let boundOps = makeBoundaryOperatorsInt testVR
-      strMat   = V.toList $ V.map printMat boundOps
+  let strMat = V.toList $ V.map printMat boundOps
   putStrLn $ intercalate "\n" $ strMat
   putStrLn "The homology groups are:"
   putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyInt testVR
@@ -177,7 +181,6 @@ main = do
 {--}
   putStrLn "Ranks of the boolean homology groups:"
   putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyBoolPar testVR
-  let boolOps = makeBoundaryOperatorsBool testVR
   putStrLn "Boolean boundary operators:"
   putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps 
 
@@ -186,7 +189,7 @@ main = do
 
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
-{-
+{--}
   let filtration = makeFiltration [10.0] metric pointCloud
   putStrLn "The filtration is:"
   putStrLn $ filtr2String filtration

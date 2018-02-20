@@ -170,15 +170,13 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
               pivot = row ! colIndex
               x     = row ! i
               next  = i + 1
-          in
+          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-                  q1        = pivot `div` gcd
-                  q2        = x `div` gcd
-              in improve next $ colOperation colIndex i (thr gcdTriple, two gcdTriple, -q2, q1) mat
+              in improve next $ colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (colIndex + 1) matrix
 
 --given pivot index and pivot paired with matrix whose pivot row has been improved, eliminates the entries in the pivot row
@@ -235,15 +233,13 @@ improveRowIntPar (rowIndex, colIndex) numCols matrix =
               pivot = row ! colIndex
               x     = row ! i
               next  = i + 1
-          in
+          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-                  q1        = pivot `div` gcd
-                  q2        = x `div` gcd
-              in improve next $ colOperationPar colIndex i (thr gcdTriple, two gcdTriple, -q2, q1) mat
+              in improve next $ colOperationPar colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (colIndex + 1) matrix
 
 --eliminates a row in parallel
@@ -319,13 +315,13 @@ improveColInt pIndex maxIndex matrix =
               pivot = col ! pIndex
               x     = col ! i
               next  = i + 1
-          in
+          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-              in improve next $ rowOperation pIndex i (thr gcdTriple, two gcdTriple, -(x `div` gcd), pivot `div` gcd) mat
+              in improve next $ rowOperation pIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (pIndex + 1) matrix
 
 --eliminates the pivot column of a matrix to obtain normal form
@@ -375,13 +371,13 @@ improveColIntPar pIndex maxIndex matrix =
               pivot = col ! pIndex
               x     = col ! i
               next  = i + 1
-          in
+          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-              in improve next $ rowOperationPar pIndex i (thr gcdTriple, two gcdTriple, -(x `div` gcd), pivot `div` gcd) mat
+              in improve next $ rowOperationPar pIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (pIndex + 1) matrix
 
 --NEEDS TO BE PARALLELIZED
@@ -441,7 +437,7 @@ improveRowIntWithId (rowIndex, colIndex) numCols elems identity =
             else
             let gcdTriple = extEucAlg pivot x
                 gcd       = one gcdTriple
-                transform = colOperation colIndex i (thr gcdTriple, two gcdTriple, -(x `div` gcd), pivot `div` gcd)
+                transform = colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
             in improve next (transform mat) (transform ide)
   in improve (colIndex + 1) elems identity
 
@@ -493,13 +489,13 @@ improveRowIntWithIdPar (rowIndex, colIndex) numCols elems identity =
               pivot = row ! colIndex
               x     = row ! i
               next  = i + 1
-          in
+          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat ide
             else
             let gcdTriple = extEucAlg pivot x
                 gcd       = one gcdTriple
-                transform = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, -(x `div` gcd), pivot `div` gcd)
+                transform = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
             in improve next (transform mat) (transform ide)
   in improve (colIndex + 1) elems identity
 
@@ -561,8 +557,8 @@ improveRowIntWithInv (rowIndex, colIndex) numCols kernel image =
                   gcd        = one gcdTriple
                   q1         = pivot `div` gcd
                   q2         = x `div` gcd
-                  transform1 = colOperation colIndex i (thr gcdTriple, -q2, two gcdTriple, q1)
-                  transform2 = rowOperation colIndex i (q1, -(two gcdTriple), q2, thr gcdTriple)
+                  transform1 = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, q2, -q1)
+                  transform2 = rowOperationPar colIndex i (-q1, -(two gcdTriple), -q2, thr gcdTriple)
               in improve next (transform1 ker) (transform2 img)
   in improve (colIndex + 1) kernel image
 
@@ -621,8 +617,8 @@ improveRowIntWithInvPar (rowIndex, colIndex) numCols kernel image =
                   gcd        = one gcdTriple
                   q1         = pivot `div` gcd
                   q2         = x `div` gcd
-                  transform1 = colOperationPar colIndex i (thr gcdTriple, -q2, two gcdTriple, q1)
-                  transform2 = rowOperationPar colIndex i (q1, -(two gcdTriple), q2, thr gcdTriple)
+                  transform1 = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, q2, -q1)
+                  transform2 = rowOperationPar colIndex i (-q1, -(two gcdTriple), -q2, thr gcdTriple)
               in improve next (transform1 ker) (transform2 img)
   in improve (colIndex + 1) kernel image
 

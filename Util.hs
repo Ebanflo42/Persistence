@@ -36,7 +36,7 @@ extEucAlg a b =
                 nexts = fst s - q*s2
                 nextt = fst t - q*t2
             in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
-  in (\(x, y, z) -> if x < 0 then (-x, -y, -z) else (x, y, z)) $ eeaHelper (a, b) (0, 1) (1, 0)
+  in eeaHelper (a, b) (0, 1) (1, 0)
 
 one (a, _, _) = a
 two (_, b, _) = b

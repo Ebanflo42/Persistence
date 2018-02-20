@@ -21,8 +21,8 @@ instance Eq Simplex where
 instance Ord Simplex where
   (>)   = \(Simplex a _ _) (Simplex b _ _) -> a > b
   (<)   = \(Simplex a _ _) (Simplex b _ _) -> a < b
-  (<=)  = \(Simplex a _ _) (Simplex b _ _) -> a < b || a == b
-  (>=)  = \(Simplex a _ _) (Simplex b _ _) -> a > b || a == b
+  (<=)  = \(Simplex a _ _) (Simplex b _ _) -> a <= b
+  (>=)  = \(Simplex a _ _) (Simplex b _ _) -> a >= b
 
 sim2String :: Simplex -> String
 sim2String (Simplex index vertices faces) =
