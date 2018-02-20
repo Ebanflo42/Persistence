@@ -11,10 +11,9 @@ The objective of the library is to provide users with functions for computing si
 
 Major TODOs:
 
-My objective is to get simplicial homology over the integers and integers modulo 2 working before I move on to persistent homology.
-There are a few things that could be causing the malfunctioning of simplicial homology:
-1) The most likely is that fact that, while the nth and (n+1)th boundary operators are being transformed to find the image of one in the basis of the kernel of the other, their product is not always the zero matrix. This is something I noticed in the result of imgInKerInt but I haven't been able to pinpoint what's causing it.
-2) For some reason, one of the test cases for computing the Smith normal form of an integer matrix has a sign flipped in one of the diagonal entries. I'm not sure why this is or whether or not it will affect the homology groups.
+My objective is to get simplicial homology over the integers and integers modulo 2 working before I move on to persistent homology. However I have already implemented the construction of the Vietoris-Rips complex and its filtration.
+
+I believe I have narrowed down the location of the bug with simplicial homology. Computing simplicial homology depends on representing the image of one matrix (B) in the basis of the kernel of another matrix (A). To do this, A must be put into column eschelon form while the corresponding inverse row operations are performed on B. A fundamental constraint on these matrices based on the definition of homology is that AB=0, always. While debugging I found that this condition was violated after the matrices were passed through `elimRowIntWithInv`, so this is where I believe the problem to be. If it is, there is also a problem with the parallel counterpart: `elimRowIntWithInvPar`.
 
 Known unaccounted for edge-cases:
 1) If the algorithm for computing the Smith normal form of an integer matrix runs into a zero column and zero row which intersect each other along the diagonal, it will ignore this and move on, leaving a zero in the middle of the diagonal which shouldn't be there (unless all entries after it are zero) because it will never be able to divide the next diagonal entry.
