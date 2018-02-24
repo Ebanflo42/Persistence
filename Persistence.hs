@@ -55,7 +55,11 @@ makeFiltration scales metric dataSet =
 
 boundOpBool :: Int -> Filtration -> BPolyMat
 boundOpBool dim filtration =
-  let makeBoundary :: Simplex -> Vector BPolynomial
-      makeBoundary (Simplex i v f) =
-        V.map (\(Simplex k v f) -> (i - k)) $ V.map (\j -> filtration ! (dim - 1) ! j) f
+  let makeBoundary (Simplex i v f) =
+        let makeMonomial j =
+              if V.elem j f then
+                let (Simplex k v f) = filtration ! (dim - 1) ! j
+                in Power $ i - k
+              else Zero
+        in V.map makeMonomial $ 0 `range` ((V.length $ filtration ! (dim - 1)) - 1)
   in transposeMat $ V.map makeBoundary $ filtration ! dim

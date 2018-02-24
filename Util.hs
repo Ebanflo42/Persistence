@@ -272,6 +272,15 @@ exists p v
   | p $ V.head v = True
   | otherwise    = exists p $ V.tail v
 
+foldRelation :: (a -> a -> Bool) -> Vector a -> a
+foldRelation rel vec =
+  let calc w v
+        | V.null v  = w
+        | rel w x   = calc x xs
+        | otherwise = calc w xs
+        where x = V.head v; xs = V.tail v
+  in calc (V.head vec) (V.tail vec)
+
 replaceElemList :: Int -> a -> [a] -> [a]
 replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 

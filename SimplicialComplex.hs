@@ -55,6 +55,7 @@ The diagonal of the Smith normal form represents the nth homology group.
 type SimplicialComplex = (Int, [Vector (Vector Int, Vector Int)])
 
 sc2String :: SimplicialComplex -> String
+sc2String (v, [])              = (show v) L.++ " vertices."
 sc2String (v, edges:simplices) =
   let showSimplex s     =
         '\n':(intercalate "\n" $ V.toList $ V.map show s)
@@ -82,8 +83,11 @@ makeVRComplex scale metric dataSet =
                 L.++ (organizeCliques (dim - 1) $ L.drop i simplices))
           Nothing -> [V.fromList simplices]
       makePair simplices = --pair the organized dataSet of maximal cliques with its dimension
-        let dim = V.length $ L.head simplices
-        in (dim, organizeCliques dim simplices)
+        case simplices of
+          (x:_) ->
+            let dim = V.length x
+            in (dim, organizeCliques dim simplices)
+          []    -> (-1, [])
       maxCliques =
         makePair $ sortVecs $ L.map V.fromList $
           L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (dataSet !! i) (dataSet !! j) < scale) [0..numVerts - 1]
@@ -99,7 +103,9 @@ makeVRComplex scale metric dataSet =
               uCombos   = bigU allCombos
               indices   = V.map (V.map (\face -> len + (V.head $ V.elemIndices face uCombos))) allCombos
           in combos i1 max (replaceElemList i1 (next V.++ uCombos) sc) $ (V.zip current indices):result
-  in (L.length dataSet, combos 0 (fst maxCliques - 2) (snd maxCliques) [])
+  in
+    if fst maxCliques == (-1) then (numVerts, [])
+    else (numVerts, combos 0 (fst maxCliques - 2) (snd maxCliques) [])
 
 --INTEGER HOMOLOGY--------------------------------------------------------
 
@@ -156,7 +162,9 @@ calculateHomologyInt sc =
           let i1 = i - 1
           in (getDiagonal $ normalFormInt $
             imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
-  in calc dim
+  in
+    if L.null $ snd sc then [L.replicate (fst sc) 0]
+    else calc dim
 
 --calculates all homology groups of the complex in parallel using parallel matrix functions
 calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
@@ -171,7 +179,9 @@ calculateHomologyIntPar sc =
           let i1 = i - 1
           in evalPar (getDiagonal $ normalFormIntPar $ --see Util for evalPar
             imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
-  in calc dim
+  in
+    if L.null $ snd sc then [L.replicate (fst sc) 0]
+    else calc dim
 
 --BOOLEAN HOMOLOGY--------------------------------------------------------
 
@@ -208,29 +218,35 @@ makeBoundaryOperatorsBool sc =
 --calculate the ranks of all homology groups
 calculateHomologyBool :: SimplicialComplex -> [Int]
 calculateHomologyBool sc =
-  let dim      = getDimension sc
+  let dim      = (getDimension sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
-      calc 1   = [rankBool $ imgInKerBool (boundOps ! 0) (boundOps ! 1)]
+      ranks    = --dimension of image paired with dimension of kernel
+        (0, V.length $ V.head boundOps) `cons`
+          (V.map (\op -> let rank = rankBool op in (rank, (V.length $ V.head op) - rank)) boundOps)
+      calc 1   = [(snd $ ranks ! 0) - (fst $ ranks ! 1)]
       calc i   =
-        if i == dim then
-          ((V.length $ V.head $ V.last boundOps) - (rankBool $ V.last boundOps)):(calc $ i - 1)
-        else
-          let i1 = i - 1
-          in (rankBool $ imgInKerBool (boundOps ! i1) (boundOps ! i)):(calc i1)
-  in calc dim
+        let i1 = i - 1
+        in
+          if i == dim then (snd $ V.last ranks):(calc i1) --see Util for evalPar
+          else ((snd $ ranks ! i1) - (fst $ ranks ! i)):(calc i1)
+  in
+    if L.null $ snd sc then [fst sc]
+    else calc dim
 
 --calculate ranks of all homology groups in parallel
 calculateHomologyBoolPar :: SimplicialComplex -> [Int]
 calculateHomologyBoolPar sc =
-  let dim      = getDimension sc
+  let dim      = (getDimension sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
       ranks    = --dimension of image paired with dimension of kernel
         (0, V.length $ V.head boundOps) `cons`
-          (parMapVec (\op -> let rank = rankBool op in (rank, (V.length $ V.head op) - rank)) $ V.tail boundOps)
-      calc 0   = [(snd $ V.head ranks) - (fst $ ranks ! 1)]
+          (parMapVec (\op -> let rank = rankBool op in (rank, (V.length $ V.head op) - rank)) boundOps)
+      calc 1   = [(snd $ ranks ! 0) - (fst $ ranks ! 1)]
       calc i   =
         let i1 = i - 1
         in
           if i == dim then evalPar (snd $ V.last ranks) (calc i1) --see Util for evalPar
-          else evalPar ((snd $ ranks ! i) - (fst $ ranks ! i1)) (calc i1)
-  in calc dim
+          else evalPar ((snd $ ranks ! i1) - (fst $ ranks ! i)) (calc i1)
+  in
+    if L.null $ snd sc then [fst sc]
+    else calc dim

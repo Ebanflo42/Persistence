@@ -167,29 +167,33 @@ main = do
 
   putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
   putStrLn $ sc2String testVR
+  {--}
   putStrLn "The boundary operators are:"
   let strMat = V.toList $ V.map printMat boundOps
   putStrLn $ intercalate "\n" $ strMat
+  --}
   putStrLn "The homology groups are:"
   putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyInt testVR
-
+{--}
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMat $ (boundOps ! 0) `multiply` (boundOps ! 1)
 
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMat $ (boundOps ! 1) `multiply` (boundOps ! 2)
+--}
 {--}
   putStrLn "Ranks of the boolean homology groups:"
   putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyBoolPar testVR
   putStrLn "Boolean boundary operators:"
   putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps 
-
+{--}
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMatBool $ (boolOps ! 0) `multiply` (boolOps ! 1)
 
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
-{--}
+  --}
+{--
   let filtration = makeFiltration [10.0] metric pointCloud
   putStrLn "The filtration is:"
   putStrLn $ filtr2String filtration

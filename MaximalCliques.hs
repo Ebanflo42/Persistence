@@ -24,7 +24,7 @@ getMaximalCliques tolFun xs = map (map (fst . (V.!) lv) . S.toList) $
           lnodes' = map (\(k,n) -> (n,S.fromList $ filter (/=k) $ map fst $ filter (tolFun n . snd) lnodes)) lnodes
           lv = V.fromList lnodes'
           pickpivot p x = head $ S.elems p ++ S.elems x
-
+          
 -- | The Bron-Kerbosch algorithm for finding all maximal cliques in an undirected graph.
 -- <http://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm>. Works on nodes represented as 'Int's.
 maximalCliques :: (S.IntSet -> S.IntSet -> Int) -- ^ A function that given two 'IntSet's, chooses a member of one as a pivot.
