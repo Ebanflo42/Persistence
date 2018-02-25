@@ -32,27 +32,28 @@ import Data.Vector as V
 import Control.Parallel.Strategies
 
 {--OVERVIEW---------------------------------------------------------------
-Matrices are transformed by iterating through each row and selecting a pivot
-The pivot is the diagonal entry of the row, and must be non-zero
-If the diagonal entry is non-zero at first, a switch is performed so that it is
 
-Eliminating elements is a slighltly more complicated process since only integer operations are allowed.
-First, every element that must be eliminated is made divisible by the pivt using the bezout coefficients
-from the extended Euclidean algorithm. Once this is done, integer division and subtraction can be used
-to eliminate the elements.
+Matrices are transformed by iterating through each row and selecting a pivot. Zero rows are skipped for finding column eschelon form but a row operation is performed (if possible) if there is a zero row for Smith normal form.
 
-Boolean matrices are regular matrices with elements modulo 2, Bool is an instance
-of Num here and the instance is given in Util.
--}
+To get the smith normal form, the entire pivot row and column is eliminated before continuing
 
-{--LAYOUT-----------------------------------------------------------------
-"BASIC STUFF" includes type synonyms, transposing matrices, multiplying matrices,
-and row/column operations
+To get column eschelon form, every element in the pivot row after the pivot is eliminated. To get the kernel, all column operations to get the matrix to this form are also performed on the identiy matrix. To get the image of one matrix inside the kernel of the one being put into column eschelon form, perform the inverse operations on the matrix whose image is needed. See second paper.
 
-"INTEGER MATRICES" is divided into "RANK," "NORMAL FORM," "KERNEL" and "IMAGE IN KERNEL"
-Each section provides functions for computing their namesake both sequentially and in parallel
+To get the rank of a matrix, look at the number of non-zero columns in the column eschelon form. To get the kernel, look at the columns of the identity (after all of the same column operations have been performed on it) which correspond to zero columns of the column eschelon form.
+
+Eliminating elements is a slighltly more complicated process since only integer operations are allowed. First, every element that must be eliminated is made divisible by the pivt using the bezout coefficients from the extended Euclidean algorithm. Once this is done, integer division and subtraction can be used to eliminate the elements.
+
+Boolean matrices are regular matrices with elements modulo 2, Bool is an instance of Num here and the instance is given in Util.
+
+--LAYOUT-----------------------------------------------------------------
+
+"BASIC STUFF" includes type synonyms, transposing matrices, multiplying matrices, and row/column operations.
+
+"INTEGER MATRICES" is divided into "RANK," "NORMAL FORM," "KERNEL" and "IMAGE IN KERNEL." Each section provides functions for computing their namesake both sequentially and in parallel.
 
 The same applies to "BOOLEAN MATRICES"
+
+"INTEGER POLYNOMIALS" and "MOD 2 POLYNOMIALS" contain functions for finding the image of one matrix inside the kernel of the other where both matrices are over the respective polynomial rings.
 -}
 
 --BASIC STUFF-------------------------------------------------------------
@@ -143,23 +144,21 @@ rowOperationPar index1 index2 (c11, c12, c21, c22) matrix =
 
 --RANK--------------------------------------------------------------------
 
---finds the pivot in a given row for Gaussian elimination
---given the index of the pivot row and the matrix
---returns whether or not the row needs to be eliminated with
---the rearranged matrix and
---the column switch performed (if there was one)
---returns Nothing if the row is all zeroes
+--finds the pivot in a given row for Gaussian elimination given the index of the pivot row and the matrix
+--returns whether or not the row needs to be eliminated with the rearranged matrix and
+--the column switch performed (if there was one), returns Nothing if the row is all zeroes
 chooseGaussPivotInt :: (Int, Int) -> IMatrix -> Maybe (Bool, IMatrix, Maybe (Int, Int))
 chooseGaussPivotInt (rowIndex, colIndex) mat = --assumes that i is a legal index for mat
-  let row     = mat ! rowIndex
-      elem    = row ! colIndex
-      indices = V.filter (\index -> index >= colIndex) $ V.findIndices (\n -> n /= 0) row
-      len     = V.length indices
-        in case len of
-          0                           -> Nothing
-          1 | indices ! 0 == colIndex -> Just (False, mat, Nothing)
-          1                           -> Just (False, V.map (switchElems colIndex (indices ! 0)) mat, Just (colIndex, indices ! 0))
-          _                           -> Just (True, V.map (switchElems colIndex (indices ! 1)) mat, Just (colIndex, indices ! 1))
+  let row     = mat ! rowIndex --the following variable should be useful for quickly determining whether or not there are more entries to eleiminate
+      indices = V.filter (\index -> index > colIndex) $ V.findIndices (\x -> x /= 0) row --but that method is not working for some reason
+  in
+    if row ! colIndex == 0 then
+      case indices of
+        v | V.null v -> Nothing
+        v            ->
+          let j = V.head v
+          in Just (not $ exactlyOneNonZero row, V.map (switchElems colIndex j) mat, Just (colIndex, j))
+    else Just (not $ exactlyOneNonZero row, mat, Nothing)
 
 --does gaussian elimination on the pivot row of an integer matrix
 improveRowInt :: (Int, Int) -> Int -> IMatrix -> IMatrix
@@ -287,24 +286,23 @@ rankIntPar matrix =
 --NORMAL FORM-------------------------------------------------------------
 
 --rearranges matrix so that the pivot entry is in the correct position, returns true if more elimination is necessary
---If the process runs into a zero column and zero row that intersect along the diagonal, it will return Nothing, which is a problem
---if the pivot is the only non-zero entry it returns Just (Nothing, matrix) and Just (Just pivot, matrix) otherwise
-chooseRowPivotInt :: Int -> IMatrix -> (Bool, IMatrix)
-chooseRowPivotInt i mat =
-  let row = mat ! i
+--returns Nothing if there is nothing but zeroes after the current pivot position
+chooseRowPivotInt :: Int -> Int -> Int -> IMatrix -> Maybe (Bool, IMatrix)
+chooseRowPivotInt pIndex numRows numCols mat =
+  let row      = mat ! pIndex
+      rIndices = V.toList $ V.findIndices (\x -> x /= 0) row
   in
-    if row ! i == 0 then
-      case V.findIndex (\n -> n /= 0) row of
-        Just x  -> (True, V.map (switchElems x i) mat)
-        Nothing ->
-          case V.findIndex (\n -> n /= 0) $ V.map (\row -> row !  i) mat of
-            Just x  ->
-              if exactlyOneNonZero $ mat ! x then
-                (False, switchElems x i mat)
-              else (True, switchElems x i mat)
-            Nothing -> (False, mat) --problem, see comment above
-    else if exactlyOneNonZero row then (False, mat)
-    else (True, mat)
+    if 0 == row ! pIndex then
+      case rIndices of
+        (i:is)  -> Just ((L.length is) > 0, V.map (switchElems i pIndex) mat)
+        []      ->
+          case V.toList $ V.findIndices (\x -> x /= 0) $ V.map (\r -> r ! pIndex) mat of
+            (i:is)  -> Just ((L.length is) > 0, switchElems i pIndex mat)
+            []      ->
+              case findElem (\(i, j) -> (mat ! i ! j) /= 0) $ L.concat $ L.map (\i -> L.zip (repeat i) [pIndex..numCols - 1]) [pIndex..numRows - 1] of
+                Just (i, j) -> Just ((L.length $ V.findIndices (\x -> x /= 0) $ mat ! i) > 1, switchElems pIndex i $ V.map (switchElems pIndex j) mat)
+                Nothing     -> Nothing
+    else Just ((L.length rIndices) > 1, mat)
 
 --given pivot index and pivot paired with matrix, improves pivot column with row operations
 improveColInt :: Int -> Int -> IMatrix -> IMatrix
@@ -351,14 +349,15 @@ normalFormInt matrix =
       calc (rowIndex, colIndex) mat =
         if rowIndex == rows || colIndex == cols then mat
         else
-          case chooseRowPivotInt rowIndex mat of
-            (True, mx)  ->
+          case chooseRowPivotInt rowIndex rows cols mat of
+            Just (True, mx)  ->
               calc (rowIndex + 1, colIndex + 1) $
                 elimColInt rowIndex $ improveColInt rowIndex rows $
                   elimRowInt (rowIndex, colIndex) $ improveRowInt (rowIndex, colIndex) cols mx
-            (False, mx) ->
+            Just (False, mx) ->
               calc (rowIndex + 1, colIndex + 1) $
                 elimColInt rowIndex $ improveColInt rowIndex rows mx
+            Nothing          -> mat
 
   in if V.null matrix then empty else calc (0, 0) matrix
 
@@ -408,14 +407,15 @@ normalFormIntPar matrix =
       calc (rowIndex, colIndex) mat =
         if rowIndex == rows || colIndex == cols then mat
         else
-          case chooseRowPivotInt rowIndex mat of
-            (True, mx)  ->
+          case chooseRowPivotInt rowIndex rows cols mat of
+            Just (True, mx)  ->
               calc (rowIndex + 1, colIndex + 1) $
                 elimColIntPar rowIndex $ improveColIntPar rowIndex rows $
                   elimRowIntPar (rowIndex, colIndex) $ improveRowIntPar (rowIndex, colIndex) cols mx
-            (False, mx) ->
+            Just (False, mx) ->
               calc (rowIndex + 1, colIndex + 1) $
                 elimColIntPar rowIndex $ improveColIntPar rowIndex rows mx
+            Nothing          -> mat
 
   in if V.null matrix then empty else calc (0, 0) matrix
 
@@ -670,20 +670,17 @@ imgInKerIntPar toColEsch toImage =
 --and returns the column operation that was performed if there was one
 --returns Nothing if the entire row is zero
 chooseGaussPivotBool :: (Int, Int) -> BMatrix -> Maybe (Bool, BMatrix, Maybe (Int, Int))
-chooseGaussPivotBool (rowIndex, colIndex) mat =
-  let row  = mat ! rowIndex
-      elem = row ! colIndex
+chooseGaussPivotBool (rowIndex, colIndex) mat = --assumes that i is a legal index for mat
+  let row     = mat ! rowIndex --the following variable should be useful for quickly determining whether or not there are more entries to eleiminate
+      indices = V.filter (\index -> index > colIndex) $ V.findIndices id row --but that method is not working for some reason
   in
-    if not elem then
-      case V.filter (\index -> index > colIndex) $ V.findIndices id row of
+    if not $ row ! colIndex then
+      case indices of
         v | V.null v -> Nothing
         v            ->
           let j = V.head v
-          in
-            if exactlyOneTrue row then Just (False, V.map (switchElems colIndex j) mat, Just (colIndex, j))
-            else Just (True, V.map (switchElems colIndex j) mat, Just (colIndex, j))
-    else if exactlyOneTrue row then Just (False, mat, Nothing)
-    else Just (True, mat, Nothing)
+          in Just (not $ exactlyOneTrue row, V.map (switchElems colIndex j) mat, Just (colIndex, j))
+    else Just (not $ exactlyOneTrue row, mat, Nothing)
 
 --eliminates pivot row of a boolean matrix
 elimRowBool :: (Int, Int) -> Int -> BMatrix -> BMatrix
@@ -718,22 +715,22 @@ rankBool matrix =
 
 --rearranges the matrix if necessary, returns the matrix paired with its pivot
 --first argument is the index of the pivot row
-chooseRowPivotBool :: Int -> BMatrix -> (Bool, BMatrix)
-chooseRowPivotBool i mat =
-  let row = mat ! i
+chooseRowPivotBool :: Int -> Int -> Int -> BMatrix -> Maybe (Bool, BMatrix)
+chooseRowPivotBool pIndex numRows numCols mat =
+  let row      = mat ! pIndex
+      rIndices = V.toList $ V.findIndices id row
   in
-    if not $ row ! i then
-      case V.findIndex id row of
-        Just x  -> (True, V.map (switchElems x i) mat)
-        Nothing ->
-          case V.findIndex id $ V.map (\row -> row !  i) mat of
-            Just x  ->
-              if exactlyOneTrue $ mat ! x then
-                (False, switchElems x i mat)
-              else (True, switchElems x i mat)
-            Nothing -> (False, mat) --problem
-    else if exactlyOneTrue row then (False, mat)
-    else (True, mat)
+    if not $ row ! pIndex then
+      case rIndices of
+        (i:is)  -> Just ((L.length is) > 0, V.map (switchElems i pIndex) mat)
+        []      ->
+          case V.toList $ V.findIndices id $ V.map (\r -> r ! pIndex) mat of
+            (i:is)  -> Just ((L.length is) > 0, switchElems i pIndex mat)
+            []      ->
+              case findElem (\(i, j) -> (mat ! i ! j)) $ L.concat $ L.map (\i -> L.zip (repeat i) [pIndex..numCols - 1]) [pIndex..numRows - 1] of
+                Just (i, j) -> Just ((V.length $ V.findIndices id $ mat ! i) > 1, switchElems pIndex i $ V.map (switchElems pIndex j) mat)
+                Nothing     -> Nothing
+    else Just ((L.length rIndices) > 1, mat)
 
 --eliminates pivot column of a boolean matrix
 elimColBool :: (Int, Int) -> Int -> BMatrix -> BMatrix
@@ -752,12 +749,13 @@ normalFormBool matrix =
       cols = V.length $ V.head matrix
       calc (rowIndex, colIndex) mat =
           if rowIndex == rows || colIndex == cols then mat else
-          case chooseRowPivotBool rowIndex mat of
-              (False, new)  ->
+          case chooseRowPivotBool rowIndex rows cols mat of
+              Just (False, new)  ->
                 calc (rowIndex + 1, colIndex + 1) $ elimColBool (rowIndex, colIndex) rows new
-              (True, new)   ->
+              Just (True, new)   ->
                 calc (rowIndex + 1, colIndex + 1) $ elimColBool (rowIndex, colIndex) rows $
                   elimRowBool (rowIndex, colIndex) cols new
+              Nothing            -> mat
   in if V.null matrix then empty else calc (0, 0) matrix
 
 --KERNEL------------------------------------------------------------------

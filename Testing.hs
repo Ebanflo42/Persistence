@@ -79,7 +79,7 @@ printMatBool :: BMatrix -> String
 printMatBool mat  =
   let printVec vec =
         if V.null vec then ""
-        else(if V.head vec then "1" else "0") L.++ (printVec $ V.tail vec)
+        else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
       print m =
         if V.null m then ""
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
@@ -173,7 +173,7 @@ main = do
   putStrLn $ intercalate "\n" $ strMat
   --}
   putStrLn "The homology groups are:"
-  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyInt testVR
+  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyIntPar testVR
 {--}
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMat $ (boundOps ! 0) `multiply` (boundOps ! 1)
@@ -183,7 +183,7 @@ main = do
 --}
 {--}
   putStrLn "Ranks of the boolean homology groups:"
-  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyBoolPar testVR
+  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyBool testVR
   putStrLn "Boolean boundary operators:"
   putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps 
 {--}

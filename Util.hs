@@ -20,24 +20,6 @@ instance Num Bool where
   fromInteger _ = True
   signum bool   = if bool then 1 else 0
 
---extended Euclidean algorithm
-extEucAlg :: Integral a => a -> a -> (a, a, a)
-extEucAlg a b =
-  let eeaHelper r s t =
-        case snd r of
-          0 -> (fst r, fst s, fst t)
-          _ ->
-            let r1    = fst r
-                r2    = snd r
-                s2    = snd s
-                t2    = snd t
-                q     = r1 `div` r2
-                nextr = r1 - q*r2
-                nexts = fst s - q*s2
-                nextt = fst t - q*t2
-            in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
-  in eeaHelper (a, b) (0, 1) (1, 0)
-
 one (a, _, _) = a
 two (_, b, _) = b
 thr (_, _, c) = c
@@ -66,6 +48,24 @@ dotProduct vec1 vec2
   | otherwise   = (V.head vec1)*(V.head vec2) + (dotProduct (V.tail vec1) (V.tail vec2))
     where a = V.null vec1; b = V.null vec2
 
+--extended Euclidean algorithm
+extEucAlg :: Integral a => a -> a -> (a, a, a)
+extEucAlg a b =
+  let eeaHelper r s t =
+        case snd r of
+          0 -> (fst r, fst s, fst t)
+          _ ->
+            let r1    = fst r
+                r2    = snd r
+                s2    = snd s
+                t2    = snd t
+                q     = r1 `div` r2
+                nextr = r1 - q*r2
+                nexts = fst s - q*s2
+                nextt = fst t - q*t2
+            in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
+  in (\(x, y, z) -> if x < 0 then (-x, -y, -z) else (x, y, z)) $ eeaHelper (a, b) (0, 1) (1, 0)
+
 switchElems ::Int -> Int -> Vector a -> Vector a
 switchElems i j vector
   | j == i    = vector
@@ -80,6 +80,7 @@ switchElems i j vector
         third  = V.drop (j + 1) vector
     in first V.++ (cons (vector ! j) second) V.++ (cons (vector ! i) third)
 
+--all arrays missing one element from the original array
 getCombos :: Vector a -> Vector (Vector a)
 getCombos vector =
   let len    = V.length vector
@@ -94,6 +95,28 @@ forallVec :: (a -> Bool) -> Vector a -> Bool
 forallVec p vector = 
   if V.null vector then True
   else (p $ V.head vector) && (forallVec p $ V.tail vector)
+
+
+exactlyOneTrue :: Vector Bool -> Bool
+exactlyOneTrue vec =
+  let calc b v
+        | V.null v  = b
+        | b && v0   = False
+        | v0        = calc True $ V.tail v
+        | otherwise = calc b $ V.tail v
+        where v0 = v ! 0
+  in calc False vec
+
+exactlyOneNonZero :: Vector Int -> Bool
+exactlyOneNonZero vec =
+  let calc b v
+        | V.null v  = b
+        | b && v0   = False
+        | v0        = calc True $ V.tail v
+        | otherwise = calc b $ V.tail v
+        where v0 = v ! 0 /= 0
+  in calc False vec
+
 
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 mapWithIndex f vector =
@@ -135,76 +158,6 @@ elemAndIndices p vector =
         | V.null vec     = []
         | p $ V.head vec = (V.head vec, i) : (helper (i + 1) $ V.tail vec)
         | otherwise      = helper (i + 1) $ V.tail vec
-  in helper 0 vector
-
-exactlyOneNonZero :: (Eq a, Num a) => Vector a -> Bool
-exactlyOneNonZero vector =
-  let helper b vec =
-        if V.null vec then b else
-        if V.head vec /= fromIntegral 0 then
-          if b then False
-          else helper True $ V.tail vec
-        else helper b $ V.tail vec
-  in helper False vector
-
-exactlyOneTrue :: Vector Bool -> Bool
-exactlyOneTrue vector =
-  let helper b vec =
-        if V.null vec then b else
-        if V.head vec then
-          if b then False
-          else helper True $ V.tail vec
-        else helper b $ V.tail vec
-  in helper False vector
-
---if the lists differ by one element, returns that element
---otherwise returns nothing
-diffByOneElem :: Eq a => Vector a -> Vector a -> Maybe a
-diffByOneElem list1 list2 =
-  let helper a v1 v2 =
-        if V.null v1 || V.null v2 then Nothing
-        else
-          let x = V.head v1; y = V.head v2; xs = V.tail v1; ys = V.tail v2
-          in case a of
-            Just z  ->
-              if x == y then Nothing
-              else helper a xs ys
-            Nothing ->
-              if x == y then helper (Just x) xs ys
-              else helper (Just y) xs ys
-  in helper Nothing list1 list2
-
---finds the element of the first list that is missing in the second
-findMissing :: Eq a => Vector a -> Vector a -> Maybe a
-findMissing vec1 vec2 =
-  if V.null vec1 then Nothing
-  else
-    let x = V.head vec1
-    in case V.elemIndex x vec2 of
-      Nothing -> Just x
-      Just _  -> findMissing (V.tail vec1) vec2
-
---returns number of elements satisying the predicate and a list of the elements
-filterAndCount :: (a -> Bool) -> [a] -> (Int, [a])
-filterAndCount p list =
-  let helper = \arg i result ->
-       case arg of
-         []     -> (i, result)
-         (x:xs) ->
-           if p x then helper xs i (x:result)
-           else helper xs (i + 1) result
-  in helper list 0 []
-
-myfilterVec :: (a -> Bool) -> Vector a -> (Vector a, Vector Int, Vector a)
-myfilterVec p vector =
-  let helper = \i v ->
-        if V.null v then (empty, empty, empty)
-        else
-          let x    = V.head v; xs = V.tail v
-              rest = helper (i + 1) xs
-          in
-            if p x then (cons x (one rest), cons i (two rest), thr rest)
-            else (one rest, two rest, cons x (thr rest))
   in helper 0 vector
 
 --orders a list of vectors from greatest to least length
@@ -280,6 +233,12 @@ foldRelation rel vec =
         | otherwise = calc w xs
         where x = V.head v; xs = V.tail v
   in calc (V.head vec) (V.tail vec)
+
+findElem :: (a -> Bool) -> [a] -> Maybe a
+findElem p []     = Nothing
+findElem p (x:xs) =
+  if p x then Just x
+  else findElem p xs
 
 replaceElemList :: Int -> a -> [a] -> [a]
 replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))

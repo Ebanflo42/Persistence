@@ -20,29 +20,21 @@ import Data.IntSet as S
 import Control.Parallel.Strategies
 
 {--OVERVIEW---------------------------------------------------------------
-Simplicial complexes are represented as a pair. The first component is an integer
-indicating the number of vertices (might remove that) and the second is a list
-of arrays of simplices whose dimension is given by the index in the list +2.
-The simplices are represented as an array of their vertices with an array of
-indices pointing to their faces in the previous entry of the list.
 
-This module provides functions for constructing the Vietoris-Rips complex and calculating homology
-over both the integers and the integers modulo 2 (represented with booleans).
+Simplicial complexes are represented as a pair. The first component is an integer indicating the number of vertices and the second is a list of arrays of simplices whose dimension is given by the index in the outer list +2.
 
-The Vietoris-Rips complex is constructed by first finding all maximal cliques of the data set given
-the metric and scale (all arrras of points which fall within the scale of each other) and then
-enumerating all the faces of the cliques.
+This module provides functions for constructing the Vietoris-Rips complex and calculating homology over both the integers and the integers modulo 2 (represented with booleans).
 
-Homology groups are represented by integer lists. An element being 0 in the list represents a factor
-of the infinite cyclic group in the homology group. An element k /= 0 represents a factor of the
-cyclic group of order k in the homology group. So an element of 1 represents a factor of the trivial group, i.e. no factor.
+The Vietoris-Rips complex is constructed by first finding all maximal cliques of the data set given the metric and scale (all arrrays of points which fall within the scale of each other) and then enumerating all the faces of the cliques.
 
-The nth homology group is the quotient of the kernel of the nth boundary operator by the image of the (n+1)th boundary operator.
-First, the kernel of the nth boundary operator is found (in Matrix.hs) and its basis is arranged into the rows of a matrix.
-Since the image of the (n+1)th boundary operator is its column space, it is left-multiplied by the kernel matrix
-to project the basis of the image onto the basis of the kernel, a change of coordinates. Once this is done,
-the Smith normal form of that matrix is computed so that we can see how the basis of one vector space fits into the other.
-The diagonal of the Smith normal form represents the nth homology group.
+Integer homology groups are represented by integer lists. An element being 0 in the list represents a factor of the infinite cyclic group in the homology group. An element k /= 0 represents a factor of the cyclic group of order k in the homology group. So an element of 1 represents a factor of the trivial group, i.e. no factor.
+
+The nth homology group is the quotient of the kernel of the nth boundary operator by the image of the (n+1)th boundary operator. The boundary operators represented by rectangular 2D arrays.
+
+For homology over the integers, one must first put the nth boundary operator in column eschelon form and perform the corresponding inverse row operations on the n+1th boundary operator. After this process is complete the column space of the rows of the n+1th corresponding to zero columns in the column eschelon form is the image of the n+1th represented in the basis of the kernel of the nth. See the second paper. These are the two modules we need to quotient; to get the representation of the quotient as a direct product of cyclic groups we look at the diagonal of the Smith normal form of the afformentioned matrix.
+
+Simplicial homology over F2 is much simpler. The only information we could possibly need from any homology group is its rank as an F_2 vector space. Since it is a quotient space, this is simply the number of n-simplices in the complex minus the rank of the nth boundary operator minus the rank of the n+1th boundary operator.
+
 --------------------------------------------------------------------------}
 
 --CONSTRUCTION------------------------------------------------------------
@@ -152,16 +144,15 @@ makeBoundaryOperatorsInt sc =
 --calculates all homology groups of the complex
 calculateHomologyInt :: SimplicialComplex -> [[Int]]
 calculateHomologyInt sc =
-  let dim      = getDimension sc
+  let dim      = (getDimension sc) + 1
       boundOps = makeBoundaryOperatorsInt sc
       calc 1   = [getDiagonal $ normalFormInt $ imgInKerInt (boundOps ! 0) (boundOps ! 1)]
       calc i   =
         if i == dim then
-          (L.replicate (V.length $ kernelInt$ V.last boundOps) 0):(calc $ i - 1)
+          (L.replicate (V.length $ kernelInt $ V.last boundOps) 0):(calc $ i - 1)
         else
           let i1 = i - 1
-          in (getDiagonal $ normalFormInt $
-            imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
+          in (getDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]
     else calc dim
@@ -169,7 +160,7 @@ calculateHomologyInt sc =
 --calculates all homology groups of the complex in parallel using parallel matrix functions
 calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
 calculateHomologyIntPar sc =
-  let dim      = getDimension sc
+  let dim      = (getDimension sc) + 1
       boundOps = makeBoundaryOperatorsInt sc
       calc 1   = [getDiagonal $ normalFormIntPar $ imgInKerIntPar (boundOps ! 0) (boundOps ! 1)]
       calc i   =
@@ -227,7 +218,7 @@ calculateHomologyBool sc =
       calc i   =
         let i1 = i - 1
         in
-          if i == dim then (snd $ V.last ranks):(calc i1) --see Util for evalPar
+          if i == dim then (snd $ V.last ranks):(calc i1)
           else ((snd $ ranks ! i1) - (fst $ ranks ! i)):(calc i1)
   in
     if L.null $ snd sc then [fst sc]

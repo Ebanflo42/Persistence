@@ -12,9 +12,6 @@ import SimplicialComplex
 --and indices of the faces in the filtration
 data Simplex = Simplex Int (Vector Int) (Vector Int)
 
---2D array of simplices organized according to dimension
-type Filtration = Vector (Vector Simplex)
-
 instance Eq Simplex where
   (==) = \(Simplex a _ _) (Simplex b _ _) -> a == b
 
@@ -29,6 +26,10 @@ sim2String (Simplex index vertices faces) =
   "Filtration index: " L.++ (show index) L.++
     "\nVertex indices: " L.++ (show vertices) L.++
       "\nBoundary indices: " L.++ (show faces) L.++ "\nend\n"
+
+--2D array of simplices organized according to dimension
+--each array of simplices should be sorted based on filtration index
+type Filtration = Vector (Vector Simplex)
 
 filtr2String :: Filtration -> String
 filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map sim2String)))
