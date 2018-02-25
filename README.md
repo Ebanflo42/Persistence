@@ -13,13 +13,11 @@ Major TODOs:
 
 Matrix:
 
-1) There is an edge case with the Smith normal form of a matrix where a zero row intersects a zero column on the diagonal. This needs to be fixed.
-
-2) Implement integer polynomial functions.
+1) Implement column eschelon form for integer polynomial matrices.
 
 Simplicial Complex:
 
-1) Continue debugging homology over the integers (probably requires fixing Smith normal form).
+1) Continue debugging homology over the integers (probably requires fixing things in Matrix.hs).
 
 Persistence:
 
@@ -28,7 +26,7 @@ Persistence:
 2) Investigate the second paper further to ensure a good understanding of how to calculate persistent homology over PID's then implement persistent homology over the integers.
 
 General:
-1) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented; current tests reveal that many sparks are fizzling or being garbage-collected.
+1) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented.
 
 A good blog post on computing simplicial homology:
 
