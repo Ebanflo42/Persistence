@@ -25,6 +25,10 @@ Persistence:
 
 2) Investigate the second paper further to ensure a good understanding of how to calculate persistent homology over PID's then implement persistent homology over the integers.
 
+Testing:
+
+1) Add tests for Smith normal form where a zero column intersects a zero row along the diagonal, this may be a problematic edge case.
+
 General:
 1) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented.
 
