@@ -66,6 +66,13 @@ extEucAlg a b =
             in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
   in (\(x, y, z) -> if x < 0 then (-x, -y, -z) else (x, y, z)) $ eeaHelper (a, b) (0, 1) (1, 0)
 
+divides :: Int -> Int -> Bool
+0 `divides` b = False
+a `divides` b
+  | b < 0     = False
+  | b == 0    = True
+  | otherwise = a `divides` (b - a)
+
 switchElems ::Int -> Int -> Vector a -> Vector a
 switchElems i j vector
   | j == i    = vector

@@ -63,6 +63,15 @@ snf5 =
     , [0, 12, 0]
     , [0, 0, 60] ]
 
+matrix6 :: IMatrix
+matrix6 =
+  V.fromList $ L.map V.fromList $
+    [ [9,   0, -36,  30]
+    , [0,   0,   0,   0]
+    , [-36, 0,  19, -18]
+    , [30,  0, -18, 18] ]
+
+
 printMat :: IMatrix -> String
 printMat mat  =
   let printVec vec =
@@ -164,6 +173,13 @@ main = do
   putStrLn $ printMat $ normalFormIntPar matrix5
   putStrLn "The Smith Normal form should be:"
   putStrLn $ printMat $ snf5
+
+  putStrLn "The sixthth matrix is:"
+  putStrLn $ printMat matrix6
+  putStrLn "It's Smith normal form is:"
+  putStrLn $ printMat $ normalFormInt matrix6
+  putStrLn "It's Smith normal form computed in parallel is:"
+  putStrLn $ printMat $ normalFormIntPar matrix6
 
   putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
   putStrLn $ sc2String testVR

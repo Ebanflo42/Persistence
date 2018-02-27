@@ -27,12 +27,13 @@ sim2String (Simplex index vertices faces) =
     "\nVertex indices: " L.++ (show vertices) L.++
       "\nBoundary indices: " L.++ (show faces) L.++ "\nend\n"
 
+--number of vertices paired with
 --2D array of simplices organized according to dimension
 --each array of simplices should be sorted based on filtration index
-type Filtration = Vector (Vector Simplex)
+type Filtration = (Int, Vector (Vector Simplex))
 
 filtr2String :: Filtration -> String
-filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map sim2String)))
+filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map sim2String))) . snd
 
 --scales must be in decreasing order
 makeFiltration :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
@@ -48,19 +49,45 @@ makeFiltration scales metric dataSet =
               if forallVec (\edge -> edgeNotInSimplex edge v) longEdges then Simplex 0 v f --check if it isnt excluded by this scale
               else Simplex i v f --if it is excluded, assign to it the current filtration index
             else Simplex j v f)) sc --if it already has an index, do not change it
-      maxIndex = (L.length scales) - 1
-  in V.map quicksort $ --sort the simplices by filtration index
+      maxIndex           = (L.length scales) - 1
+      (verts, simplices) = makeVRComplex (L.head scales) metric dataSet
+  in (verts, V.map quicksort $ --sort the simplices by filtration index
       calcIndices maxIndex (L.tail scales) $
-        V.map (V.map (\(v, f) -> Simplex 0 v f)) $ fromList $ snd $
-          makeVRComplex (L.head scales) metric dataSet
+        V.map (V.map (\(v, f) -> Simplex 0 v f)) $ fromList $ simplices)
+
+edgeBoundaryBool :: Filtration -> BPolyMat
+edgeBoundaryBool (verts, simplices) =
+  if V.null simplices then V.empty
+  else
+    let makeBoundary (Simplex i v f) =
+          replaceElem (f ! 0) (Power i) $ replaceElem (f ! 1) (Power i) $ V.replicate verts Zero
+    in transposeMat $ V.map makeBoundary $ V.head simplices
 
 boundOpBool :: Int -> Filtration -> BPolyMat
-boundOpBool dim filtration =
+boundOpBool dim (verts, simplices) =
   let makeBoundary (Simplex i v f) =
         let makeMonomial j =
               if V.elem j f then
-                let (Simplex k v f) = filtration ! (dim - 1) ! j
+                let (Simplex k v f) = simplices ! (dim - 2) ! j
                 in Power $ i - k
               else Zero
-        in V.map makeMonomial $ 0 `range` ((V.length $ filtration ! (dim - 1)) - 1)
-  in transposeMat $ V.map makeBoundary $ filtration ! dim
+        in V.map makeMonomial $ 0 `range` ((V.length $ simplices ! (dim - 2)) - 1)
+  in transposeMat $ V.map makeBoundary $ simplices ! (dim - 1)
+
+boundaryOperatorsBool :: Filtration -> Vector BPolyMat
+boundaryOperatorsBool f =
+  let calc 1 = (edgeBoundaryBool f) `cons` V.empty
+      calc i = (boundOpBool i f) `cons` (calc $ i - 1)
+  in calc $ V.length $ snd f
+
+persistentHomologyBool :: Filtration -> Vector BPolyMat
+persistentHomologyBool filtration =
+  let boundOps   = boundaryOperatorsBool filtration
+      max        = (V.length boundOps) - 1
+      calc i ops =
+        if i == max then ops --need to get final column eschelon form!
+        else
+          let i1   = i + 1
+              pair = eschelonAndNextBool (ops ! i) (ops ! i1)
+          in calc i1 $ replaceElem i (fst pair) $ replaceElem i1 (snd pair) ops
+  in calc 0 boundOps

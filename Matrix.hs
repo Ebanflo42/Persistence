@@ -1,17 +1,12 @@
 --TODOS:
 --make parallelism better
 module Matrix
-  ( IMatrix
-  , BMatrix
-  , IPolynomial
-  , IPolyMat
-  , BMonomial (Power, Zero)
-  , BPolyMat
-  , getDiagonal
+  ( getDiagonal
   , transposeMat
   , transposePar
   , multiply
-  , multiplyPar
+  , multiplyPar  
+  , IMatrix
   , rankInt
   , rankIntPar
   , normalFormInt
@@ -20,10 +15,16 @@ module Matrix
   , kernelIntPar
   , imgInKerInt
   , imgInKerIntPar
+  , BMatrix
   , rankBool
   , normalFormBool
   , kernelBool
   , imgInKerBool
+  , IPolynomial
+  , IPolyMat
+  , BMonomial (Power, Zero)
+  , BPolyMat
+  , eschelonAndNextBool
   ) where
 
 import Util
@@ -300,7 +301,7 @@ chooseRowPivotInt pIndex numRows numCols mat =
             (i:is)  -> Just ((L.length is) > 0, switchElems i pIndex mat)
             []      ->
               case findElem (\(i, j) -> (mat ! i ! j) /= 0) $ L.concat $ L.map (\i -> L.zip (repeat i) [pIndex..numCols - 1]) [pIndex..numRows - 1] of
-                Just (i, j) -> Just ((L.length $ V.findIndices (\x -> x /= 0) $ mat ! i) > 1, switchElems pIndex i $ V.map (switchElems pIndex j) mat)
+                Just (i, j) -> Just ((L.length $ rIndices) > 1, switchElems pIndex i $ V.map (switchElems pIndex j) mat)
                 Nothing     -> Nothing
     else Just ((L.length rIndices) > 1, mat)
 
@@ -343,11 +344,12 @@ elimColInt pIndex elems =
  --gets the Smith normal form of an integer matrix
 normalFormInt :: IMatrix -> IMatrix
 normalFormInt matrix =
-  let rows       = V.length matrix
-      cols       = V.length $ V.head matrix
+  let rows = V.length matrix
+      cols = V.length $ V.head matrix
+      diag = min rows cols
 
       calc (rowIndex, colIndex) mat =
-        if rowIndex == rows || colIndex == cols then mat
+        if rowIndex == diag then mat
         else
           case chooseRowPivotInt rowIndex rows cols mat of
             Just (True, mx)  ->
@@ -401,11 +403,12 @@ elimColIntPar pIndex elems =
 --gets the Smith normal form of a matrix, uses lots of parallelism if possible
 normalFormIntPar :: IMatrix -> IMatrix
 normalFormIntPar matrix =
-  let rows       = V.length matrix
-      cols       = V.length $ V.head matrix
+  let rows = V.length matrix
+      cols = V.length $ V.head matrix
+      diag = min rows cols
 
       calc (rowIndex, colIndex) mat =
-        if rowIndex == rows || colIndex == cols then mat
+        if rowIndex == diag then mat
         else
           case chooseRowPivotInt rowIndex rows cols mat of
             Just (True, mx)  ->
