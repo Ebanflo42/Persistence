@@ -13,7 +13,9 @@ Major TODOs:
 
 Matrix:
 
-1) Implement column eschelon form for integer polynomial matrices.
+1) Deal with edge case for Smith normal form - need to insure that all zero entries are at the end of the diagonal and that each diagonal entry divides the next.
+
+2) Implement column eschelon form for integer polynomial matrices.
 
 Simplicial Complex:
 
@@ -27,7 +29,7 @@ Persistence:
 
 Testing:
 
-1) Add tests for Smith normal form where a zero column intersects a zero row along the diagonal, this may be a problematic edge case.
+1) Create a filtration for testing persistent homology over F_2.
 
 General:
 1) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented.
