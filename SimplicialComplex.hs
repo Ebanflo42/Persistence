@@ -144,15 +144,16 @@ makeBoundaryOperatorsInt sc =
 --calculates all homology groups of the complex
 calculateHomologyInt :: SimplicialComplex -> [[Int]]
 calculateHomologyInt sc =
-  let dim      = (getDimension sc) + 1
+  let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
-      calc 1   = [getDiagonal $ normalFormInt $ imgInKerInt (boundOps ! 0) (boundOps ! 1)]
+      calc 0   = [getUnsignedDiagonal $ normalFormInt (boundOps ! 0)]
       calc i   =
         if i == dim then
-          (L.replicate (V.length $ kernelInt $ V.last boundOps) 0):(calc $ i - 1)
+          let op = V.last boundOps
+          in (L.replicate ((V.length $ V.head op) - (rankInt op)) 0):(calc $ i - 1)
         else
           let i1 = i - 1
-          in (getDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
+          in (getUnsignedDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]
     else calc dim
@@ -160,15 +161,16 @@ calculateHomologyInt sc =
 --calculates all homology groups of the complex in parallel using parallel matrix functions
 calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
 calculateHomologyIntPar sc =
-  let dim      = (getDimension sc) + 1
+  let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
-      calc 1   = [getDiagonal $ normalFormIntPar $ imgInKerIntPar (boundOps ! 0) (boundOps ! 1)]
+      calc 0   = [getUnsignedDiagonal $ normalFormInt (boundOps ! 0)]
       calc i   =
         if i == dim then
-          evalPar (L.replicate (V.length $ kernelIntPar $ V.last boundOps) 0) $ calc $ i - 1
+          let op = V.last boundOps
+          in evalPar (L.replicate ((V.length $ V.head op) - (rankInt op)) 0) $ calc $ i - 1
         else
           let i1 = i - 1
-          in evalPar (getDiagonal $ normalFormIntPar $ --see Util for evalPar
+          in evalPar (getUnsignedDiagonal $ normalFormIntPar $ --see Util for evalPar
             imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]

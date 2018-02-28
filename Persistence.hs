@@ -12,6 +12,8 @@ import SimplicialComplex
 --and indices of the faces in the filtration
 data Simplex = Simplex Int (Vector Int) (Vector Int)
 
+getIndex (Simplex i _ _) = i
+
 instance Eq Simplex where
   (==) = \(Simplex a _ _) (Simplex b _ _) -> a == b
 
@@ -80,14 +82,43 @@ boundaryOperatorsBool f =
       calc i = (boundOpBool i f) `cons` (calc $ i - 1)
   in calc $ V.length $ snd f
 
-persistentHomologyBool :: Filtration -> Vector BPolyMat
+persistentHomologyBool :: Filtration -> [[(Int, Int)]]
 persistentHomologyBool filtration =
   let boundOps   = boundaryOperatorsBool filtration
       max        = (V.length boundOps) - 1
-      calc i ops =
-        if i == max then ops --need to get final column eschelon form!
+
+      reduce i ixs ops =
+        if i == max then (ixs, ops) --need to get final column eschelon form!
         else
-          let i1   = i + 1
-              pair = eschelonAndNextBool (ops ! i) (ops ! i1)
-          in calc i1 $ replaceElem i (fst pair) $ replaceElem i1 (snd pair) ops
-  in calc 0 boundOps
+          let i1     = i + 1
+              triple = eschelonAndNextBool (ops ! i) (ops ! i1)
+          in reduce i1 (ixs `snoc` (two triple)) $ replaceElem i (one triple) $ replaceElem i1 (thr triple) ops
+
+      getEdgeBarCodes op =
+        let find j =
+              case V.findIndex (\x -> x /= Zero) $ V.map (\r -> r ! j) op of
+                Just k  ->
+                  case op ! k ! j of
+                    Power p -> (0, p):(find $ j + 1)
+                    Zero    -> error "The impossible happened; Persistence.persistentHomologyBool.getEdgeBarCodes.find"
+                Nothing -> []
+        in find 0
+
+      getBarCodes i ops indices =
+        if V.null ops then []
+        else
+          let op     = V.head ops
+
+              find j =
+                case V.findIndex (\x -> x /= Zero) $ V.map (\r -> r ! j) op of
+                  Just k  ->
+                    case op ! k ! j of
+                      Power p ->
+                        let i1 = i - 1; rowIndex = getIndex $ (snd filtration) ! i1 ! (indices ! i1 ! k)
+                        in (rowIndex, rowIndex + p):(find $ j + 1)
+                      Zero    -> error "The impossible happened; Persistence.persistentHomologyBool.getBarCodes.find"
+                  Nothing -> []
+          in (find 0):(getBarCodes (i + 1) (V.tail ops) indices)
+
+      reduced = reduce 0 V.empty boundOps
+  in (getEdgeBarCodes $ V.head $ snd reduced):(getBarCodes 1 (V.tail $ snd reduced) (fst reduced))

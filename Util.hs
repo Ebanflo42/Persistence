@@ -71,7 +71,7 @@ divides :: Int -> Int -> Bool
 a `divides` b
   | b < 0     = False
   | b == 0    = True
-  | otherwise = a `divides` (b - a)
+  | otherwise = a `divides` (b - (abs a))
 
 switchElems ::Int -> Int -> Vector a -> Vector a
 switchElems i j vector
@@ -166,6 +166,15 @@ elemAndIndices p vector =
         | p $ V.head vec = (V.head vec, i) : (helper (i + 1) $ V.tail vec)
         | otherwise      = helper (i + 1) $ V.tail vec
   in helper 0 vector
+
+biFilter :: (a -> Bool) -> Vector a -> (Vector a, Vector a)
+biFilter p vector =
+  let calc true false v
+        | V.null v  = (true, false)
+        | p x       = calc (true `snoc` x) false $ V.tail v
+        | otherwise = calc true (false `snoc` x) $ V.tail v
+        where x = V.head v
+  in calc V.empty V.empty vector
 
 --orders a list of vectors from greatest to least length
 sortVecs :: [Vector a] -> [Vector a]

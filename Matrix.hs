@@ -2,6 +2,7 @@
 --make parallelism better
 module Matrix
   ( getDiagonal
+  , getUnsignedDiagonal
   , transposeMat
   , transposePar
   , multiply
@@ -288,21 +289,18 @@ rankIntPar matrix =
 
 --rearranges matrix so that the pivot entry is in the correct position, returns true if more elimination is necessary
 --returns Nothing if there is nothing but zeroes after the current pivot position
-chooseRowPivotInt :: Int -> Int -> Int -> IMatrix -> Maybe (Bool, IMatrix)
-chooseRowPivotInt pIndex numRows numCols mat =
-  let row      = mat ! pIndex
+chooseRowPivotInt :: (Int, Int) -> Int -> Int -> IMatrix -> Maybe (Bool, IMatrix)
+chooseRowPivotInt (rowIndex, colIndex) numRows numCols mat =
+  let row      = mat ! rowIndex
       rIndices = V.toList $ V.findIndices (\x -> x /= 0) row
   in
-    if 0 == row ! pIndex then
+    if 0 == row ! colIndex then
       case rIndices of
-        (i:is)  -> Just ((L.length is) > 0, V.map (switchElems i pIndex) mat)
+        (i:is)  -> Just ((L.length is) > 0, V.map (switchElems i colIndex) mat)
         []      ->
-          case V.toList $ V.findIndices (\x -> x /= 0) $ V.map (\r -> r ! pIndex) mat of
-            (i:is)  -> Just ((L.length is) > 0, switchElems i pIndex mat)
-            []      ->
-              case findElem (\(i, j) -> (mat ! i ! j) /= 0) $ L.concat $ L.map (\i -> L.zip (repeat i) [pIndex..numCols - 1]) [pIndex..numRows - 1] of
-                Just (i, j) -> Just ((L.length $ rIndices) > 1, switchElems pIndex i $ V.map (switchElems pIndex j) mat)
-                Nothing     -> Nothing
+          case V.toList $ V.findIndices (\x -> x /= 0) $ V.map (\r -> r ! colIndex) mat of
+            (i:_)  -> Just (True, switchElems i rowIndex mat)
+            []     -> Nothing
     else Just ((L.length rIndices) > 1, mat)
 
 --given pivot index and pivot paired with matrix, improves pivot column with row operations
@@ -324,11 +322,11 @@ improveColInt pIndex maxIndex matrix =
   in improve (pIndex + 1) matrix
 
 --eliminates the pivot column of a matrix to obtain normal form
-elimColInt :: Int -> IMatrix -> IMatrix
-elimColInt pIndex elems =
-  let pRow  = elems ! pIndex
-      pivot = pRow ! pIndex
-      p1    = pIndex + 1
+elimColInt :: (Int, Int) -> IMatrix -> IMatrix
+elimColInt (rowIndex, colIndex) elems =
+  let pRow  = elems ! rowIndex
+      pivot = pRow ! colIndex
+      ri1   = rowIndex + 1
       makeCoeffs i v =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
@@ -339,7 +337,27 @@ elimColInt pIndex elems =
         if V.null ops then mat
         else let (i, coeff) = V.head ops in
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
-  in calc elems $ makeCoeffs p1 $ V.drop p1 $ V.map (\row -> row ! pIndex) elems
+  in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
+
+finish :: Int -> IMatrix -> IMatrix
+finish diagLen matrix =
+  let calc i mat =
+        let i1    = i + 1
+            row   = mat ! i
+            entry = row ! i
+            nextR = mat ! i1
+            nextE = nextR ! i1
+        in
+          if entry == 0 || i1 == diagLen then mat
+          else if entry `divides` nextE then calc i1 mat
+          else
+            let mat'      = replaceElem i (replaceElem i1 nextE row) mat
+                gcdTriple = extEucAlg entry nextE; gcd = one gcdTriple
+                improve   = colOperation i i1 (thr gcdTriple, two gcdTriple, -(nextE `div` gcd), entry `div` gcd)
+                cleanup   = \m -> elimColInt (i, i) $ elimRowInt (i, i) m
+            in calc i1 $ cleanup $ improve mat'
+      filtered = biFilter (\row -> exists (\x -> x /= 0) row) matrix
+  in calc 0 $ (fst filtered) V.++ (snd filtered)
 
  --gets the Smith normal form of an integer matrix
 normalFormInt :: IMatrix -> IMatrix
@@ -349,19 +367,19 @@ normalFormInt matrix =
       diag = min rows cols
 
       calc (rowIndex, colIndex) mat =
-        if rowIndex == diag then mat
+        if rowIndex == rows || colIndex == cols then mat
         else
-          case chooseRowPivotInt rowIndex rows cols mat of
+          case chooseRowPivotInt (rowIndex, colIndex) rows cols mat of
             Just (True, mx)  ->
               calc (rowIndex + 1, colIndex + 1) $
-                elimColInt rowIndex $ improveColInt rowIndex rows $
+                elimColInt (rowIndex, colIndex) $ improveColInt rowIndex rows $
                   elimRowInt (rowIndex, colIndex) $ improveRowInt (rowIndex, colIndex) cols mx
             Just (False, mx) ->
               calc (rowIndex + 1, colIndex + 1) $
-                elimColInt rowIndex $ improveColInt rowIndex rows mx
-            Nothing          -> mat
+                elimColInt (rowIndex, colIndex) $ improveColInt rowIndex rows mx
+            Nothing          -> calc (rowIndex + 1, colIndex) mat
 
-  in if V.null matrix then empty else calc (0, 0) matrix
+  in if V.null matrix then empty else finish diag $ calc (0, 0) matrix
 
 --improves the pivot column of a matrix in parallel
 improveColIntPar :: Int -> Int -> IMatrix -> IMatrix
@@ -383,11 +401,11 @@ improveColIntPar pIndex maxIndex matrix =
 
 --NEEDS TO BE PARALLELIZED
 --eliminates pivot column in parallel
-elimColIntPar :: Int -> IMatrix -> IMatrix
-elimColIntPar pIndex elems =
-  let pRow  = elems ! pIndex
-      pivot = pRow ! pIndex
-      p1    = pIndex + 1
+elimColIntPar :: (Int, Int) -> IMatrix -> IMatrix
+elimColIntPar (rowIndex, colIndex) elems =
+  let pRow  = elems ! rowIndex
+      pivot = pRow ! colIndex
+      ri1   = rowIndex + 1
       makeCoeffs i v =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
@@ -398,7 +416,7 @@ elimColIntPar pIndex elems =
         if V.null ops then mat
         else let (i, coeff) = V.head ops in
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
-  in calc elems $ makeCoeffs p1 $ V.drop p1 $ V.map (\row -> row ! pIndex) elems
+  in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
 --gets the Smith normal form of a matrix, uses lots of parallelism if possible
 normalFormIntPar :: IMatrix -> IMatrix
@@ -408,19 +426,19 @@ normalFormIntPar matrix =
       diag = min rows cols
 
       calc (rowIndex, colIndex) mat =
-        if rowIndex == diag then mat
+        if rowIndex == rows || colIndex == cols then mat
         else
-          case chooseRowPivotInt rowIndex rows cols mat of
+          case chooseRowPivotInt (rowIndex, colIndex) rows cols mat of
             Just (True, mx)  ->
               calc (rowIndex + 1, colIndex + 1) $
-                elimColIntPar rowIndex $ improveColIntPar rowIndex rows $
+                elimColIntPar (rowIndex, colIndex) $ improveColIntPar rowIndex rows $
                   elimRowIntPar (rowIndex, colIndex) $ improveRowIntPar (rowIndex, colIndex) cols mx
             Just (False, mx) ->
               calc (rowIndex + 1, colIndex + 1) $
-                elimColIntPar rowIndex $ improveColIntPar rowIndex rows mx
-            Nothing          -> mat
+                elimColIntPar (rowIndex, colIndex) $ improveColIntPar rowIndex rows mx
+            Nothing          -> calc (rowIndex + 1, colIndex) mat
 
-  in if V.null matrix then empty else calc (0, 0) matrix
+  in if V.null matrix then empty else finish diag $ calc (0, 0) matrix
 
 --KERNEL------------------------------------------------------------------
 
@@ -916,23 +934,58 @@ choosePolyPivotBool (rowIndex, colIndex) mat =
       let index = foldRelation (\i j -> (row ! i) > (row ! j)) indices
       in Just (True, V.map (switchElems colIndex index) mat, Just (colIndex, index))
 
-colOp :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat)
-colOp pIndex index coeff matrix inverted =
+colOp :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat
+colOp pIndex index coeff matrix =
+  V.map (\row -> replaceElem index ((row ! index) + (coeff * (row ! pIndex))) row) matrix
+
+elimRowPolyBool :: (Int, Int) -> Int -> BPolyMat -> BPolyMat
+elimRowPolyBool (rowIndex, colIndex) numCols matrix =
+  let row = matrix ! rowIndex
+      elim i mat
+        | i == numCols    = mat
+        | Zero == row ! i = elim (i + 1) mat
+        | otherwise       = elim (i + 1) $ colOp colIndex i ((row ! i) `d` (row ! colIndex)) mat
+  in elim (colIndex + 1) matrix
+
+eschelonFormBool :: BPolyMat -> BPolyMat
+eschelonFormBool toColEsch =
+  let rows  = V.length toColEsch
+      cols  = V.length $ V.head toColEsch
+      cols1 = cols - 1
+
+      doColOps (rowIndex, colIndex) mat =
+        if rowIndex == rows || colIndex == cols then mat
+        else
+          case choosePolyPivotBool (rowIndex, colIndex) mat of
+            Just (True, _, Nothing)       ->
+              doColOps (rowIndex + 1, colIndex + 1) $
+                elimRowPolyBool (rowIndex, colIndex) cols mat
+            Just (True, mx, Just (i, j))  ->
+              doColOps (rowIndex + 1, colIndex + 1) $
+                elimRowPolyBool (rowIndex, colIndex) cols mx
+            Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) mx
+            Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) mat
+            Nothing                       -> doColOps (rowIndex + 1, colIndex) mat
+
+  in doColOps (0, 0) toColEsch
+
+colOpWithInv :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat)
+colOpWithInv pIndex index coeff matrix inverted =
   let transform1 = V.map (\row -> replaceElem index ((row ! index) + (coeff * (row ! pIndex))) row)
       transform2 = \mat -> replaceElem pIndex ((mat ! pIndex) `add` (coeff `mul` (mat ! index))) mat
   in (transform1 matrix, transform2 inverted)
 
-elimRowPolyBool :: (Int, Int) -> Int -> BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat)
-elimRowPolyBool (rowIndex, colIndex) numCols matrix inverted =
+elimRowPolyBoolWithInv :: (Int, Int) -> Int -> BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat)
+elimRowPolyBoolWithInv (rowIndex, colIndex) numCols matrix inverted =
   let row = matrix ! rowIndex
       elim :: Int -> (BPolyMat, BPolyMat) -> (BPolyMat, BPolyMat)
       elim i (ker, img)
         | i == numCols    = (ker, img)
         | Zero == row ! i = elim (i + 1) (ker, img)
-        | otherwise       = elim (i + 1) $ colOp colIndex i ((row ! i) `d` (row ! colIndex)) ker img
+        | otherwise       = elim (i + 1) $ colOpWithInv colIndex i ((row ! i) `d` (row ! colIndex)) ker img
   in elim (colIndex + 1) (matrix, inverted)
 
-eschelonAndNextBool :: BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat)
+eschelonAndNextBool :: BPolyMat -> BPolyMat -> (BPolyMat, Vector Int, BPolyMat)
 eschelonAndNextBool toColEsch toImage =
   let rows  = V.length toColEsch
       cols  = V.length $ V.head toColEsch
@@ -944,15 +997,16 @@ eschelonAndNextBool toColEsch toImage =
           case choosePolyPivotBool (rowIndex, colIndex) ker of
             Just (True, _, Nothing)       ->
               doColOps (rowIndex + 1, colIndex + 1) $
-                elimRowPolyBool (rowIndex, colIndex) cols ker img
+                elimRowPolyBoolWithInv (rowIndex, colIndex) cols ker img
             Just (True, mx, Just (i, j))  ->
               doColOps (rowIndex + 1, colIndex + 1) $
-                elimRowPolyBool (rowIndex, colIndex) cols mx $ switchElems i j img
+                elimRowPolyBoolWithInv (rowIndex, colIndex) cols mx $ switchElems i j img
             Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
             Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (ker, img)
             Nothing                       -> doColOps (rowIndex + 1, colIndex) (ker, img)
 
-      result = doColOps (0, 0) (toColEsch, toImage)
-      ker    = fst result
-      img    = snd result
-  in (ker, V.map (\i -> V.map (\row -> row ! i) img) $ V.filter (\i -> forallVec (\row -> Zero == row ! i) ker) $ 0 `range` cols1)
+      result  = doColOps (0, 0) (toColEsch, toImage)
+      ker     = fst result
+      img     = snd result
+      indices = V.filter (\i -> forallVec (\row -> Zero == row ! i) ker) $ 0 `range` cols1
+  in (ker, indices, V.map (\i -> img ! i) indices)
