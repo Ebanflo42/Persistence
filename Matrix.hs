@@ -25,6 +25,7 @@ module Matrix
   , IPolyMat
   , BMonomial (Power, Zero)
   , BPolyMat
+  , eschelonFormBool
   , eschelonAndNextBool
   ) where
 
@@ -220,8 +221,7 @@ rankInt matrix =
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ V.map (\i -> if exists (\j -> mat ! j ! i /= 0) $
-          0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
+        V.sum $ V.map (\i -> if exists (\j -> mat ! j ! i /= 0) $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
 
@@ -722,7 +722,7 @@ rankBool matrix =
 
       doColOps (rowIndex, colIndex) mat =
         if rowIndex == rows || colIndex == cols then mat else
-          case chooseGaussPivotBool (rowIndex, colIndex) mat of --FIX
+          case chooseGaussPivotBool (rowIndex, colIndex) mat of
             Just (True, mx, _)  -> doColOps (rowIndex + 1, colIndex + 1) $ elimRowBool (rowIndex, colIndex) cols mx
             Just (False, mx, _) -> doColOps (rowIndex + 1, colIndex + 1) mat
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat

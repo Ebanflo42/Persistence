@@ -261,3 +261,9 @@ replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 
 evalPar :: a -> [a] -> [a]
 evalPar c r = runEval $ rpar c >> rseq r >> return (c:r)
+
+(!!?) :: [a] -> Int -> Maybe a
+list !!? i
+  | i < 0              = Nothing
+  | i >= L.length list = Nothing
+  | otherwise          = Just $ list !! i

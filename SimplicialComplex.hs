@@ -65,6 +65,7 @@ getDimension = L.length . snd
 makeVRComplex :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
 makeVRComplex scale metric dataSet =
   let numVerts = L.length dataSet
+
       organizeCliques dim simplices = --make a dataSet with an entry for every dimension
         case L.findIndex (\v -> (V.length v) /= dim) simplices of
           Just i  ->
@@ -74,22 +75,28 @@ makeVRComplex scale metric dataSet =
               else (V.fromList $ L.take i simplices):((L.replicate (diff - 1) V.empty)
                 L.++ (organizeCliques (dim - 1) $ L.drop i simplices))
           Nothing -> [V.fromList simplices]
-      makePair simplices = --pair the organized dataSet of maximal cliques with its dimension
+
+      makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
         case simplices of
           (x:_) ->
             let dim = V.length x
             in (dim, organizeCliques dim simplices)
           []    -> (-1, [])
-      maxCliques =
+
+      maxCliques = --find all maximal cliques and sort them from largest to smallest (excludes maximal cliques which are single points)
         makePair $ sortVecs $ L.map V.fromList $
           L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (dataSet !! i) (dataSet !! j) < scale) [0..numVerts - 1]
+
       combos i max sc result =
         if i == max then --don't need to record boundary indices for edges
           (V.map (\s -> (s, V.empty)) $ L.last sc):result
         else
           let i1        = i + 1
               current   = sc !! i
-              next      = sc !! i1
+              next      =
+                case sc !!? i1 of
+                  Nothing -> error "SimplicialComplex 98"
+                  Just x  -> x
               len       = V.length next
               allCombos = V.map getCombos current
               uCombos   = bigU allCombos

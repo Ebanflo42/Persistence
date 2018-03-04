@@ -10,7 +10,7 @@ import SimplicialComplex
 --the index of the filtration where the simplex enters
 --indices of the vertices in the original data set
 --and indices of the faces in the filtration
-data Simplex = Simplex Int (Vector Int) (Vector Int)
+data Simplex = Simplex Int (Vector Int) (Vector Int) deriving Show
 
 getIndex (Simplex i _ _) = i
 
@@ -26,8 +26,8 @@ instance Ord Simplex where
 sim2String :: Simplex -> String
 sim2String (Simplex index vertices faces) =
   "Filtration index: " L.++ (show index) L.++
-    "\nVertex indices: " L.++ (show vertices) L.++
-      "\nBoundary indices: " L.++ (show faces) L.++ "\nend\n"
+    "; Vertex indices: " L.++ (show vertices) L.++
+      "; Boundary indices: " L.++ (show faces) L.++ "\n"
 
 --number of vertices paired with
 --2D array of simplices organized according to dimension
@@ -40,8 +40,10 @@ filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map 
 --scales must be in decreasing order
 makeFiltration :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
 makeFiltration scales metric dataSet =
-  let edgeNotInSimplex edge       = forallVec (\x -> V.head edge /= x && V.last edge /= x)
-      edgeToLong scale edge       = metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge)) > scale
+  let edgeNotInSimplex edge = forallVec (\x -> V.head edge /= x && V.last edge /= x)
+      edgeToLong scale edge = scale < metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge))
+      maxIndex              = (L.length scales) - 1
+
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
         let longEdges = V.filter (edgeToLong scl) $ V.map (\(Simplex i v f) -> v) $ V.head sc --find edges excluded by this scale
@@ -51,8 +53,9 @@ makeFiltration scales metric dataSet =
               if forallVec (\edge -> edgeNotInSimplex edge v) longEdges then Simplex 0 v f --check if it isnt excluded by this scale
               else Simplex i v f --if it is excluded, assign to it the current filtration index
             else Simplex j v f)) sc --if it already has an index, do not change it
-      maxIndex           = (L.length scales) - 1
+
       (verts, simplices) = makeVRComplex (L.head scales) metric dataSet
+
   in (verts, V.map quicksort $ --sort the simplices by filtration index
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> Simplex 0 v f)) $ fromList $ simplices)
@@ -88,7 +91,7 @@ persistentHomologyBool filtration =
       max        = (V.length boundOps) - 1
 
       reduce i ixs ops =
-        if i == max then (ixs, ops) --need to get final column eschelon form!
+        if i == max then (ixs, (V.init ops) `snoc` (eschelonFormBool $ V.last ops))
         else
           let i1     = i + 1
               triple = eschelonAndNextBool (ops ! i) (ops ! i1)

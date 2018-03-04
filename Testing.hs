@@ -94,8 +94,8 @@ printMatBool mat  =
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
   in print mat
 
-pointCloud :: [(Float, Float)]
-pointCloud =
+pointCloud1 :: [(Float, Float)]
+pointCloud1 =
   [ ( -7, -19)
   , ( -6, -16)
   , (  2, -16)
@@ -116,19 +116,73 @@ pointCloud =
   , ( 17,  20)
   ]
 
+pointCloud2 :: [(Float, Float)]
+pointCloud2 =
+  [ (  1, -22)
+  , (  4, -21)
+  , ( -3, -20)
+  , (  4, -19)
+  , ( -7, -18)
+  , (  5, -17)
+  , ( -7, -12)
+  , ( -1, -12)
+  , (  3, -12)
+  , (  6, -12)
+  , (  8, -12)
+  , ( -9, -10)
+  , ( -4,  -9)
+  , (-12,  -8)
+  , (  7,  -8)
+  , ( -8,  -7)
+  , ( -5,  -7)
+  , (-11,  -6)
+  , (  9,  -5)
+  , ( -6,  -4)
+  , (-14,  -3)
+  , (-12,  -3)
+  , (  7,  -3)
+  , (  5,  -1)
+  , ( -7,   0)
+  , (  0,   0)
+  , (  8,   0)
+  , (-12,   1)
+  , (  2,   1)
+  , (  0,   2)
+  , (-10,   3)
+  , ( -7,   3)
+  , (  6,   3)
+  , ( -2,   5)
+  , ( 10,   5)
+  , ( -8,   9)
+  , (  8,   9)
+  , ( -9, -11)
+  , (  6,  11)
+  , ( -6,  12)
+  , ( -4,  13)
+  , (  2,  13)
+  , (  8,  13)
+  , ( -2,  14)
+  , (  5,  14)
+  , ( -4,  16)
+  , (  1,  16)
+  ]
+
 metric :: (Float, Float) -> (Float, Float) -> Float
 metric (a, b) (c, d) =
   let x = a - c; y = b - d in
   sqrt (x * x + y * y)
 
-testVR = makeVRComplex 10.0 metric pointCloud
+--should have 2 1-cycles and 3 connected components
+testVR = makeVRComplex 10.0 metric pointCloud1
 
 boundOps = makeBoundaryOperatorsInt testVR
 
 boolOps = makeBoundaryOperatorsBool testVR
 
-main = do
+testFiltration = makeFiltration [12.0, 9.0, 6.0, 3.0] metric pointCloud2
 
+main = do
+{--
   putStrLn "The first matrix is:"
   putStrLn $ printMat matrix1
   putStrLn "It's kernel is:"
@@ -209,8 +263,5 @@ main = do
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
   --}
-{--
-  let filtration = makeFiltration [10.0] metric pointCloud
-  putStrLn "The filtration is:"
-  putStrLn $ filtr2String filtration
-  --}
+  putStrLn "The filtration of pointCloud2 is:"
+  putStrLn $ filtr2String testFiltration
