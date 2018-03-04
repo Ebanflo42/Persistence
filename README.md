@@ -13,25 +13,28 @@ Major TODOs:
 
 Matrix:
 
-1) Deal with edge case for Smith normal form - need to insure that all zero entries are at the end of the diagonal and that each diagonal entry divides the next.
+1) Debug finding the image of one matrix in the basis of the kernel of another matrix - this appears to be causing the problem with simplicial homology over ther integers.
 
 2) Implement column eschelon form for integer polynomial matrices.
 
 Simplicial Complex:
 
-1) Continue debugging homology over the integers (probably requires fixing things in Matrix.hs).
+1) Debug construction of the Vietoris-Rips complex.
+
+2) Continue debugging homology over the integers (probably requires fixing things in Matrix.hs).
 
 Persistence:
 
-1) Ensure that construction of the boundary operators is complete for F_2 and implement persistent homology over F_2.
+1) Continue debugging the construction of the filtration and then move on to testing persistent homology over F_2.
 
 2) Investigate the second paper further to ensure a good understanding of how to calculate persistent homology over PID's then implement persistent homology over the integers.
 
 Testing:
 
-1) Create a filtration for testing persistent homology over F_2.
+1) Make sure the expected output for the persistent homology test case is understood.
 
 General:
+
 1) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented.
 
 A good blog post on computing simplicial homology:
