@@ -1,10 +1,12 @@
 module Persistence where
 
+import Data.List as L
+import Data.Vector as V
+import Control.Parallel.Strategies
+
 import Util
 import Matrix
-import Data.List as L
 import MaximalCliques
-import Data.Vector as V
 import SimplicialComplex
 
 --the index of the filtration where the simplex enters
@@ -18,10 +20,10 @@ instance Eq Simplex where
   (==) = \(Simplex a _ _) (Simplex b _ _) -> a == b
 
 instance Ord Simplex where
-  (>)   = \(Simplex a _ _) (Simplex b _ _) -> a > b
-  (<)   = \(Simplex a _ _) (Simplex b _ _) -> a < b
-  (<=)  = \(Simplex a _ _) (Simplex b _ _) -> a <= b
-  (>=)  = \(Simplex a _ _) (Simplex b _ _) -> a >= b
+  (>)  = \(Simplex a _ _) (Simplex b _ _) -> a > b
+  (<)  = \(Simplex a _ _) (Simplex b _ _) -> a < b
+  (<=) = \(Simplex a _ _) (Simplex b _ _) -> a <= b
+  (>=) = \(Simplex a _ _) (Simplex b _ _) -> a >= b
 
 sim2String :: Simplex -> String
 sim2String (Simplex index vertices faces) =
@@ -40,13 +42,13 @@ filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map 
 --scales must be in decreasing order
 makeFiltration :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
 makeFiltration scales metric dataSet =
-  let edgeNotInSimplex edge = forallVec (\x -> V.head edge /= x && V.last edge /= x)
-      edgeToLong scale edge = scale < metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge))
-      maxIndex              = (L.length scales) - 1
+  let edgeNotInSimplex edge  = not . exists (\x -> V.head edge == x || V.last edge == x)
+      edgeTooLong scale edge = scale < metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge))
+      maxIndex               = (L.length scales) - 1
 
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
-        let longEdges = V.filter (edgeToLong scl) $ V.map (\(Simplex i v f) -> v) $ V.head sc --find edges excluded by this scale
+        let longEdges = V.filter (edgeTooLong scl) $ V.map (\(Simplex i v f) -> v) $ V.head sc --find edges excluded by this scale
         in calcIndices (i - 1) scls $
           V.map (V.map (\(Simplex j v f) ->
             if j == 0 then --if the simplex has not yet been assigned a filtration index
@@ -87,8 +89,8 @@ boundaryOperatorsBool f =
 
 persistentHomologyBool :: Filtration -> [[(Int, Int)]]
 persistentHomologyBool filtration =
-  let boundOps   = boundaryOperatorsBool filtration
-      max        = (V.length boundOps) - 1
+  let boundOps = boundaryOperatorsBool filtration
+      max      = (V.length boundOps) - 1
 
       reduce i ixs ops =
         if i == max then (ixs, (V.init ops) `snoc` (eschelonFormBool $ V.last ops))

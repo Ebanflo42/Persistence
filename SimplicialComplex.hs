@@ -4,11 +4,11 @@ module SimplicialComplex
   , getDimension
   , makeVRComplex
   , makeBoundaryOperatorsInt
-  , calculateHomologyInt
-  , calculateHomologyIntPar
+  , simplicialHomologyInt
+  , simplicialHomologyIntPar
   , makeBoundaryOperatorsBool
-  , calculateHomologyBool
-  , calculateHomologyBoolPar
+  , simplicialHomologyBool
+  , simplicialHomologyBoolPar
   ) where
 
 import Util
@@ -62,49 +62,48 @@ getDimension = L.length . snd
 
 --makes the Vietoris-Rips complex given a scale, metric, and data set
 --uses Bron-Kerbosch algorithm to find maximal cliques and then enumerates faces
+--uses parallelism by default because the construction is expensive
 makeVRComplex :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
 makeVRComplex scale metric dataSet =
   let numVerts = L.length dataSet
 
-      organizeCliques dim simplices = --make a dataSet with an entry for every dimension
-        case L.findIndex (\v -> (V.length v) /= dim) simplices of
-          Just i  ->
-            let diff = (V.length $ simplices !! i) - dim
-            in
-              if diff == 1 then (V.fromList $ L.take i simplices):(organizeCliques (dim - 1) $ L.drop i simplices)
-              else (V.fromList $ L.take i simplices):((L.replicate (diff - 1) V.empty)
-                L.++ (organizeCliques (dim - 1) $ L.drop i simplices))
-          Nothing -> [V.fromList simplices]
+      --make a list with an entry for every dimension of simplices
+      organizeCliques 1 _       = []
+      organizeCliques i cliques =
+        let helper = biFilter (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
+        in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
 
       makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
         case simplices of
           (x:_) ->
             let dim = V.length x
-            in (dim, organizeCliques dim simplices)
-          []    -> (-1, [])
+            in (dim, organizeCliques dim $ V.fromList simplices)
+          []    -> (1, []) --if there are no maximal cliques this acts as a flag so that the algorithm doesn't try to generate all the other simplices
 
+      maxCliques :: (Int, [Vector (Vector Int)])
       maxCliques = --find all maximal cliques and sort them from largest to smallest (excludes maximal cliques which are single points)
         makePair $ sortVecs $ L.map V.fromList $
           L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (dataSet !! i) (dataSet !! j) < scale) [0..numVerts - 1]
+      fstmc2 = fst maxCliques - 2
 
+      --generates faces of simplices and records the boundary indices
+      combos :: Int -> Int -> [Vector (Vector Int)] -> [Vector (Vector Int, Vector Int)] -> [Vector (Vector Int, Vector Int)]
       combos i max sc result =
-        if i == max then --don't need to record boundary indices for edges
-          (V.map (\s -> (s, V.empty)) $ L.last sc):result
+        if i == max then
+          (V.map (\s -> (s, V.empty)) $ L.last sc):result --don't record boundary indices for edges
         else
-          let i1        = i + 1
+          let i1        = i + 1 --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
               current   = sc !! i
-              next      =
-                case sc !!? i1 of
-                  Nothing -> error "SimplicialComplex 98"
-                  Just x  -> x
+              next      = sc !! i1
               len       = V.length next
-              allCombos = V.map getCombos current
-              uCombos   = bigU allCombos
-              indices   = V.map (V.map (\face -> len + (V.head $ V.elemIndices face uCombos))) allCombos
+              allCombos = V.map getCombos current --get all the faces of every simplex
+              uCombos   = bigU allCombos --union of faces
+              --the index of the faces of each simplex can be found by adding the number of (n-1)-simplices to the index of each face in the union of faces
+              indices   = parMapVec (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
           in combos i1 max (replaceElemList i1 (next V.++ uCombos) sc) $ (V.zip current indices):result
   in
-    if fst maxCliques == (-1) then (numVerts, [])
-    else (numVerts, combos 0 (fst maxCliques - 2) (snd maxCliques) [])
+    if fstmc2 == (-1) then (numVerts, []) --if there are no maximal cliques, the complex is just a bunch of points
+    else (numVerts, combos 0 fstmc2 (snd maxCliques) [])
 
 --INTEGER HOMOLOGY--------------------------------------------------------
 
@@ -149,8 +148,8 @@ makeBoundaryOperatorsInt sc =
   in calc 1
 
 --calculates all homology groups of the complex
-calculateHomologyInt :: SimplicialComplex -> [[Int]]
-calculateHomologyInt sc =
+simplicialHomologyInt :: SimplicialComplex -> [[Int]]
+simplicialHomologyInt sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
       calc 0   = [getUnsignedDiagonal $ normalFormInt (boundOps ! 0)]
@@ -166,8 +165,8 @@ calculateHomologyInt sc =
     else calc dim
 
 --calculates all homology groups of the complex in parallel using parallel matrix functions
-calculateHomologyIntPar :: SimplicialComplex -> [[Int]]
-calculateHomologyIntPar sc =
+simplicialHomologyIntPar :: SimplicialComplex -> [[Int]]
+simplicialHomologyIntPar sc =
   let dim      = getDimension sc
       boundOps = makeBoundaryOperatorsInt sc
       calc 0   = [getUnsignedDiagonal $ normalFormInt (boundOps ! 0)]
@@ -216,8 +215,8 @@ makeBoundaryOperatorsBool sc =
   in calc 1
 
 --calculate the ranks of all homology groups
-calculateHomologyBool :: SimplicialComplex -> [Int]
-calculateHomologyBool sc =
+simplicialHomologyBool :: SimplicialComplex -> [Int]
+simplicialHomologyBool sc =
   let dim      = (getDimension sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
       ranks    = --dimension of image paired with dimension of kernel
@@ -234,8 +233,8 @@ calculateHomologyBool sc =
     else calc dim
 
 --calculate ranks of all homology groups in parallel
-calculateHomologyBoolPar :: SimplicialComplex -> [Int]
-calculateHomologyBoolPar sc =
+simplicialHomologyBoolPar :: SimplicialComplex -> [Int]
+simplicialHomologyBoolPar sc =
   let dim      = (getDimension sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
       ranks    = --dimension of image paired with dimension of kernel

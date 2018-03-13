@@ -44,7 +44,7 @@ matrix4 =
       cons (cons 10 $ cons (-4) $ cons (-16) empty) empty
 
 snf4 :: IMatrix
-snf4 = 
+snf4 =
   cons (cons 2 $ cons 0 $ cons 0 empty) $
     cons (cons 0 $ cons 6 $ cons 0 empty) $
       cons (cons 0 $ cons 0 $ cons 12 empty) empty
@@ -70,7 +70,6 @@ matrix6 =
     , [0,   0,   0,   0]
     , [-36, 0,  19, -18]
     , [30,  0, -18, 18] ]
-
 
 printMat :: IMatrix -> String
 printMat mat  =
@@ -155,7 +154,7 @@ pointCloud2 =
   , ( 10,   5)
   , ( -8,   9)
   , (  8,   9)
-  , ( -9, -11)
+  , ( -9,  11)
   , (  6,  11)
   , ( -6,  12)
   , ( -4,  13)
@@ -179,7 +178,7 @@ boundOps = makeBoundaryOperatorsInt testVR
 
 boolOps = makeBoundaryOperatorsBool testVR
 
-testFiltration = makeFiltration [12.0, 9.0, 6.0, 3.0] metric pointCloud2
+testFiltration = makeFiltration [6.0, 5.0, 4.0] metric pointCloud2
 
 main = do
 {--
@@ -242,8 +241,9 @@ main = do
   let strMat = V.toList $ V.map printMat boundOps
   putStrLn $ intercalate "\n" $ strMat
   --}
+
   putStrLn "The homology groups are:"
-  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyIntPar testVR
+  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyIntPar testVR
 {--}
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMat $ (boundOps ! 0) `multiply` (boundOps ! 1)
@@ -251,11 +251,11 @@ main = do
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMat $ (boundOps ! 1) `multiply` (boundOps ! 2)
 --}
-{--}
+{--
   putStrLn "Ranks of the boolean homology groups:"
-  putStrLn $ intercalate "\n" $ L.map show $ calculateHomologyBool testVR
+  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyBool testVR
   putStrLn "Boolean boundary operators:"
-  putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps 
+  putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps
 {--}
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMatBool $ (boolOps ! 0) `multiply` (boolOps ! 1)
