@@ -6,7 +6,7 @@ module Matrix
   , transposeMat
   , transposePar
   , multiply
-  , multiplyPar  
+  , multiplyPar
   , IMatrix
   , rankInt
   , rankIntPar
@@ -213,7 +213,7 @@ rankInt matrix =
       cols1    = cols - 1
 
       doColOps (rowIndex, colIndex) mat =
-        if rowIndex == rows || colIndex == cols then mat else 
+        if rowIndex == rows || colIndex == cols then mat else
           case chooseGaussPivotInt (rowIndex, colIndex) mat of
             Just (True, mx, _)  ->
               doColOps (rowIndex + 1, colIndex + 1) $ elimRowInt (rowIndex, colIndex) $ improveRowInt (rowIndex, colIndex) cols mx
@@ -221,7 +221,7 @@ rankInt matrix =
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ V.map (\i -> if exists (\j -> mat ! j ! i /= 0) $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
+        V.sum $ V.map (\i -> if existsVec (\j -> mat ! j ! i /= 0) $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
 
@@ -271,7 +271,7 @@ rankIntPar matrix =
       cols1    = cols - 1
 
       doColOps (rowIndex, colIndex) mat =
-        if rowIndex == rows || colIndex == cols then mat else 
+        if rowIndex == rows || colIndex == cols then mat else
           case chooseGaussPivotInt (rowIndex, colIndex) mat of
             Just (True, mx, _)  ->
               doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntPar (rowIndex, colIndex) $
@@ -280,7 +280,7 @@ rankIntPar matrix =
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ parMapVec (\i -> if exists (\j -> mat ! j ! i /= 0) $
+        V.sum $ parMapVec (\i -> if existsVec (\j -> mat ! j ! i /= 0) $
           0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
@@ -356,7 +356,7 @@ finish diagLen matrix =
                 improve   = colOperation i i1 (thr gcdTriple, two gcdTriple, -(nextE `div` gcd), entry `div` gcd)
                 cleanup   = \m -> elimColInt (i, i) $ elimRowInt (i, i) m
             in calc i1 $ cleanup $ improve mat'
-      filtered = biFilter (\row -> exists (\x -> x /= 0) row) matrix
+      filtered = biFilter (\row -> existsVec (\x -> x /= 0) row) matrix
   in calc 0 $ (fst filtered) V.++ (snd filtered)
 
  --gets the Smith normal form of an integer matrix
@@ -484,7 +484,7 @@ kernelInt matrix =
       identity = V.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
 
       doColOps (rowIndex, colIndex) (elems, ide) =
-        if rowIndex == rows || colIndex == cols then (elems, ide) else 
+        if rowIndex == rows || colIndex == cols then (elems, ide) else
           case chooseGaussPivotInt (rowIndex, colIndex) elems of
             Just (True, mx, Just (i, j))  ->
               doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithId (rowIndex, colIndex) cols $
@@ -541,7 +541,7 @@ kernelIntPar matrix =
       identity = V.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
 
       doColOps (rowIndex, colIndex) (elems, ide) =
-        if rowIndex == rows || colIndex == cols then (elems, ide) else 
+        if rowIndex == rows || colIndex == cols then (elems, ide) else
           case chooseGaussPivotInt (rowIndex, colIndex) elems of
             Just (True, mx, Just (i, j))  ->
               doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithIdPar (rowIndex, colIndex) cols $
@@ -729,7 +729,7 @@ rankBool matrix =
 
       countNonZeroCols mat =
         V.sum $ V.map (\i ->
-           if exists (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
+           if existsVec (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
   in countNonZeroCols $ doColOps (0, 0) matrix
 
 --NORMAL FORM-------------------------------------------------------------
@@ -804,7 +804,7 @@ kernelBool matrix =
 
       doColOps (rowIndex, colIndex) (ker, ide) =
         if rowIndex == rows || colIndex == cols then (ker, ide)
-        else 
+        else
           case chooseGaussPivotBool (rowIndex, colIndex) ker of
             Just (True, _, Nothing)      ->
               doColOps (rowIndex + 1, colIndex + 1) $
@@ -880,7 +880,7 @@ type IPolyMat    = Vector (Vector IPolynomial)
 
 --MOD 2 POLYNOMIALS-------------------------------------------------------
 
-data BMonomial = Zero | Power Int deriving Eq
+data BMonomial = Zero | Power Int deriving (Eq, Show)
 type BPolyMat  = Vector (Vector BMonomial)
 
 a :: BMonomial -> BMonomial -> BMonomial

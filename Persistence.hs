@@ -42,19 +42,18 @@ filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map 
 --scales must be in decreasing order
 makeFiltration :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
 makeFiltration scales metric dataSet =
-  let edgeNotInSimplex edge  = not . exists (\x -> V.head edge == x || V.last edge == x)
-      edgeTooLong scale edge = scale < metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge))
-      maxIndex               = (L.length scales) - 1
+  let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
+      edgeTooLong scale edge     = scale < metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge))
+      maxIndex                   = (L.length scales) - 1
 
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
         let longEdges = V.filter (edgeTooLong scl) $ V.map (\(Simplex i v f) -> v) $ V.head sc --find edges excluded by this scale
-        in calcIndices (i - 1) scls $
-          V.map (V.map (\(Simplex j v f) ->
-            if j == 0 then --if the simplex has not yet been assigned a filtration index
-              if forallVec (\edge -> edgeNotInSimplex edge v) longEdges then Simplex 0 v f --check if it isnt excluded by this scale
-              else Simplex i v f --if it is excluded, assign to it the current filtration index
-            else Simplex j v f)) sc --if it already has an index, do not change it
+        in calcIndices (i - 1) scls $ V.map (V.map (\(Simplex j v f) ->
+          if j == 0 then --if the simplex has not yet been assigned a fitration index
+            if existsVec (\edge -> edgeInSimplex edge v) longEdges then Simplex i v f --if a long edge is in the simplex, assign it the current index
+            else Simplex 0 v f --otherwise wait until next iteration
+          else Simplex j v f)) sc --otherwise leave it alone
 
       (verts, simplices) = makeVRComplex (L.head scales) metric dataSet
 
@@ -100,11 +99,14 @@ persistentHomologyBool filtration =
           in reduce i1 (ixs `snoc` (two triple)) $ replaceElem i (one triple) $ replaceElem i1 (thr triple) ops
 
       getEdgeBarCodes op =
-        let find j =
+        let maxIndex = (V.length $ V.head op) - 1
+            find j   =
               case V.findIndex (\x -> x /= Zero) $ V.map (\r -> r ! j) op of
                 Just k  ->
                   case op ! k ! j of
-                    Power p -> (0, p):(find $ j + 1)
+                    Power p ->
+                      if j == maxIndex then (0, p):[]
+                      else (0, p):(find $ j + 1)
                     Zero    -> error "The impossible happened; Persistence.persistentHomologyBool.getEdgeBarCodes.find"
                 Nothing -> []
         in find 0
@@ -112,18 +114,21 @@ persistentHomologyBool filtration =
       getBarCodes i ops indices =
         if V.null ops then []
         else
-          let op     = V.head ops
-
-              find j =
+          let op       = V.head ops
+              maxIndex = (V.length $ V.head op) - 1
+              find j   = --find the pivot element of the jth column
                 case V.findIndex (\x -> x /= Zero) $ V.map (\r -> r ! j) op of
                   Just k  ->
                     case op ! k ! j of
                       Power p ->
-                        let i1 = i - 1; rowIndex = getIndex $ (snd filtration) ! i1 ! (indices ! i1 ! k)
-                        in (rowIndex, rowIndex + p):(find $ j + 1)
+                        let rowIndex = getIndex $ (snd filtration) ! i ! (indices ! i ! k)
+                        in
+                          if j == maxIndex then (rowIndex, rowIndex + p):[]
+                          else (rowIndex, rowIndex + p):(find $ j + 1)
                       Zero    -> error "The impossible happened; Persistence.persistentHomologyBool.getBarCodes.find"
                   Nothing -> []
           in (find 0):(getBarCodes (i + 1) (V.tail ops) indices)
 
       reduced = reduce 0 V.empty boundOps
-  in (getEdgeBarCodes $ V.head $ snd reduced):(getBarCodes 1 (V.tail $ snd reduced) (fst reduced))
+
+  in (getEdgeBarCodes $ V.head $ snd reduced):(getBarCodes 0 (V.tail $ snd reduced) (fst reduced))

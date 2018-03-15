@@ -1,5 +1,4 @@
 module Util where
-
 import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies
@@ -23,7 +22,6 @@ instance Num Bool where
 one (a, _, _) = a
 two (_, b, _) = b
 thr (_, _, c) = c
-
 not1 (_, b, c) = (b, c)
 not2 (a, _, c) = (a, c)
 not3 (a, b, _) = (a, b)
@@ -99,10 +97,9 @@ getCombos vector =
   in calc 0
 
 forallVec :: (a -> Bool) -> Vector a -> Bool
-forallVec p vector = 
+forallVec p vector =
   if V.null vector then True
   else (p $ V.head vector) && (forallVec p $ V.tail vector)
-
 
 exactlyOneTrue :: Vector Bool -> Bool
 exactlyOneTrue vec =
@@ -123,7 +120,6 @@ exactlyOneNonZero vec =
         | otherwise = calc b $ V.tail v
         where v0 = v ! 0 /= 0
   in calc False vec
-
 
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 mapWithIndex f vector =
@@ -167,6 +163,7 @@ elemAndIndices p vector =
         | otherwise      = helper (i + 1) $ V.tail vec
   in helper 0 vector
 
+--fst vector satisfies predicate, snd vector does not
 biFilter :: (a -> Bool) -> Vector a -> (Vector a, Vector a)
 biFilter p vector =
   let calc true false v
@@ -187,7 +184,6 @@ sortVecs (v:vs) =
 
 parMapVec :: (a -> b) -> Vector a -> Vector b
 parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
-
 range :: Int -> Int -> Vector Int
 range x y
   | x == y = x `cons` empty
@@ -216,8 +212,8 @@ quicksort vector =
   else
     let x       = V.head vector
         xs      = V.tail vector
-        lesser  = V.filter (< x) xs
-        greater = V.filter (>= x) xs
+        lesser  = V.filter (<x) xs
+        greater = V.filter (>=x) xs
     in (quicksort lesser) V.++ (x `cons` (quicksort greater))
 
 bigU :: Eq a => Vector (Vector a) -> Vector a
@@ -235,11 +231,11 @@ bigU =
             else union (V.tail v1) (x `cons` v2)
   in V.foldl1 union
 
-exists :: (a -> Bool) -> Vector a -> Bool
-exists p v
+existsVec :: (a -> Bool) -> Vector a -> Bool
+existsVec p v
   | V.null v     = False
   | p $ V.head v = True
-  | otherwise    = exists p $ V.tail v
+  | otherwise    = existsVec p $ V.tail v
 
 foldRelation :: (a -> a -> Bool) -> Vector a -> a
 foldRelation rel vec =
@@ -249,6 +245,14 @@ foldRelation rel vec =
         | otherwise = calc w xs
         where x = V.head v; xs = V.tail v
   in calc (V.head vec) (V.tail vec)
+
+elemIndexUnsafe :: Eq a => a -> Vector a -> Int
+elemIndexUnsafe elem vector =
+  let find i v
+        | V.head v == elem = i
+        | V.null v         = error "Element isn't here, Util.elemIndexUnsafe"
+        | otherwise        = find (i + 1) $ V.tail v
+  in find 0 vector
 
 findElem :: (a -> Bool) -> [a] -> Maybe a
 findElem p []     = Nothing

@@ -241,10 +241,11 @@ main = do
   let strMat = V.toList $ V.map printMat boundOps
   putStrLn $ intercalate "\n" $ strMat
   --}
-
+{--
   putStrLn "The homology groups are:"
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyIntPar testVR
-{--}
+  --}
+{--
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMat $ (boundOps ! 0) `multiply` (boundOps ! 1)
 
@@ -263,5 +264,11 @@ main = do
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
   --}
+  {--}
   putStrLn "The filtration of pointCloud2 is:"
   putStrLn $ filtr2String testFiltration
+  --}
+  {--
+  putStrLn "The bar codes of pointCloud2 are:"
+  putStrLn $ intercalate "\n" $ L.map show $ persistentHomologyBool testFiltration
+  --}
