@@ -880,14 +880,16 @@ type IPolyMat    = Vector (Vector IPolynomial)
 
 --MOD 2 POLYNOMIALS-------------------------------------------------------
 
-data BMonomial = Zero | Power Int deriving (Eq, Show)
+data BMonomial = Zero | Power Int deriving (Eq, Show, Read)
 type BPolyMat  = Vector (Vector BMonomial)
-
+{--}
 a :: BMonomial -> BMonomial -> BMonomial
 Zero `a` x         = x
 x `a` Zero         = x
-(Power n) `a` (Power m) = Power $ n + m
-
+(Power n) `a` (Power m) =
+  if n /= m then error "Tried to add boolean monomials of a different degree"
+  else Zero
+--}
 d :: BMonomial -> BMonomial -> BMonomial
 Zero `d` _         = Zero
 (Power n) `d` (Power m) =
@@ -895,6 +897,8 @@ Zero `d` _         = Zero
   else Power $ n - m
 
 m :: BMonomial -> BMonomial -> BMonomial
+Zero `m` _              = Zero
+_ `m` Zero              = Zero
 (Power n) `m` (Power m) = Power $ n + m
 
 instance Num BMonomial where
@@ -936,7 +940,7 @@ choosePolyPivotBool (rowIndex, colIndex) mat =
 
 colOp :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat
 colOp pIndex index coeff matrix =
-  V.map (\row -> replaceElem index ((row ! index) + (coeff * (row ! pIndex))) row) matrix
+  V.map (\row -> replaceElem index ((row ! index) - (coeff * (row ! pIndex))) row) matrix
 
 elimRowPolyBool :: (Int, Int) -> Int -> BPolyMat -> BPolyMat
 elimRowPolyBool (rowIndex, colIndex) numCols matrix =
@@ -985,6 +989,7 @@ elimRowPolyBoolWithInv (rowIndex, colIndex) numCols matrix inverted =
         | otherwise       = elim (i + 1) $ colOpWithInv colIndex i ((row ! i) `d` (row ! colIndex)) ker img
   in elim (colIndex + 1) (matrix, inverted)
 
+--column eschelon of the first matrix, indices of the zero columns of the column eschelon form, corresponding rows of the second matrix (with inverse row operations performed)
 eschelonAndNextBool :: BPolyMat -> BPolyMat -> (BPolyMat, Vector Int, BPolyMat)
 eschelonAndNextBool toColEsch toImage =
   let rows  = V.length toColEsch

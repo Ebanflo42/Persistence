@@ -206,15 +206,15 @@ forallRelation relation vector =
         | otherwise                                = False
   in calc vector
 
-quicksort :: Ord a => Vector a -> Vector a
-quicksort vector =
+quicksort :: (a -> a -> Bool) -> Vector a -> Vector a
+quicksort rel vector = --rel is the > operator
   if V.null vector then empty
   else
     let x       = V.head vector
         xs      = V.tail vector
-        lesser  = V.filter (<x) xs
-        greater = V.filter (>=x) xs
-    in (quicksort lesser) V.++ (x `cons` (quicksort greater))
+        lesser  = V.filter (rel x) xs
+        greater = V.filter (not . (rel x)) xs
+    in (quicksort rel lesser) V.++ (x `cons` (quicksort rel greater))
 
 bigU :: Eq a => Vector (Vector a) -> Vector a
 bigU =
@@ -271,3 +271,17 @@ list !!? i
   | i < 0              = Nothing
   | i >= L.length list = Nothing
   | otherwise          = Just $ list !! i
+
+subscript :: Int -> String
+subscript = (\c -> c : "") . (!!) "₀₁₂₃₄₅₆₇₈₉"
+
+supscript :: Int -> String
+supscript i =
+  let str  = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+      f s  =
+        let i10  = i `div` 10
+            im10 = i `mod` 10
+        in
+          if i10 == 0 then (str !! im10):[]
+          else (str !! im10):(supscript i10)
+  in L.reverse $ f str

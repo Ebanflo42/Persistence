@@ -15,15 +15,8 @@ import SimplicialComplex
 data Simplex = Simplex Int (Vector Int) (Vector Int) deriving Show
 
 getIndex (Simplex i _ _) = i
-
-instance Eq Simplex where
-  (==) = \(Simplex a _ _) (Simplex b _ _) -> a == b
-
-instance Ord Simplex where
-  (>)  = \(Simplex a _ _) (Simplex b _ _) -> a > b
-  (<)  = \(Simplex a _ _) (Simplex b _ _) -> a < b
-  (<=) = \(Simplex a _ _) (Simplex b _ _) -> a <= b
-  (>=) = \(Simplex a _ _) (Simplex b _ _) -> a >= b
+getVerts (Simplex _ v _) = v
+getFaces (Simplex _ _ f) = f
 
 sim2String :: Simplex -> String
 sim2String (Simplex index vertices faces) =
@@ -55,9 +48,23 @@ makeFiltration scales metric dataSet =
             else Simplex 0 v f --otherwise wait until next iteration
           else Simplex j v f)) sc --otherwise leave it alone
 
+      sortFiltration simplices =
+        let sortedSimplices =
+              V.map (quicksort (\(Simplex i _ _, _) (Simplex j _ _, _) -> i > j)) $
+                V.map (mapWithIndex (\i s -> (s, i))) simplices
+            newFaces dim (Simplex i v f) =
+              let findNew j =
+                    case V.findIndex (\x -> snd x == j) $ sortedSimplices ! (dim - 1) of
+                      Just k  -> k
+                      Nothing -> error "Persistence.sortFiltration.newFaces.findNew"
+              in Simplex i v (V.map findNew f)
+        in
+          if V.null simplices then simplices
+          else mapWithIndex (\i ss -> V.map ((newFaces i) . fst) ss) sortedSimplices
+
       (verts, simplices) = makeVRComplex (L.head scales) metric dataSet
 
-  in (verts, V.map quicksort $ --sort the simplices by filtration index
+  in (verts, sortFiltration $ --sort the simplices by filtration index
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> Simplex 0 v f)) $ fromList $ simplices)
 
@@ -66,7 +73,7 @@ edgeBoundaryBool (verts, simplices) =
   if V.null simplices then V.empty
   else
     let makeBoundary (Simplex i v f) =
-          replaceElem (f ! 0) (Power i) $ replaceElem (f ! 1) (Power i) $ V.replicate verts Zero
+          replaceElem (v ! 0) (Power i) $ replaceElem (v ! 1) (Power i) $ V.replicate verts Zero
     in transposeMat $ V.map makeBoundary $ V.head simplices
 
 boundOpBool :: Int -> Filtration -> BPolyMat
@@ -84,13 +91,14 @@ boundaryOperatorsBool :: Filtration -> Vector BPolyMat
 boundaryOperatorsBool f =
   let calc 1 = (edgeBoundaryBool f) `cons` V.empty
       calc i = (boundOpBool i f) `cons` (calc $ i - 1)
-  in calc $ V.length $ snd f
+  in V.reverse $ calc $ V.length $ snd f
 
 persistentHomologyBool :: Filtration -> [[(Int, Int)]]
 persistentHomologyBool filtration =
   let boundOps = boundaryOperatorsBool filtration
       max      = (V.length boundOps) - 1
 
+      --return the original row indices of all the rows left in each matrix paired with the reduced form of every matrix
       reduce i ixs ops =
         if i == max then (ixs, (V.init ops) `snoc` (eschelonFormBool $ V.last ops))
         else

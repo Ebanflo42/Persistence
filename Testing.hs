@@ -71,8 +71,16 @@ matrix6 =
     , [-36, 0,  19, -18]
     , [30,  0, -18, 18] ]
 
+bmatrix1 :: BPolyMat
+bmatrix1 =
+  V.map (V.map (\x -> read x :: BMonomial)) $ V.fromList $ L.map V.fromList
+    [ ["Power 1", "Zero", "Zero", "Zero", "Power 2", "Zero"]
+    , ["Zero", "Power 0", "Power 5", "Zero", "Zero", "Power 4"]
+    , ["Zero", "Zero", "Zero", "Power 1", "Power 7", "Power 0"]
+    , ["Zero", "Zero", "Zero", "Zero", "Zero", "Zero"] ]
+
 printMat :: IMatrix -> String
-printMat mat  =
+printMat mat =
   let printVec vec =
         if V.null vec then ""
         else
@@ -84,10 +92,23 @@ printMat mat  =
   in print mat
 
 printMatBool :: BMatrix -> String
-printMatBool mat  =
+printMatBool mat =
   let printVec vec =
         if V.null vec then ""
         else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
+      print m =
+        if V.null m then ""
+        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
+  in print mat
+
+printPolyMatBool :: BPolyMat -> String
+printPolyMatBool mat =
+  let printVec vec =
+        if V.null vec then ""
+        else
+          case V.head vec of
+            Zero    -> "  0" L.++ (printVec $ V.tail vec)
+            Power n -> " t" L.++ (supscript n) L.++ (printVec $ V.tail vec)
       print m =
         if V.null m then ""
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
@@ -264,11 +285,23 @@ main = do
   putStrLn "Boundary operator 1 times boundary operator 2:"
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
   --}
-  {--}
+  {--
+  putStrLn "Column eschelon form of shitty boolean monomial matrix:"
+  putStrLn $ printPolyMatBool $ eschelonFormBool bmatrix1
+  --}
+  {--
   putStrLn "The filtration of pointCloud2 is:"
   putStrLn $ filtr2String testFiltration
   --}
   {--
+  putStrLn "The boundary operators of the filtration are:"
+  putStrLn $ intercalate "\n" $ V.toList $ V.map show $ boundaryOperatorsBool testFiltration
+  --}
+  {--
+  putStrLn "The edge boundary operators of the filtration are:"
+  putStrLn $ intercalate "\n" $ V.toList $ V.map show $ edgeBoundaryBool testFiltration
+  --}
+  {--}
   putStrLn "The bar codes of pointCloud2 are:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomologyBool testFiltration
   --}
