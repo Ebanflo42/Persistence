@@ -1,5 +1,8 @@
 module SimplicialComplex
-  ( SimplicialComplex
+  ( Graph (Graph)
+  , makeNbrhdGraph
+  , getEdgeLength
+  , SimplicialComplex
   , sc2String
   , getDimension
   , makeVRComplex
@@ -10,14 +13,6 @@ module SimplicialComplex
   , simplicialHomologyBool
   , simplicialHomologyBoolPar
   ) where
-
-import Util
-import Matrix
-import MaximalCliques
-import Data.List as L
-import Data.Vector as V
-import Data.IntSet as S
-import Control.Parallel.Strategies
 
 {--OVERVIEW---------------------------------------------------------------
 
@@ -37,7 +32,32 @@ Simplicial homology over F2 is much simpler. The only information we could possi
 
 --------------------------------------------------------------------------}
 
+import Util
+import Matrix
+import MaximalCliques
+import Data.List as L
+import Data.Vector as V
+import Data.IntSet as S
+import Control.Parallel.Strategies
+
 --CONSTRUCTION------------------------------------------------------------
+
+--integer labeled graph with edges labeled by type a
+data Graph a = Graph (Vector (Int, Int, a))
+
+getEdgeLength :: Ord a => Graph a -> Int -> Int -> a
+getEdgeLength (Graph g) i j =
+  case V.find (\(k, l, _) -> i == k && j == l) g of
+    Just (_, _, d) -> d
+    Nothing        -> error "SimplicialComplex.getEdgeLength tried to access an edge that was not in the graph."
+
+makeNbrhdGraph :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> Graph a
+makeNbrhdGraph scale metric dataSet =
+  let vector      = V.fromList dataSet
+      calc []     = V.empty
+      calc (i:is) = (calc is) V.++
+        (filterMap (\j k -> metric (vector ! j) (vector ! k)) (\x -> x <= scale) i is)
+  in Graph $ calc [0..V.length vector - 1]
 
 --the first component of the pair is the number of vertices
 --every element of the list is a vector of simplices whose dimension is given by the index +2
@@ -49,9 +69,9 @@ type SimplicialComplex = (Int, [Vector (Vector Int, Vector Int)])
 sc2String :: SimplicialComplex -> String
 sc2String (v, [])              = (show v) L.++ " vertices."
 sc2String (v, edges:simplices) =
-  let showSimplex s     =
+  let showSimplex s =
         '\n':(intercalate "\n" $ V.toList $ V.map show s)
-      showAll sc =
+      showAll sc    =
         case sc of
           (s:ss) -> showSimplex s L.++ ('\n':(showAll ss))
           []     -> '\n':(show v) L.++ " vertices"
@@ -103,7 +123,9 @@ makeVRComplex scale metric dataSet =
           in combos i1 max (replaceElemList i1 (next V.++ uCombos) sc) $ (V.zip current indices):result
   in
     if fstmc2 == (-1) then (numVerts, []) --if there are no maximal cliques, the complex is just a bunch of points
-    else (numVerts, combos 0 fstmc2 (snd maxCliques) [])
+    else
+      let sc = combos 0 fstmc2 (snd maxCliques) []
+      in (numVerts, sc)
 
 --INTEGER HOMOLOGY--------------------------------------------------------
 

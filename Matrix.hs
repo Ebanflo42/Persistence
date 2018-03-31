@@ -29,11 +29,6 @@ module Matrix
   , eschelonAndNextBool
   ) where
 
-import Util
-import Data.List as L
-import Data.Vector as V
-import Control.Parallel.Strategies
-
 {--OVERVIEW---------------------------------------------------------------
 
 Matrices are transformed by iterating through each row and selecting a pivot. Zero rows are skipped for finding column eschelon form but a row operation is performed (if possible) if there is a zero row for Smith normal form.
@@ -58,6 +53,11 @@ The same applies to "BOOLEAN MATRICES"
 
 "INTEGER POLYNOMIALS" and "MOD 2 POLYNOMIALS" contain functions for finding the image of one matrix inside the kernel of the other where both matrices are over the respective polynomial rings.
 -}
+
+import Util
+import Data.List as L
+import Data.Vector as V
+import Control.Parallel.Strategies
 
 --BASIC STUFF-------------------------------------------------------------
 

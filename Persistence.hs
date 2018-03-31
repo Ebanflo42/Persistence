@@ -36,7 +36,10 @@ filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map 
 makeFiltration :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
 makeFiltration scales metric dataSet =
   let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
-      edgeTooLong scale edge     = scale < metric (dataSet !! (V.head edge)) (dataSet !! (V.last edge))
+      (verts, simplices)         = makeVRComplex (L.head scales) metric dataSet
+      graph                      =
+        V.map (\v -> ((v ! 0), (v ! 1), metric (dataSet !! (v ! 0)) (dataSet !! (v ! 1)))) $ V.map fst $ simplices !! 0
+      edgeTooLong scale edge     = scale < getEdgeLength (Graph graph) (edge ! 0) (edge ! 1)
       maxIndex                   = (L.length scales) - 1
 
       calcIndices 0 [] sc         = sc
@@ -50,7 +53,7 @@ makeFiltration scales metric dataSet =
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quicksort (\(Simplex i _ _, _) (Simplex j _ _, _) -> i > j)) $
+              V.map (quicksort (\(Simplex i _ _, _) (Simplex j _ _, _) -> i < j)) $
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (Simplex i v f) =
               let findNew j =
@@ -61,8 +64,6 @@ makeFiltration scales metric dataSet =
         in
           if V.null simplices then simplices
           else mapWithIndex (\i ss -> V.map ((newFaces i) . fst) ss) sortedSimplices
-
-      (verts, simplices) = makeVRComplex (L.head scales) metric dataSet
 
   in (verts, sortFiltration $ --sort the simplices by filtration index
       calcIndices maxIndex (L.tail scales) $
@@ -93,8 +94,10 @@ boundaryOperatorsBool f =
       calc i = (boundOpBool i f) `cons` (calc $ i - 1)
   in V.reverse $ calc $ V.length $ snd f
 
-persistentHomologyBool :: Filtration -> [[(Int, Int)]]
-persistentHomologyBool filtration =
+type BarCode = (Int, Maybe Int)
+
+persistentHomology :: Filtration -> [[BarCode]]
+persistentHomology filtration =
   let boundOps = boundaryOperatorsBool filtration
       max      = (V.length boundOps) - 1
 
@@ -107,34 +110,33 @@ persistentHomologyBool filtration =
           in reduce i1 (ixs `snoc` (two triple)) $ replaceElem i (one triple) $ replaceElem i1 (thr triple) ops
 
       getEdgeBarCodes op =
-        let maxIndex = (V.length $ V.head op) - 1
-            find j   =
-              case V.findIndex (\x -> x /= Zero) $ V.map (\r -> r ! j) op of
-                Just k  ->
-                  case op ! k ! j of
-                    Power p ->
-                      if j == maxIndex then (0, p):[]
-                      else (0, p):(find $ j + 1)
+        let find row =
+              case V.findIndex (\x -> x /= Zero) row of
+                Just j  ->
+                  case row ! j of
+                    Power p -> (0, Just p)
                     Zero    -> error "The impossible happened; Persistence.persistentHomologyBool.getEdgeBarCodes.find"
-                Nothing -> []
-        in find 0
+                Nothing -> (0, Nothing)
+        in L.filter (\(_, x) -> x /= Just 0) $ V.toList $ V.map find op
 
       getBarCodes i ops indices =
         if V.null ops then []
         else
           let op       = V.head ops
-              maxIndex = (V.length $ V.head op) - 1
-              find j   = --find the pivot element of the jth column
-                case V.findIndex (\x -> x /= Zero) $ V.map (\r -> r ! j) op of
+              maxIndex = V.length op - 1
+              find j   = --find the pivot of the jth row and identify contribution to the homology group
+                let rowIndex = getIndex $ (snd filtration) ! i ! (indices ! i ! j)
+                in case V.findIndex (\x -> x /= Zero) $ op ! j of
                   Just k  ->
-                    case op ! k ! j of
+                    case op ! j ! k of
                       Power p ->
-                        let rowIndex = getIndex $ (snd filtration) ! i ! (indices ! i ! k)
-                        in
-                          if j == maxIndex then (rowIndex, rowIndex + p):[]
-                          else (rowIndex, rowIndex + p):(find $ j + 1)
+                        if j == maxIndex then (rowIndex, Just $ rowIndex + p):[]
+                        else if p == 0 then find $ j + 1
+                        else (rowIndex, Just $ rowIndex + p):(find $ j + 1)
                       Zero    -> error "The impossible happened; Persistence.persistentHomologyBool.getBarCodes.find"
-                  Nothing -> []
+                  Nothing ->
+                    if j == maxIndex then (rowIndex, Nothing):[]
+                    else (rowIndex, Nothing):(find $ j + 1)
           in (find 0):(getBarCodes (i + 1) (V.tail ops) indices)
 
       reduced = reduce 0 V.empty boundOps

@@ -184,6 +184,10 @@ sortVecs (v:vs) =
 
 parMapVec :: (a -> b) -> Vector a -> Vector b
 parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
+
+filterMap :: (a -> a -> b) -> (b -> Bool) -> a -> [a] -> Vector (a, a, b)
+filterMap f p x = V.fromList . L.filter (\(_, _, b) -> p b) . L.map (\y -> (x, y, f x y))
+
 range :: Int -> Int -> Vector Int
 range x y
   | x == y = x `cons` empty

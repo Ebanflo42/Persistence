@@ -248,16 +248,18 @@ main = do
   putStrLn "The Smith Normal form should be:"
   putStrLn $ printMat $ snf5
 
-  putStrLn "The sixthth matrix is:"
+  putStrLn "The sixth matrix is:"
   putStrLn $ printMat matrix6
   putStrLn "It's Smith normal form is:"
   putStrLn $ printMat $ normalFormInt matrix6
   putStrLn "It's Smith normal form computed in parallel is:"
   putStrLn $ printMat $ normalFormIntPar matrix6
-
+  --}
+{--
   putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
   putStrLn $ sc2String testVR
-  {--}
+  --}
+  {--
   putStrLn "The boundary operators are:"
   let strMat = V.toList $ V.map printMat boundOps
   putStrLn $ intercalate "\n" $ strMat
@@ -278,7 +280,8 @@ main = do
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyBool testVR
   putStrLn "Boolean boundary operators:"
   putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps
-{--}
+  --}
+{--
   putStrLn "Boundary operator 0 times boundary operator 1:"
   putStrLn $ printMatBool $ (boolOps ! 0) `multiply` (boolOps ! 1)
 
@@ -286,7 +289,7 @@ main = do
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
   --}
   {--
-  putStrLn "Column eschelon form of shitty boolean monomial matrix:"
+  putStrLn "Reduced column eschelon form of boolean monomial matrix:"
   putStrLn $ printPolyMatBool $ eschelonFormBool bmatrix1
   --}
   {--
@@ -303,5 +306,9 @@ main = do
   --}
   {--}
   putStrLn "The bar codes of pointCloud2 are:"
-  putStrLn $ intercalate "\n" $ L.map show $ persistentHomologyBool testFiltration
+  putStrLn $ intercalate "\n" $ L.map show $ persistentHomology testFiltration
+  --}
+  {--
+  putStrLn "The neighborhood graph of scale 4 for pointCloud2:"
+  putStrLn $ intercalate "\n" $ V.toList $ V.map show $ (\(Graph v) -> v) $ makeNbrhdGraph 4.0 metric pointCloud2
   --}
