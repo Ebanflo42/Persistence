@@ -202,14 +202,6 @@ vecConcat v =
 replaceElem :: Int -> a -> Vector a -> Vector a
 replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 
-forallRelation :: (a -> a -> Bool) -> Vector a -> Bool
-forallRelation relation vector =
-  let calc vec
-        | V.null vec                               = True
-        | forallVec (relation (V.head vec)) vector = calc $ V.tail vec
-        | otherwise                                = False
-  in calc vector
-
 quicksort :: (a -> a -> Bool) -> Vector a -> Vector a
 quicksort rel vector = --rel is the > operator
   if V.null vector then empty
@@ -241,6 +233,7 @@ existsVec p v
   | p $ V.head v = True
   | otherwise    = existsVec p $ V.tail v
 
+--if the relation is a "greater than" operator, this would find the minimum of the vector
 foldRelation :: (a -> a -> Bool) -> Vector a -> a
 foldRelation rel vec =
   let calc w v
@@ -253,28 +246,24 @@ foldRelation rel vec =
 elemIndexUnsafe :: Eq a => a -> Vector a -> Int
 elemIndexUnsafe elem vector =
   let find i v
-        | V.head v == elem = i
         | V.null v         = error "Element isn't here, Util.elemIndexUnsafe"
+        | V.head v == elem = i
         | otherwise        = find (i + 1) $ V.tail v
   in find 0 vector
 
-findElem :: (a -> Bool) -> [a] -> Maybe a
-findElem p []     = Nothing
-findElem p (x:xs) =
-  if p x then Just x
-  else findElem p xs
+reverseFind :: (a -> Bool) -> Vector a -> Maybe (a, Int)
+reverseFind p vector =
+  let find i
+        | i == (-1)      = Nothing
+        | p $ vector ! i = Just (vector ! i, i)
+        | otherwise      = find $ i - 1
+  in find $ (V.length vector) - 1
 
 replaceElemList :: Int -> a -> [a] -> [a]
 replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 
 evalPar :: a -> [a] -> [a]
 evalPar c r = runEval $ rpar c >> rseq r >> return (c:r)
-
-(!!?) :: [a] -> Int -> Maybe a
-list !!? i
-  | i < 0              = Nothing
-  | i >= L.length list = Nothing
-  | otherwise          = Just $ list !! i
 
 subscript :: Int -> String
 subscript = (\c -> c : "") . (!!) "₀₁₂₃₄₅₆₇₈₉"

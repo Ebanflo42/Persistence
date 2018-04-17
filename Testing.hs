@@ -5,6 +5,15 @@ import Persistence
 import Data.Vector as V
 import Data.List as L
 
+simpleCloud :: [(Float, Float)]
+simpleCloud =
+  [ ( 0,  0)
+  , (-1,  3)
+  , ( 2,  4)
+  , ( 4,  2)
+  , ( 3, -1)
+  ]
+
 matrix1 :: IMatrix
 matrix1 =
   cons (cons 2 $ cons 3 $ cons 5 empty)
@@ -187,19 +196,58 @@ pointCloud2 =
   , (  1,  16)
   ]
 
-metric :: (Float, Float) -> (Float, Float) -> Float
-metric (a, b) (c, d) =
+octahedralCloud =
+  [ ( 1, 0, 0)
+  , (-1, 0, 0)
+  , ( 0, 1, 0)
+  , ( 0,-1, 0)
+  , ( 0, 0, 1)
+  , ( 0, 0,-1)
+  --, (100,0,0)
+  --, (100,0,1)
+  --, (100,1,1)
+  --, (100,1,0)
+  ]
+
+another =
+  [ (0,0)
+  , (1,0)
+  , (2,0)
+  , (3,0)
+  , (3,1)
+  , (3,2)
+  , (3,3)
+  , (2,3)
+  , (1,3)
+  , (0,3)
+  , (0,2)
+  , (0,1)
+  ]
+
+metric2 :: (Float, Float) -> (Float, Float) -> Float
+metric2 (a, b) (c, d) =
   let x = a - c; y = b - d in
-  sqrt (x * x + y * y)
+  sqrt (x*x + y*y)
+
+metric3 :: (Float, Float, Float) -> (Float, Float, Float) -> Float
+metric3 (x0, y0, z0) (x1, y1, z1) =
+  let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
+  sqrt (dx*dx + dy*dy + dz*dz)
 
 --should have 2 1-cycles and 3 connected components
-testVR = makeVRComplex 10.0 metric pointCloud1
+testVR = fst $ makeVRComplexFast 10.0 metric2 pointCloud1
 
 boundOps = makeBoundaryOperatorsInt testVR
 
 boolOps = makeBoundaryOperatorsBool testVR
 
-testFiltration = makeFiltration [6.0, 5.0, 4.0] metric pointCloud2
+testFiltration = makeFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
+
+simpleFiltration = makeFiltrationFast [5.0] metric2 simpleCloud
+
+octahedron = makeFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
+
+filtr2 = makeFiltrationFast [1.5, 1.25, 0.5] metric2 another
 
 main = do
 {--
@@ -289,8 +337,8 @@ main = do
   putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
   --}
   {--
-  putStrLn "Reduced column eschelon form of boolean monomial matrix:"
-  putStrLn $ printPolyMatBool $ eschelonFormBool bmatrix1
+  putStrLn "Reduced column echelon form of boolean monomial matrix:"
+  putStrLn $ printPolyMatBool $ echelonFormBool bmatrix1
   --}
   {--
   putStrLn "The filtration of pointCloud2 is:"
@@ -309,6 +357,19 @@ main = do
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology testFiltration
   --}
   {--
-  putStrLn "The neighborhood graph of scale 4 for pointCloud2:"
-  putStrLn $ intercalate "\n" $ V.toList $ V.map show $ (\(Graph v) -> v) $ makeNbrhdGraph 4.0 metric pointCloud2
+  putStrLn "Very simple filtration test:"
+  putStrLn $ filtr2String simpleFiltration
+  --putStrLn $ intercalate "\n" $ L.map show $ persistentHomology simpleFiltration
+  --}
+  {--
+  putStrLn "Filtration for the octahedron cloud:"
+  putStrLn $ filtr2String octahedron
+  --}
+  {--
+  putStrLn "Bar codes for an octahedron:"
+  putStrLn $ intercalate "\n" $ L.map show $ persistentHomology octahedron
+  --}
+  {--
+  putStrLn "More Bar Codes:"
+  putStrLn $ intercalate "\n" $ L.map show $ persistentHomology filtr2
   --}
