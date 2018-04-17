@@ -13,41 +13,39 @@ Major TODOs:
 
 Matrix:
 
-1) Debug finding the image of one matrix in the basis of the kernel of another matrix - this appears to be causing the problem with simplicial homology over ther integers.
-
-2) Implement column eschelon form for integer polynomial matrices.
+See below for things that might need to be fixed in `Matrix.hs`.
 
 Simplicial Complex:
 
-1) Debug construction of the Vietoris-Rips complex.
-
-2) Continue debugging homology over the integers (probably requires fixing things in Matrix.hs).
+1) Continue debugging simplicial homology over the integers (probably requires fixing things in `Matrix.hs`).
 
 Persistence:
 
-1) Continue debugging the construction of the filtration and then move on to testing persistent homology over F_2.
-
-2) Investigate the second paper further to ensure a good understanding of how to calculate persistent homology over PID's then implement persistent homology over the integers.
+1) Debug persistent homology, may require fixing things in `Matrix.hs`.
 
 Testing:
 
-1) Make sure the expected output for the persistent homology test case is understood.
+1) Document the expected homology outputs for each of the point clouds.
 
 General:
 
 1) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented.
 
-A good blog post on computing simplicial homology:
+#Learning about Topological Data Analysis
+
+Simplicial homology:
 
 https://jeremykun.com/2013/04/10/computing-homology/
 
-Papers for learning about topological data analysis:
+The Vietoris-Rips complex:
 
 https://pdfs.semanticscholar.org/e503/c24dcc7a8110a001ae653913ccd064c1044b.pdf
 
+Persistent homology:
+
 http://geometry.stanford.edu/papers/zc-cph-05/zc-cph-05.pdf
 
-Overview of SimplicialComplex
+#Overview of SimplicialComplex
 
 Simplicial complexes are represented as a pair. The first component is an integer indicating the number of vertices and the second is a list of arrays of simplices whose dimension is given by the index in the outer list +2.
 
@@ -63,7 +61,7 @@ For homology over the integers, one must first put the nth boundary operator in 
 
 Simplicial homology over F2 is much simpler. The only information we could possibly need from any homology group is its rank as an F_2 vector space. Since it is a quotient space, this is simply the number of n-simplices in the complex minus the rank of the nth boundary operator minus the rank of the n+1th boundary operator.
 
-Overview of Matrix
+#Overview of Matrix
 
 Matrices are transformed by iterating through each row and selecting a pivot. Zero rows are skipped for finding column eschelon form but a row operation is performed (if possible) if there is a zero row for Smith normal form.
 
