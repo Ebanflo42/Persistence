@@ -18,13 +18,8 @@ module Matrix
   , imgInKerIntPar
   , BMatrix
   , rankBool
-  , normalFormBool
   , kernelBool
   , imgInKerBool
-  , BMonomial (Power, Zero)
-  , BPolyMat
-  , echelonFormBool
-  , echelonAndNextBool
   ) where
 
 {--OVERVIEW---------------------------------------------------------------
@@ -43,16 +38,7 @@ Boolean matrices are much easier to work with, they are regular matrices with el
 
 Matrices whose elements are monomials with Boolean coefficients are also operated on. According to the Stanford paper, these aren't really necessary but it really helps keep track of all the boundary chains. Finding the column echelon form of these matrices is almost exactly like finding it for ordinary matrices with coefficients from F_2 except one has to make sure that the monomial with the least degree is in the pivot position (otherwise you will end up dividing a monomial by a monomial with a larger degree).
 
---LAYOUT-----------------------------------------------------------------
-
-"BASIC STUFF" includes type synonyms, transposing matrices, multiplying matrices, and row/column operations.
-
-"INTEGER MATRICES" is divided into "RANK," "NORMAL FORM," "KERNEL" and "IMAGE IN KERNEL." Each section provides functions for computing their namesake both sequentially and in parallel.
-
-The same applies to "BOOLEAN MATRICES"
-
-"INTEGER POLYNOMIALS" and "MOD 2 POLYNOMIALS" contain functions for finding the image of one matrix inside the kernel of the other where both matrices are over the respective polynomial rings.
--}
+--}
 
 import Util
 import Data.List as L
@@ -73,7 +59,6 @@ transposePar :: Vector (Vector a) -> Vector (Vector a)
 transposePar mat =
   parMapVec (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
 
---multiply matrices
 multiply :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
 multiply mat1 mat2 =
   let t = transposeMat mat2
@@ -732,53 +717,6 @@ rankBool matrix =
            if existsVec (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
   in countNonZeroCols $ doColOps (0, 0) matrix
 
---NORMAL FORM-------------------------------------------------------------
-
---rearranges the matrix if necessary, returns the matrix paired with its pivot
---first argument is the index of the pivot row
-chooseRowPivotBool :: Int -> Int -> Int -> BMatrix -> Maybe (Bool, BMatrix)
-chooseRowPivotBool pIndex numRows numCols mat =
-  let row      = mat ! pIndex
-      rIndices = V.toList $ V.findIndices id row
-  in
-    if not $ row ! pIndex then
-      case rIndices of
-        (i:is)  -> Just ((L.length is) > 0, V.map (switchElems i pIndex) mat)
-        []      ->
-          case V.toList $ V.findIndices id $ V.map (\r -> r ! pIndex) mat of
-            (i:is)  -> Just ((L.length is) > 0, switchElems i pIndex mat)
-            []      ->
-              case L.find (\(i, j) -> (mat ! i ! j)) $ L.concat $ L.map (\i -> L.zip (repeat i) [pIndex..numCols - 1]) [pIndex..numRows - 1] of
-                Just (i, j) -> Just ((V.length $ V.findIndices id $ mat ! i) > 1, switchElems pIndex i $ V.map (switchElems pIndex j) mat)
-                Nothing     -> Nothing
-    else Just ((L.length rIndices) > 1, mat)
-
---eliminates pivot column of a boolean matrix
-elimColBool :: (Int, Int) -> Int -> BMatrix -> BMatrix
-elimColBool (rowIndex, colIndex) numRows elems =
-  let col = V.map (\r -> r ! colIndex) elems
-      elim i mat
-        | i == numRows  = mat
-        | not $ col ! i = elim (i + 1) mat
-        | otherwise     = elim (i + 1) $ replaceElem i ((mat ! i) `add` (mat ! rowIndex)) mat
-  in elim (rowIndex + 1) elems
-
---gets the Smith normal form of a boolean (mod 2) matrix, no parallel version because its very cheap
-normalFormBool :: BMatrix -> BMatrix
-normalFormBool matrix =
-  let rows = V.length matrix
-      cols = V.length $ V.head matrix
-      calc (rowIndex, colIndex) mat =
-          if rowIndex == rows || colIndex == cols then mat else
-          case chooseRowPivotBool rowIndex rows cols mat of
-              Just (False, new)  ->
-                calc (rowIndex + 1, colIndex + 1) $ elimColBool (rowIndex, colIndex) rows new
-              Just (True, new)   ->
-                calc (rowIndex + 1, colIndex + 1) $ elimColBool (rowIndex, colIndex) rows $
-                  elimRowBool (rowIndex, colIndex) cols new
-              Nothing            -> mat
-  in if V.null matrix then empty else calc (0, 0) matrix
-
 --KERNEL------------------------------------------------------------------
 
 --eliminates all the entries in the pivot row that come after the pivot, after the matrix has been improved
@@ -859,154 +797,3 @@ imgInKerBool toColEch toImage =
       ker    = fst result
       img    = snd result
   in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> not $ row ! i) ker) $ 0 `range` cols1
-
---MOD 2 POLYNOMIALS-------------------------------------------------------
-
-data BPolynomial = Add BMonomial BPolynomial | ZeroP deriving Show
-cast Zero      = ZeroP
-cast (Power 0) = Add (Power 0) ZeroP
-cast (Power p) =
-  let addZero 0 = ZeroP
-      addZero i = Add Zero (addZero (i - 1))
-  in Add (Power p) (addZero (p - 1))
-
-data BMonomial = Zero | Power Int deriving (Eq, Show, Read)
-getDeg x = case x of (Power p) -> p; Zero -> 0
-type BPolyMat  = Vector (Vector BMonomial)
-
-a :: BMonomial -> BMonomial -> BMonomial
-Zero `a` x = x
-x `a` Zero = x
-x `a` y    =
-  if x /= y then error "Matrix.a"
-  else Zero
-
-d :: BMonomial -> BMonomial -> BMonomial
-Zero `d` _         = Zero
-(Power n) `d` (Power m) =
-  if m > n then error "Tried to divide monomial by a monomial of a higher degree, the result would not be a polynomial."
-  else Power $ n - m
-
-m :: BMonomial -> BMonomial -> BMonomial
-Zero `m` _              = Zero
-_ `m` Zero              = Zero
-(Power n) `m` (Power m) = Power $ n + m
-
-instance Num BMonomial where
-  (+) = a
-  (*) = m
-  negate = id
-  signum = id
-  abs    = id
-  a - b  = a + (negate b)
-  fromInteger = Power . fromIntegral
-
-instance Ord BMonomial where
-  Zero < (Power _)       = True
-  (Power _) < Zero       = False
-  (Power n) < (Power m)  = n < m
-  Zero > (Power _)       = False
-  (Power _) > Zero       = True
-  (Power n) > (Power m)  = n > m
-  Zero <= (Power _)      = True
-  (Power _) <= Zero      = False
-  (Power n) <= (Power m) = n <= m
-  Zero >= (Power _)      = False
-  (Power _) >= Zero      = True
-  (Power n) >= (Power m) = n >= m
-
-choosePolyPivotBool :: (Int, Int) -> BPolyMat -> Maybe (Bool, BPolyMat, Maybe (Int, Int))
-choosePolyPivotBool (rowIndex, colIndex) mat =
-  let row     = mat ! rowIndex
-      elem    = row ! colIndex
-      indices = V.filter (\index -> index >= colIndex) $ V.findIndices (\n -> n /= Zero) row
-      len     = V.length indices
-  in case len of
-    0 -> Nothing
-    1 ->
-      if indices ! 0 == colIndex then Just (False, mat, Nothing)
-      else Just (False, V.map (switchElems colIndex (indices ! 0)) mat, Just (colIndex, indices ! 0))
-    _ ->
-      let index = foldRelation (\i j -> (row ! i) > (row ! j)) indices
-      in
-        if index == colIndex then Just (True, mat, Nothing)
-        else Just (True, V.map (switchElems colIndex index) mat, Just (colIndex, index))
-
-colOp :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat
-colOp pIndex index coeff matrix = V.map (\row -> replaceElem index ((row ! index) + (coeff * (row ! pIndex))) row) matrix
-
-rowOp :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat
-rowOp pIndex index coeff matrix = replaceElem pIndex ((matrix ! pIndex) `subtr` (coeff `mul` (matrix ! index))) matrix
-
-elimRowPolyBool :: (Int, Int) -> Int -> BPolyMat -> BPolyMat
-elimRowPolyBool (rowIndex, colIndex) numCols matrix =
-  let row = matrix ! rowIndex
-      elim i mat
-        | i == numCols    = mat
-        | row ! i == Zero = elim (i + 1) mat
-        | otherwise       = elim (i + 1) $ colOp colIndex i ((row ! i) `d` (row ! colIndex)) mat
-  in elim (colIndex + 1) matrix
-
-echelonFormBool :: BPolyMat -> BPolyMat
-echelonFormBool toColEch =
-  let rows  = V.length toColEch
-      cols  = V.length $ V.head toColEch
-
-      doColOps (rowIndex, colIndex) mat =
-        if rowIndex == rows || colIndex == cols then mat
-        else
-          case choosePolyPivotBool (rowIndex, colIndex) mat of
-            Just (True, mx, Just _)  ->
-              doColOps (rowIndex + 1, colIndex + 1) $
-                elimRowPolyBool (rowIndex, colIndex) cols mx
-            Just (True, _, Nothing)  ->
-              doColOps (rowIndex + 1, colIndex + 1) $
-                elimRowPolyBool (rowIndex, colIndex) cols mat
-            Just (False, _, Nothing) -> doColOps (rowIndex + 1, colIndex + 1) mat
-            Just (False, mx, _)      -> doColOps (rowIndex + 1, colIndex + 1) mx
-            Nothing                  -> doColOps (rowIndex + 1, colIndex) mat
-
-  in doColOps (0, 0) toColEch
-
-colOpWithInv :: Int -> Int -> BMonomial -> BPolyMat -> BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat, BPolyMat)
-colOpWithInv pIndex index coeff toColEch toKernel toImage =
-  let transform mat = colOp pIndex index coeff mat
-  in (transform toColEch, transform toKernel, rowOp pIndex index coeff toImage)
-
-elimRowPolyBoolWithInv :: (Int, Int) -> Int -> BPolyMat -> BPolyMat -> BPolyMat -> (BPolyMat, BPolyMat, BPolyMat)
-elimRowPolyBoolWithInv (rowIndex, colIndex) numCols toColEch toKernel toImage =
-  let row = toColEch ! rowIndex
-      elim i (ech, ker, img)
-        | i == numCols    = (ech, ker, img)
-        | row ! i == Zero = elim (i + 1) (ech, ker, img)
-        | otherwise       = elim (i + 1) $ colOpWithInv colIndex i ((row ! i) `d` (row ! colIndex)) ech ker img
-  in elim (colIndex + 1) (toColEch, toKernel, toImage)
-
---column echelon of the first matrix, basis of the kernel of the first matrix, corresponding rows of the second matrix (with inverse row operations performed)
-echelonAndNextBool :: BPolyMat -> BPolyMat -> (BPolyMat, Vector Int, BPolyMat)
-echelonAndNextBool toColEch toImage =
-  let rows     = V.length toColEch
-      cols     = V.length $ V.head toColEch
-      cols1    = cols - 1
-      identity = V.map (\i -> (V.replicate i Zero) V.++ ((Power 0) `cons` (V.replicate (cols1 - i) Zero))) $ 0 `range` cols1
-
-      doColOps (rowIndex, colIndex) (ech, ker, img) =
-        if rowIndex == rows || colIndex == cols then (ech, ker, img)
-        else
-          case choosePolyPivotBool (rowIndex, colIndex) $ one (ech, ker, img) of
-            Just (True, mx, Just (i, j))  ->
-              doColOps (rowIndex + 1, colIndex + 1) $
-                elimRowPolyBoolWithInv (rowIndex, colIndex) cols mx (V.map (switchElems i j) ker) $ switchElems i j img
-            Just (True, _, _)             ->
-              doColOps (rowIndex + 1, colIndex + 1) $
-                elimRowPolyBoolWithInv (rowIndex, colIndex) cols ech ker img
-            Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, V.map (switchElems i j) ker, switchElems i j img)
-            Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (ech, ker, img)
-            Nothing                       -> doColOps (rowIndex + 1, colIndex) (ech, ker, img)
-
-      result  = doColOps (0, 0) (toColEch, identity, toImage)
-      colEch  = one result
-      indices = V.reverse $ V.findIndices (\i -> forallVec (\row -> row ! i == Zero) colEch) $ 0 `range` cols1
-      image   = V.map (\i -> (thr result) ! i) indices
-      degrees = V.map V.maximum $ V.map (V.map getDeg) $ V.map (\i -> V.map (\row -> row ! i) $ two result) indices
-  in (colEch, degrees, image)

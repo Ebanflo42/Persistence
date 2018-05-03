@@ -188,6 +188,15 @@ parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
 filterMap :: (a -> a -> b) -> (b -> Bool) -> a -> [a] -> Vector (a, a, b)
 filterMap f p x = V.fromList . L.filter (\(_, _, b) -> p b) . L.map (\y -> (x, y, f x y))
 
+filterWithIndex :: (Int -> a -> Bool) -> Vector a -> Vector a
+filterWithIndex p vector =
+  let maxIndex = V.length vector - 1
+      calc i
+        | i == maxIndex    = V.empty
+        | p i (vector ! i) = (vector ! i) `cons` calc (i + 1)
+        | otherwise        = calc (i + 1)
+  in calc 0
+
 range :: Int -> Int -> Vector Int
 range x y
   | x == y = x `cons` empty
@@ -214,10 +223,10 @@ quicksort rel vector = --rel is the > operator
 
 bigU :: Eq a => Vector (Vector a) -> Vector a
 bigU =
-  let exists x v =
-        if V.null v then False
-        else if V.head v == x then True
-        else exists x (V.tail v)
+  let exists x v
+        | V.null v      = False
+        | V.head v == x = True
+        | otherwise     = exists x (V.tail v)
       union v1 v2 =
         if V.null v1 then v2
         else
@@ -227,11 +236,36 @@ bigU =
             else union (V.tail v1) (x `cons` v2)
   in V.foldl1 union
 
+--list, value, low, high, return int
+binarySearch :: Ord a => a -> Vector a -> Int -> Int -> Maybe Int
+binarySearch value xs low high
+  | high < low        = Nothing
+  | xs ! mid > value  = binarySearch value xs low (mid - 1)
+  | xs ! mid < value  = binarySearch value xs (mid + 1) high
+  | otherwise         = Just mid
+  where mid = low + ((high - low) `div` 2)
+
+--intersection of ordered vectors
+(|^|) :: Ord a => Vector a -> Vector a -> Vector a
+vector1 |^| vector2 =
+  let len          = V.length vector2 - 1
+      calc acc v =
+        if V.null v then acc
+        else
+          let x = V.head v; xs = V.tail v
+          in case binarySearch x vector2 0 len of
+            Just _  -> calc (x `cons` acc) xs
+            Nothing -> calc acc xs
+  in calc V.empty vector1
+
 existsVec :: (a -> Bool) -> Vector a -> Bool
 existsVec p v
   | V.null v     = False
   | p $ V.head v = True
   | otherwise    = existsVec p $ V.tail v
+
+findElems :: (a -> Bool) -> Vector a -> [a]
+findElems p v = V.toList $ V.map ((!) v) $ V.findIndices p v
 
 --if the relation is a "greater than" operator, this would find the minimum of the vector
 foldRelation :: (a -> a -> Bool) -> Vector a -> a
