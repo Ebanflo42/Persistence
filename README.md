@@ -11,17 +11,25 @@ The objective of the library is to provide users with functions for computing si
 
 Major TODOs:
 
-Matrix:
+`Matrix.hs`:
 
-See below for things that might need to be fixed in `Matrix.hs`.
+1) Fix Gauss-Jordan elimnation over the integers.
 
-Simplicial Complex:
+`SimplicialComplex.hs`:
 
-1) Continue debugging simplicial homology over the integers (probably requires fixing things in `Matrix.hs`).
+1) Implement construction of the clique complex for graphs.
+
+2) Implement construction of the directed clique complex for directed graphs (simplices are acyclic complete subgraphs instead of just complete subgraphs).
+
+3) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
 
 Persistence:
 
-1) Debug persistent homology, may require fixing things in `Matrix.hs`.
+1) Fix infinite barcodes.
+
+2) Implement filtration by weights for the clique complex of a weighted graph.
+
+3) Implement filtration by weights for the directed clique complex of a directed weighted graph.
 
 Testing:
 
