@@ -23,7 +23,7 @@ Major TODOs:
 
 3) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
 
-Persistence:
+`Persistence.hs`:
 
 1) Fix infinite barcodes.
 
@@ -31,7 +31,7 @@ Persistence:
 
 3) Implement filtration by weights for the directed clique complex of a directed weighted graph.
 
-Testing:
+`Testing.hs`:
 
 1) Document the expected homology outputs for each of the point clouds.
 
