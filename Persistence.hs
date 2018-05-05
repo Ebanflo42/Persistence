@@ -18,9 +18,18 @@ type Filtration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
 getComplex :: Int -> Filtration -> SimplicialComplex
 getComplex index (n, simplices) = (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
 
+--find the number of simplices with the given dimensions and filtration indices
+getNumSimplices :: [Int] -> [Int] -> Filtration -> Int
+getNumSimplices dimensions indices (_, simplices) =
+  L.length $ L.concat $
+    L.map (\d -> V.toList $ V.filter (\(i, _, _) ->
+      L.elemIndex i indices /= Nothing) $ simplices ! (d - 1)) dimensions
+
 getDimension :: Filtration -> Int
 getDimension = V.length . snd
 
+--a simplex is represented as a filtration index tupled with the vertex indices and boundary indices
+--this shows all the information in a simplex
 sim2String :: (Int, Vector Int, Vector Int) -> String
 sim2String (index, vertices, faces) =
   "Filtration index: " L.++ (show index) L.++
@@ -30,9 +39,10 @@ sim2String (index, vertices, faces) =
 filtr2String :: Filtration -> String
 filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map sim2String))) . snd
 
+--(i, Just j) is a feature that begins at i and ends at j, (i, Nothing) begins at i and never ends
 type BarCode = (Int, Maybe Int)
 
---scales must be in decreasing order
+--SCALES MUST BE IN DECREASING ORDER
 makeFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
 makeFiltrationFast scales metric dataSet =
   let edgeInSimplex edge simplex  = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
@@ -131,10 +141,11 @@ persistentHomology (numVerts, allSimplices) =
       makeBarCodesAndMark :: Int -> Int -> Vector Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode], Vector Int) -> ([BarCode], Vector Int, Vector Int)
       makeBarCodesAndMark dim index marked reduced simplices (codes, newMarked)
         | V.null simplices = (codes, newMarked, V.findIndices (\x -> x == Nothing) reduced)
-        | V.null d         = makeBarCodesAndMark dim (index + 1) marked reduced (V.tail simplices) (codes, index `cons` newMarked)
+        | V.null d         = makeBarCodesAndMark dim (index + 1) marked reduced (V.tail simplices) (codes, newMarked `snoc` index)
         | otherwise        =
-          let begin = one $ allSimplices ! (dim - 1) ! (V.head d)
-          in makeBarCodesAndMark dim (index + 1) marked (replaceElem (V.head d) (Just d) reduced) (V.tail simplices)
+          let maxindex = V.head d
+              begin    = one $ allSimplices ! (dim - 1) ! maxindex
+          in makeBarCodesAndMark dim (index + 1) marked (replaceElem maxindex (Just d) reduced) (V.tail simplices)
               (if begin == i then codes else (begin, Just i):codes, newMarked)
         where (i, v, f) = V.head simplices
               d         = removePivotRows reduced $ removeUnmarked marked f
@@ -142,26 +153,27 @@ persistentHomology (numVerts, allSimplices) =
       makeEdgeCodes :: Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode], Vector Int) -> ([BarCode], Vector Int, Vector Int)
       makeEdgeCodes index reduced edges (codes, marked)
         | V.null edges = (codes, marked, V.findIndices (\x -> x == Nothing) reduced)
-        | V.null d     = makeEdgeCodes (index + 1) reduced (V.tail edges) (codes, index `cons` marked)
+        | V.null d     =
+          makeEdgeCodes (index + 1) reduced (V.tail edges) (codes, marked `snoc` index)
         | otherwise    =
           makeEdgeCodes (index + 1) (replaceElem (V.head d) (Just d) reduced) (V.tail edges) (if i == 0 then codes else (0, Just i):codes, marked)
         where (i, v, f) = V.head edges
               d         = removePivotRows reduced f
-      
+
       makeFiniteBarCodes :: Int -> Int -> [[BarCode]] -> Vector (Vector Int) -> Vector (Vector Int) -> ([[BarCode]], Vector (Vector Int), Vector (Vector Int))
       makeFiniteBarCodes dim maxdim barcodes marked slots =
         if dim == maxdim then (barcodes, marked, slots)
         else
-          let (newCodes, newMarked, unusedSlots) =
-                makeBarCodesAndMark dim 0 (V.last marked) (V.replicate (V.length $ allSimplices ! (dim - 1)) Nothing) (allSimplices ! dim) ([], V.empty)
+          let (newCodes, newMarked, unusedSlots) = makeBarCodesAndMark dim 0 (V.last marked) (V.replicate (V.length $ allSimplices ! (dim - 1)) Nothing) (allSimplices ! dim) ([], V.empty)
           in makeFiniteBarCodes (dim + 1) maxdim (barcodes L.++ [newCodes]) (marked `snoc` newMarked) (slots `snoc` unusedSlots)
 
       makeInfiniteBarCodes :: ([[BarCode]], Vector (Vector Int), Vector (Vector Int)) -> [[BarCode]]
       makeInfiniteBarCodes (barcodes, marked, unusedSlots) =
         let makeCodes i codes =
               let slots = unusedSlots ! i; marks = marked ! i
-              in codes L.++ (V.toList $ V.map (\j -> (one $ allSimplices ! i ! j, Nothing)) $ slots |^| marks)
-            loop i []     = []
+              in codes L.++ (V.toList $ V.map (\j -> (one $ allSimplices ! (i - 1) ! j, Nothing)) $ slots |^| marks)
+            loop _ []     = []
+            loop 0 (x:xs) = (x L.++ (V.toList $ V.map (\j -> (0, Nothing)) $ (unusedSlots ! 0) |^| (marked ! 0))):(loop 1 xs)
             loop i (x:xs) = (makeCodes i x):(loop (i + 1) xs)
         in loop 0 barcodes
 
@@ -170,4 +182,6 @@ persistentHomology (numVerts, allSimplices) =
 
       (fstCodes, fstMarked, fstSlots) = makeEdgeCodes 0 (V.replicate numVerts Nothing) edges ([], V.empty)
 
-  in makeInfiniteBarCodes $ makeFiniteBarCodes 1 (V.length allSimplices) [fstCodes] (fstMarked `cons` V.empty) (fstSlots `cons` V.empty)
+      verts = 0 `range` (numVerts - 1)
+
+  in makeInfiniteBarCodes $ makeFiniteBarCodes 1 (V.length allSimplices) [fstCodes] (verts `cons` (fstMarked `cons` V.empty)) (fstSlots `cons` V.empty)

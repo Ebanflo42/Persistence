@@ -5,15 +5,6 @@ import Persistence
 import Data.Vector as V
 import Data.List as L
 
-simpleCloud :: [(Float, Float)]
-simpleCloud =
-  [ ( 0,  0)
-  , (-1,  3)
-  , ( 2,  4)
-  , ( 4,  2)
-  , ( 3, -1)
-  ]
-
 matrix1 :: IMatrix
 matrix1 =
   cons (cons 2 $ cons 3 $ cons 5 empty)
@@ -188,7 +179,7 @@ octahedralCloud =
   --, (100,1,0)
   ]
 
-another =
+sqrCloud =
   [ (0,0)
   , (1,0)
   , (2,0)
@@ -213,20 +204,22 @@ metric3 (x0, y0, z0) (x1, y1, z1) =
   let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
   sqrt (dx*dx + dy*dy + dz*dz)
 
---should have 2 1-cycles and 3 connected components
+--should have 2 loops and 3 connected components
 testVR = fst $ makeVRComplexFast 10.0 metric2 pointCloud1
 
 boundOps = makeBoundaryOperatorsInt testVR
 
 boolOps = makeBoundaryOperatorsBool testVR
 
+--8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
+--1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
 testFiltration = makeFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
 
-simpleFiltration = makeFiltrationFast [5.0] metric2 simpleCloud
-
+--5 connected components from 0 to 2, 1 void from 2 to 3
 octahedron = makeFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
 
-filtr2 = makeFiltrationFast [1.5, 1.25, 0.5] metric2 another
+--11 connected components from 0 to 1, 1 loop starting at 1
+square = makeFiltrationFast [3.5, 2.0, 0.5] metric2 sqrCloud
 
 main = do
 {--
@@ -349,6 +342,15 @@ main = do
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology octahedron
   --}
   {--
-  putStrLn "More Bar Codes:"
-  putStrLn $ intercalate "\n" $ L.map show $ persistentHomology filtr2
+  putStrLn "VR Complex scale 5 for square cloud:"
+  --putStrLn $ show $ makeNbrhdGraph 5.0 metric2 sqrCloud
+  putStrLn $ sc2String $ fst $ makeVRComplexFast 3.5 metric2 sqrCloud
+  --}
+  {--
+  putStrLn "Square filtration:"
+  putStrLn $ filtr2String square
+  --}
+  {--}
+  putStrLn "Bar codes for a square:"
+  putStrLn $ intercalate "\n" $ L.map show $ persistentHomology square
   --}
