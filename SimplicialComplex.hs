@@ -1,15 +1,14 @@
 module SimplicialComplex
   ( SimplicialComplex
   , sc2String
+  , getDim
   , Graph
   , makeNbrhdGraph
-  , getDim
+  , makeFlagComplex
   , makeVRComplexFast
   , makeVRComplexLight
-  , makeBoundaryOperatorsInt
   , simplicialHomologyInt
   , simplicialHomologyIntPar
-  , makeBoundaryOperatorsBool
   , simplicialHomologyBool
   , simplicialHomologyBoolPar
   ) where
@@ -37,12 +36,13 @@ Simplicial homology over F_2 (the field with 2 elements) is much simpler. The on
 import Util
 import Matrix
 import MaximalCliques
+
 import Data.List as L
 import Data.Vector as V
 import Data.IntSet as S
 import Control.Parallel.Strategies
 
---CONSTRUCTION------------------------------------------------------------
+--BASIC STUFF-------------------------------------------------------------
 
 --the first component of the pair is the number of vertices
 --every element of the list is a vector of simplices whose dimension is given by the index +2
@@ -76,14 +76,12 @@ makeNbrhdGraph scale metric dataSet =
   let vector      = V.fromList dataSet
   in V.map (\x -> V.map (\y -> let d = metric x y in (d, d <= scale)) vector) vector
 
---makes the Vietoris-Rips complex given a scale, metric, and data set
---uses Bron-Kerbosch algorithm to find maximal cliques and then enumerates faces
---uses parallelism by default because the construction is expensive
-makeVRComplexFast :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> (SimplicialComplex, Graph a)
-makeVRComplexFast scale metric dataSet =
-  let numVerts = L.length dataSet
-      graph    = makeNbrhdGraph scale metric dataSet
+--CONSTRUCTION------------------------------------------------------------
 
+--makes a simplicial complex where the simplices are the complete subgraphs of the given graph
+makeFlagComplex :: Graph a -> SimplicialComplex
+makeFlagComplex graph =
+  let numVerts = V.length graph
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
@@ -120,10 +118,19 @@ makeVRComplexFast scale metric dataSet =
 
       fstmc2 = fst maxCliques - 2
   in
-    if fstmc2 == (-1) then ((numVerts, V.empty), graph) --if there are no maximal cliques, the complex is just a bunch of points
+    if fstmc2 == (-1) then (numVerts, V.empty) --if there are no maximal cliques, the complex is just a bunch of points
     else
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
-      in ((numVerts, sc), graph)
+      in (numVerts, sc)
+
+--makes the Vietoris-Rips complex given a scale, metric, and data set
+--uses Bron-Kerbosch algorithm to find maximal cliques and then enumerates faces
+--uses parallelism by default because the construction is expensive
+makeVRComplexFast :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> (SimplicialComplex, Graph a)
+makeVRComplexFast scale metric dataSet =
+  let graph = makeNbrhdGraph scale metric dataSet
+      sc    = makeFlagComplex graph
+  in (sc, graph)
 
 makeVRComplexLight :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
 makeVRComplexLight scale metric dataSet =
@@ -173,8 +180,7 @@ makeVRComplexLight scale metric dataSet =
 
 --INTEGER HOMOLOGY--------------------------------------------------------
 
---gets the first boundary operator (because edges don't need to point to their subsimplices)
-
+--gets the first boundary operator (because edges don't need to point to their faces)
 makeEdgeBoundariesInt :: SimplicialComplex -> IMatrix
 makeEdgeBoundariesInt sc =
   transposeMat $

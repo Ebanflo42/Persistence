@@ -1,7 +1,9 @@
 import Util
 import Matrix
 import SimplicialComplex
+import HasseDiagram
 import Persistence
+
 import Data.Vector as V
 import Data.List as L
 
@@ -207,19 +209,15 @@ metric3 (x0, y0, z0) (x1, y1, z1) =
 --should have 2 loops and 3 connected components
 testVR = fst $ makeVRComplexFast 10.0 metric2 pointCloud1
 
-boundOps = makeBoundaryOperatorsInt testVR
-
-boolOps = makeBoundaryOperatorsBool testVR
-
 --8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
 --1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
-testFiltration = makeFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
+testFiltration = makeVRFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
 
 --5 connected components from 0 to 2, 1 void from 2 to 3
-octahedron = makeFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
+octahedron = makeVRFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
 
 --11 connected components from 0 to 1, 1 loop starting at 1
-square = makeFiltrationFast [3.5, 2.0, 0.5] metric2 sqrCloud
+square = makeVRFiltrationFast [3.5, 2.0, 0.5] metric2 sqrCloud
 
 main = do
 {--
@@ -275,38 +273,13 @@ main = do
   putStrLn "It's Smith normal form computed in parallel is:"
   putStrLn $ printMat $ normalFormIntPar matrix6
   --}
-{--
-  putStrLn "The Vietoris-Rips complex, scale 10.0, is:"
+  {--}
+  putStrLn "The Vietoris-Rips complex of the first point cloud, scale 10.0, is:"
   putStrLn $ sc2String testVR
-  --}
-  {--
-  putStrLn "The boundary operators are:"
-  let strMat = V.toList $ V.map printMat boundOps
-  putStrLn $ intercalate "\n" $ strMat
   --}
 {--
   putStrLn "The homology groups are:"
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyIntPar testVR
-  --}
-{--
-  putStrLn "Boundary operator 0 times boundary operator 1:"
-  putStrLn $ printMat $ (boundOps ! 0) `multiply` (boundOps ! 1)
-
-  putStrLn "Boundary operator 1 times boundary operator 2:"
-  putStrLn $ printMat $ (boundOps ! 1) `multiply` (boundOps ! 2)
---}
-{--
-  putStrLn "Ranks of the boolean homology groups:"
-  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyBool testVR
-  putStrLn "Boolean boundary operators:"
-  putStrLn $ intercalate "\n" $ V.toList $ V.map printMatBool boolOps
-  --}
-{--
-  putStrLn "Boundary operator 0 times boundary operator 1:"
-  putStrLn $ printMatBool $ (boolOps ! 0) `multiply` (boolOps ! 1)
-
-  putStrLn "Boundary operator 1 times boundary operator 2:"
-  putStrLn $ printMatBool $ (boolOps ! 1) `multiply` (boolOps ! 2)
   --}
   {--
   putStrLn "Reduced column echelon form of boolean monomial matrix:"
@@ -315,14 +288,6 @@ main = do
   {--
   putStrLn "The filtration of pointCloud2 is:"
   putStrLn $ filtr2String testFiltration
-  --}
-  {--
-  putStrLn "The boundary operators of the filtration are:"
-  putStrLn $ intercalate "\n" $ V.toList $ V.map show $ boundaryOperatorsBool testFiltration
-  --}
-  {--
-  putStrLn "The edge boundary operators of the filtration are:"
-  putStrLn $ intercalate "\n" $ V.toList $ V.map show $ edgeBoundaryBool testFiltration
   --}
   {--}
   putStrLn "The bar codes of pointCloud2 are:"

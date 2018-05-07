@@ -1,13 +1,15 @@
 module Persistence where
 
-import Data.List as L
-import Data.Vector as V
-import Control.Parallel.Strategies
-
 import Util
 import Matrix
 import MaximalCliques
 import SimplicialComplex
+
+import Data.List as L
+import Data.Vector as V
+import Control.Parallel.Strategies
+
+--DATA TYPES--------------------------------------------------------------
 
 --number of vertices paired with
 --2D array of simplices organized according to dimension
@@ -42,13 +44,14 @@ filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map 
 --(i, Just j) is a feature that begins at i and ends at j, (i, Nothing) begins at i and never ends
 type BarCode = (Int, Maybe Int)
 
+--FILTRATION CONSTRUCTION-------------------------------------------------
+
 --SCALES MUST BE IN DECREASING ORDER
-makeFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
-makeFiltrationFast scales metric dataSet =
-  let edgeInSimplex edge simplex  = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
-      ((verts, simplices), graph) = makeVRComplexFast (L.head scales) metric dataSet
-      edgeTooLong scale edge      = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
-      maxIndex                    = (L.length scales) - 1
+makeFiltrationFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> Filtration
+makeFiltrationFast scales ((numVerts, simplices), graph) =
+  let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
+      edgeTooLong scale edge     = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
+      maxIndex                   = (L.length scales) - 1
 
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
@@ -73,18 +76,19 @@ makeFiltrationFast scales metric dataSet =
           if V.null simplices then simplices
           else mapWithIndex (\i ss -> V.map ((newFaces i) . fst) ss) sortedSimplices
 
-  in (verts, sortFiltration $ --sort the simplices by filtration index
+  in (numVerts, sortFiltration $ --sort the simplices by filtration index
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
---scales must be in decreasing order
-makeFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
-makeFiltrationLight scales metric dataSet =
-  let edgeInSimplex edge simplex  = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
-      (verts, simplices)          = makeVRComplexLight (L.head scales) metric dataSet
-      vector                      = V.fromList dataSet
-      edgeTooLong scale edge      = scale <= (metric (vector ! (edge ! 0)) (vector ! (edge ! 1)))
-      maxIndex                    = (L.length scales) - 1
+makeVRFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
+makeVRFiltrationFast scales metric dataSet = makeFiltrationFast scales $ makeVRComplexFast (L.head scales) metric dataSet
+
+makeFiltrationLight :: Ord a => [a] -> (b -> b -> a) -> [b] -> SimplicialComplex -> Filtration
+makeFiltrationLight scales metric dataSet (numVerts, simplices) =
+  let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
+      vector                     = V.fromList dataSet
+      edgeTooLong scale edge     = scale <= (metric (vector ! (edge ! 0)) (vector ! (edge ! 1)))
+      maxIndex                   = (L.length scales) - 1
 
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
@@ -109,9 +113,14 @@ makeFiltrationLight scales metric dataSet =
           if V.null simplices then simplices
           else mapWithIndex (\i ss -> V.map ((newFaces i) . fst) ss) sortedSimplices
 
-  in (verts, sortFiltration $ --sort the simplices by filtration index
+  in (numVerts, sortFiltration $ --sort the simplices by filtration index
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
+
+makeVRFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
+makeVRFiltrationLight scales metric dataSet = makeFiltrationLight scales metric dataSet $ makeVRComplexLight (L.head scales) metric dataSet
+
+--PERSISTENT HOMOLOGY-----------------------------------------------------
 
 persistentHomology :: Filtration -> [[BarCode]]
 persistentHomology (numVerts, allSimplices) =

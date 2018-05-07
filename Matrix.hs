@@ -36,11 +36,10 @@ Eliminating elements is a slighltly more complicated process since only integer 
 
 Boolean matrices are much easier to work with, they are regular matrices with elements modulo 2. Bool is an instance of Num here and the instance is given in Util.
 
-Matrices whose elements are monomials with Boolean coefficients are also operated on. According to the Stanford paper, these aren't really necessary but it really helps keep track of all the boundary chains. Finding the column echelon form of these matrices is almost exactly like finding it for ordinary matrices with coefficients from F_2 except one has to make sure that the monomial with the least degree is in the pivot position (otherwise you will end up dividing a monomial by a monomial with a larger degree).
-
 --}
 
 import Util
+
 import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies

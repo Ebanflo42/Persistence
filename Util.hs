@@ -96,6 +96,9 @@ getCombos vector =
           in ((V.take i vector) V.++ (V.drop i1 vector)) `cons` (calc i1)
   in calc 0
 
+concatVec :: Vector (Vector a) -> Vector a
+concatVec = V.foldl1 (V.++)
+
 forallVec :: (a -> Bool) -> Vector a -> Bool
 forallVec p vector =
   if V.null vector then True
@@ -162,6 +165,15 @@ elemAndIndices p vector =
         | p $ V.head vec = (V.head vec, i) : (helper (i + 1) $ V.tail vec)
         | otherwise      = helper (i + 1) $ V.tail vec
   in helper 0 vector
+
+findBothElems :: (a -> b -> Bool) -> Vector a -> Vector b -> Vector (a, b)
+findBothElems rel vector1 vector2 =
+  let calc i result =
+        let a = vector1 ! i
+        in case V.find (\b -> rel a b) vector2 of
+          Just b  -> calc (i + 1) $ result `snoc` (a, b)
+          Nothing -> calc (i + 1) result
+  in calc 0 V.empty
 
 --fst vector satisfies predicate, snd vector does not
 biFilter :: (a -> Bool) -> Vector a -> (Vector a, Vector a)
@@ -264,8 +276,8 @@ existsVec p v
   | p $ V.head v = True
   | otherwise    = existsVec p $ V.tail v
 
-findElems :: (a -> Bool) -> Vector a -> [a]
-findElems p v = V.toList $ V.map ((!) v) $ V.findIndices p v
+findElems :: (a -> Bool) -> Vector a -> Vector a
+findElems p v = V.map ((!) v) $ V.findIndices p v
 
 --if the relation is a "greater than" operator, this would find the minimum of the vector
 foldRelation :: (a -> a -> Bool) -> Vector a -> a
