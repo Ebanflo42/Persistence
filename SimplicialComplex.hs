@@ -7,10 +7,10 @@ module SimplicialComplex
   , makeFlagComplex
   , makeVRComplexFast
   , makeVRComplexLight
-  , simplicialHomologyInt
-  , simplicialHomologyIntPar
-  , simplicialHomologyBool
-  , simplicialHomologyBoolPar
+  , simplicialHomology
+  , simplicialHomologyPar
+  , bettiNumbers
+  , bettiNumbersPar
   ) where
 
 {--OVERVIEW---------------------------------------------------------------
@@ -220,8 +220,8 @@ makeBoundaryOperatorsInt sc =
   in calc 1
 
 --calculates all homology groups of the complex
-simplicialHomologyInt :: SimplicialComplex -> [[Int]]
-simplicialHomologyInt sc =
+simplicialHomology :: SimplicialComplex -> [[Int]]
+simplicialHomology sc =
   let dim      = getDim sc
       boundOps = makeBoundaryOperatorsInt sc
       calc 0   = [getUnsignedDiagonal $ normalFormInt (boundOps ! 0)]
@@ -234,11 +234,11 @@ simplicialHomologyInt sc =
           in (getUnsignedDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]
-    else L.map (L.filter (/=0)) $ calc dim
+    else L.reverse $ L.map (L.filter (/=1)) $ calc dim
 
 --calculates all homology groups of the complex in parallel using parallel matrix functions
-simplicialHomologyIntPar :: SimplicialComplex -> [[Int]]
-simplicialHomologyIntPar sc =
+simplicialHomologyPar :: SimplicialComplex -> [[Int]]
+simplicialHomologyPar sc =
   let dim      = getDim sc
       boundOps = makeBoundaryOperatorsInt sc
       calc 0   = [getUnsignedDiagonal $ normalFormInt (boundOps ! 0)]
@@ -252,7 +252,7 @@ simplicialHomologyIntPar sc =
             imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]
-    else L.map (L.filter (/=0)) $ calc dim
+    else L.reverse $ L.map (L.filter (/=1)) $ calc dim
 
 --BOOLEAN HOMOLOGY--------------------------------------------------------
 
@@ -287,8 +287,8 @@ makeBoundaryOperatorsBool sc =
   in calc 1
 
 --calculate the ranks of all homology groups
-simplicialHomologyBool :: SimplicialComplex -> [Int]
-simplicialHomologyBool sc =
+bettiNumbers :: SimplicialComplex -> [Int]
+bettiNumbers sc =
   let dim      = (getDim sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
       ranks    = --dimension of image paired with dimension of kernel
@@ -302,11 +302,11 @@ simplicialHomologyBool sc =
           else ((snd $ ranks ! i1) - (fst $ ranks ! i)):(calc i1)
   in
     if L.null $ snd sc then [fst sc]
-    else calc dim
+    else L.reverse $ calc dim
 
 --calculate ranks of all homology groups in parallel
-simplicialHomologyBoolPar :: SimplicialComplex -> [Int]
-simplicialHomologyBoolPar sc =
+bettiNumbersPar :: SimplicialComplex -> [Int]
+bettiNumbersPar sc =
   let dim      = (getDim sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
       ranks    = --dimension of image paired with dimension of kernel
@@ -320,4 +320,4 @@ simplicialHomologyBoolPar sc =
           else evalPar ((snd $ ranks ! i1) - (fst $ ranks ! i)) (calc i1)
   in
     if L.null $ snd sc then [fst sc]
-    else calc dim
+    else L.reverse $ calc dim

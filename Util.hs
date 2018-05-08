@@ -104,26 +104,6 @@ forallVec p vector =
   if V.null vector then True
   else (p $ V.head vector) && (forallVec p $ V.tail vector)
 
-exactlyOneTrue :: Vector Bool -> Bool
-exactlyOneTrue vec =
-  let calc b v
-        | V.null v  = b
-        | b && v0   = False
-        | v0        = calc True $ V.tail v
-        | otherwise = calc b $ V.tail v
-        where v0 = v ! 0
-  in calc False vec
-
-exactlyOneNonZero :: Vector Int -> Bool
-exactlyOneNonZero vec =
-  let calc b v
-        | V.null v  = b
-        | b && v0   = False
-        | v0        = calc True $ V.tail v
-        | otherwise = calc b $ V.tail v
-        where v0 = v ! 0 /= 0
-  in calc False vec
-
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 mapWithIndex f vector =
   let helper i vec =

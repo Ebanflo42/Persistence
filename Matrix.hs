@@ -135,7 +135,7 @@ rowOperationPar index1 index2 (c11, c12, c21, c22) matrix =
 --returns whether or not the row needs to be eliminated with the rearranged matrix and
 --the column switch performed (if there was one), returns Nothing if the row is all zeroes
 chooseGaussPivotInt :: (Int, Int) -> IMatrix -> Maybe (Bool, IMatrix, Maybe (Int, Int))
-chooseGaussPivotInt (rowIndex, colIndex) mat = --assumes that i is a legal index for mat
+chooseGaussPivotInt (rowIndex, colIndex) mat =
   let row     = mat ! rowIndex --the following variable should be useful for quickly determining whether or not there are more entries to eleiminate
       indices = V.filter (\index -> index > colIndex) $ V.findIndices (\x -> x /= 0) row --but that method is not working for some reason
   in
@@ -144,8 +144,8 @@ chooseGaussPivotInt (rowIndex, colIndex) mat = --assumes that i is a legal index
         v | V.null v -> Nothing
         v            ->
           let j = V.head v
-          in Just (not $ exactlyOneNonZero row, V.map (switchElems colIndex j) mat, Just (colIndex, j))
-    else Just (not $ exactlyOneNonZero row, mat, Nothing)
+          in Just (V.length v > 0, V.map (switchElems colIndex j) mat, Just (colIndex, j))
+    else Just (V.length indices > 0, mat, Nothing)
 
 --does gaussian elimination on the pivot row of an integer matrix
 improveRowInt :: (Int, Int) -> Int -> IMatrix -> IMatrix
@@ -178,7 +178,7 @@ elimRowInt (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, if pivot == 0 then error "line 181" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
 
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
@@ -238,7 +238,7 @@ elimRowIntPar (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, if pivot == 0 then error "line 241" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
 
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
@@ -315,7 +315,7 @@ elimColInt (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, if pivot == 0 then error "line 318" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
         if V.null ops then mat
@@ -394,7 +394,7 @@ elimColIntPar (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, if pivot == 0 then error "line 397" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
         if V.null ops then mat
@@ -454,7 +454,7 @@ elimRowIntWithId (rowIndex, colIndex) numCols (elems, pivot, identity) =
       elim i mat ide =
         if i == numCols then (mat, ide)
         else
-          let coeff     = (row ! i) `div` pivot
+          let coeff     = if pivot == 0 then error "line 457" else (row ! i) `div` pivot
               transform = V.map (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
@@ -511,7 +511,7 @@ elimRowIntWithIdPar (rowIndex, colIndex) numCols (elems, pivot, identity) =
       elim i mat ide =
         if i == numCols then (mat, ide)
         else
-          let coeff     = (row ! i) `div` pivot
+          let coeff     = if pivot == 0 then error "line 514" else (row ! i) `div` pivot
               transform = parMapVec (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
@@ -575,7 +575,7 @@ elimRowIntWithInv (rowIndex, colIndex) numCols (kernel, pivot, image) =
         | i == numCols            = (ker, img)
         | row ! i == 0 = elim (i + 1) ker img
         | otherwise               =
-          let coeff      = (row ! i) `div` pivot
+          let coeff      = if pivot == 0 then error "line 578" else (row ! i) `div` pivot
               transform1 = V.map (\r -> replaceElem i ((r ! i) - coeff*(r ! colIndex)) r)
               transform2 = \mat -> replaceElem colIndex ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
           in elim (i + 1) (transform1 ker) (transform2 img)
@@ -636,7 +636,7 @@ elimRowIntWithInvPar (rowIndex, colIndex) numCols (kernel, pivot, image) =
         | i == numCols            = (ker, img)
         | row ! i == 0 = elim (i + 1) ker img
         | otherwise               =
-          let coeff      = (row ! i) `div` pivot
+          let coeff      = if pivot == 0 then error "line 639" else (row ! i) `div` pivot
               transform1 = parMapVec (\r -> replaceElem i ((r ! i) - coeff*(r ! colIndex)) r)
               transform2 = \mat -> replaceElem colIndex ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
           in elim (i + 1) (transform1 ker) (transform2 img)
@@ -675,7 +675,7 @@ imgInKerIntPar toColEsch toImage =
 --and returns the column operation that was performed if there was one
 --returns Nothing if the entire row is zero
 chooseGaussPivotBool :: (Int, Int) -> BMatrix -> Maybe (Bool, BMatrix, Maybe (Int, Int))
-chooseGaussPivotBool (rowIndex, colIndex) mat = --assumes that i is a legal index for mat
+chooseGaussPivotBool (rowIndex, colIndex) mat =
   let row     = mat ! rowIndex --the following variable should be useful for quickly determining whether or not there are more entries to eleiminate
       indices = V.filter (\index -> index > colIndex) $ V.findIndices id row --but that method is not working for some reason
   in
@@ -684,8 +684,8 @@ chooseGaussPivotBool (rowIndex, colIndex) mat = --assumes that i is a legal inde
         v | V.null v -> Nothing
         v            ->
           let j = V.head v
-          in Just (not $ exactlyOneTrue row, V.map (switchElems colIndex j) mat, Just (colIndex, j))
-    else Just (not $ exactlyOneTrue row, mat, Nothing)
+          in Just (V.length v > 0, V.map (switchElems colIndex j) mat, Just (colIndex, j))
+    else Just (V.length indices > 0, mat, Nothing)
 
 --eliminates pivot row of a boolean matrix
 elimRowBool :: (Int, Int) -> Int -> BMatrix -> BMatrix

@@ -273,25 +273,32 @@ main = do
   putStrLn "It's Smith normal form computed in parallel is:"
   putStrLn $ printMat $ normalFormIntPar matrix6
   --}
-  {--}
+  {--
   putStrLn "The Vietoris-Rips complex of the first point cloud, scale 10.0, is:"
   putStrLn $ sc2String testVR
-  --}
-{--
-  putStrLn "The homology groups are:"
-  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyIntPar testVR
+  putStrLn "Distances in the neighborhood graph:"
+  putStrLn $ L.intercalate "\n" $
+    L.map show $ V.toList $ V.map (\e -> metric2 (pointCloud1 !! (e ! 0)) (pointCloud1 !! (e ! 1))) $ V.map fst $ (snd testVR) ! 0
   --}
   {--
-  putStrLn "Reduced column echelon form of boolean monomial matrix:"
-  putStrLn $ printPolyMatBool $ echelonFormBool bmatrix1
+  putStrLn "The homology groups over the integers are:"
+  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomologyPar testVR
+  --}
+  {--
+  putStrLn "The Betti numbers are:"
+  putStrLn $ intercalate "\n" $ L.map show $ bettiNumbersPar testVR
   --}
   {--
   putStrLn "The filtration of pointCloud2 is:"
   putStrLn $ filtr2String testFiltration
   --}
-  {--}
+  {--
   putStrLn "The bar codes of pointCloud2 are:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology testFiltration
+  --}
+  {--}
+  putStrLn "The homology groups of the point cloud, scale 5:"
+  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 5.0 metric2 pointCloud2
   --}
   {--
   putStrLn "Very simple filtration test:"
@@ -302,7 +309,7 @@ main = do
   putStrLn "Filtration for the octahedron cloud:"
   putStrLn $ filtr2String octahedron
   --}
-  {--}
+  {--
   putStrLn "Bar codes for an octahedron:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology octahedron
   --}
@@ -315,7 +322,7 @@ main = do
   putStrLn "Square filtration:"
   putStrLn $ filtr2String square
   --}
-  {--}
+  {--
   putStrLn "Bar codes for a square:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology square
   --}
