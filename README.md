@@ -23,6 +23,10 @@ Persistent homology:
 
 http://geometry.stanford.edu/papers/zc-cph-05/zc-cph-05.pdf
 
+The algorithm for finding the directed clique complex is inspired by the pseudocode in the supplementary materials of this paper:
+
+https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
+
 # Major TODOs:
 
 `Matrix.hs`:
