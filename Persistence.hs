@@ -1,54 +1,100 @@
-module Persistence where
+{- |
+Module     : Persistence.Persistence
+Copyright  : (c) Eben Cowley, 2018
+License    : BSD 3 Clause
+Maintainer : eben.cowley42@gmail.com
+Stability  : experimental
+
+This module contains functions for constructing filtrations and computing persistent homology, as well as a few utility functions for working with filtrations.
+
+A filtration is a finite sequence of simplicial complexes where each complex is a subset of the next. This means that a filtration can be thought of as a single simplicial complex where each of the simplices is labeled with a "filtration index" that represents the index in the sequence where that simplex enters the filtration.
+
+One way to create a filtration, given a simplicial complex, a metric for the vertices, and a list of distances, is to loop through the distances from greatest to least: create a simplicial complex each iteration which excludes simplices that contain pairs of vertices which are further than the current distance apart. This method will produce a filtration of Vietoris-Rips complexes - each filtration index will correspond to a VR complex whose scale is the corresponding distance.
+
+An essential thing to note about the way this library is set up is the distinction between "fast" and "light" functions. Light functions call the metric every time distance between two points is required, which is a lot. Fast functions store the distances between points and access them in constant time, BUT this means they use O(n^2) memory with respect to the number of data points, so it's a really bad idea to use this optimization on substantially large data.
+
+IMPORTANT NOTE: This library currently only handles filtrations where all the vertices have filtration index 0. Since I haven't thought of any way filtrations that don't respect this property could come up in applications, I have chosen to exclude them in favor of less memory usage and a slight speedup.
+
+Persistent homology is the main event of topological data analysis. It allows one to identify clusters, holes, and voids that persist in the data throughout many scales. The output of the persistence algorithm is a barcode diagram, which currently have a somewhat crude representation in this library. A single barcode represents the filtration index where a feature appears and the index where it disappears (if it does). Thus, short barcodes are typically interpretted as noise and long barcodes are interpretted as actual features.
+
+-}
+
+module Persistence
+  ( Filtration
+  , BarCode
+  , sim2String
+  , filtr2String
+  , getComplex
+  , getNumSimplices
+  , getDimension
+  , filterByWeightsFast
+  , makeVRFiltrationFast
+  , filterByWeightsLight
+  , makeVRFiltrationLight
+  , persistentHomology
+  ) where
 
 import Util
 import Matrix
-import MaximalCliques
 import SimplicialComplex
 
 import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies
+import Data.Algorithm.MaximalCliques
 
 --DATA TYPES--------------------------------------------------------------
 
---number of vertices paired with
---2D array of simplices organized according to dimension
---each array of simplices should be sorted based on filtration index
+{- |
+  The first component is simply the number of vertices (all vertices are assumed to have filtration index 0).
+  The second component is a vector with an entry for each dimension of simplices, starting at dimension 1 for edges.
+  Each simplex is represented as a triple: its filtration index, the indices of its vertices in the original data, and the indices of its faces in the next lowest dimension.
+  Edges do not have reference to their faces, as it would be redundant with their vertices. All simplices are sorted according to filtration index upon construction of the filtration.
+-}
 type Filtration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
 
---gets the simplicial complex at the specified filtration index
-getComplex :: Int -> Filtration -> SimplicialComplex
-getComplex index (n, simplices) = (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
+-- | (i, Just j) is a feature that appears at filtration index i and disappears at index j, (i, Nothing) begins at i and doesn't disappear.
+type BarCode = (Int, Maybe Int)
 
---find the number of simplices with the given dimensions and filtration indices
-getNumSimplices :: [Int] -> [Int] -> Filtration -> Int
-getNumSimplices dimensions indices (_, simplices) =
-  L.length $ L.concat $
-    L.map (\d -> V.toList $ V.filter (\(i, _, _) ->
-      L.elemIndex i indices /= Nothing) $ simplices ! (d - 1)) dimensions
-
-getDimension :: Filtration -> Int
-getDimension = V.length . snd
-
---a simplex is represented as a filtration index tupled with the vertex indices and boundary indices
---this shows all the information in a simplex
+-- | Shows all the information in a simplex.
 sim2String :: (Int, Vector Int, Vector Int) -> String
 sim2String (index, vertices, faces) =
   "Filtration index: " L.++ (show index) L.++
     "; Vertex indices: " L.++ (show vertices) L.++
       "; Boundary indices: " L.++ (show faces) L.++ "\n"
 
+-- | Shows all the information in a filtration.
 filtr2String :: Filtration -> String
 filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map sim2String))) . snd
 
---(i, Just j) is a feature that begins at i and ends at j, (i, Nothing) begins at i and never ends
-type BarCode = (Int, Maybe Int)
+-- | Gets the simplicial complex specified by the filtration index. This is O(n) with respect to the number of simplices.
+getComplex :: Int -> Filtration -> SimplicialComplex
+getComplex index (n, simplices) = (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
+
+{- |
+  The first argument is a list of dimensions, the second argument is a list of filtration indices.
+  The function returns the number of simplices in the filtration whose dimension and index exist in the respective lists.
+-}
+getNumSimplices :: [Int] -> [Int] -> Filtration -> Int
+getNumSimplices dimensions indices (_, simplices) =
+  L.length $ L.concat $
+    L.map (\d -> V.toList $ V.filter (\(i, _, _) ->
+      L.elemIndex i indices /= Nothing) $ simplices ! (d - 1)) dimensions
+
+-- | Return the dimension of the highest dimensional simplex in the filtration (constant time).
+getDimension :: Filtration -> Int
+getDimension = V.length . snd
 
 --FILTRATION CONSTRUCTION-------------------------------------------------
 
---SCALES MUST BE IN DECREASING ORDER
-makeFiltrationFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> Filtration
-makeFiltrationFast scales ((numVerts, simplices), graph) =
+{- |
+  Given a list of scales, a simplicial complex, and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
+  this function creates a filtration out of a simplicial complex by removing simplices that contain edges that are too long for each scale in the list.
+  Really, this is a helper function to be called by makeVRFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
+  The scales MUST be in decreasing order for this function.
+-}
+filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> Filtration
+filterByWeightsFast scales ((numVerts, simplices), graph) =
   let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
       edgeTooLong scale edge     = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
       maxIndex                   = (L.length scales) - 1
@@ -80,11 +126,16 @@ makeFiltrationFast scales ((numVerts, simplices), graph) =
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
+{- |
+  Given a list of scales, a metric, and a data set, this function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
+  The scales MUST be in decreasing order. Note that this a fast function, meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
+-}
 makeVRFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
-makeVRFiltrationFast scales metric dataSet = makeFiltrationFast scales $ makeVRComplexFast (L.head scales) metric dataSet
+makeVRFiltrationFast scales metric dataSet = filterByWeightsFast scales $ makeVRComplexFast (L.head scales) metric dataSet
 
-makeFiltrationLight :: Ord a => [a] -> (b -> b -> a) -> [b] -> SimplicialComplex -> Filtration
-makeFiltrationLight scales metric dataSet (numVerts, simplices) =
+-- | The same as filterbyWeightsFast except it uses far less memory at the cost of speed. Note that the scales must be in decreasing order.
+filterByWeightsLight :: Ord a => [a] -> (b -> b -> a) -> [b] -> SimplicialComplex -> Filtration
+filterByWeightsLight scales metric dataSet (numVerts, simplices) =
   let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
       vector                     = V.fromList dataSet
       edgeTooLong scale edge     = scale <= (metric (vector ! (edge ! 0)) (vector ! (edge ! 1)))
@@ -107,7 +158,7 @@ makeFiltrationLight scales metric dataSet (numVerts, simplices) =
               let findNew j =
                     case V.findIndex (\x -> snd x == j) $ sortedSimplices ! (dim - 1) of
                       Just k  -> k
-                      Nothing -> error "Persistence.makeFiltrationLight.sortFiltration.newFaces.findNew"
+                      Nothing -> error "Persistence.filterByWeightsLight.sortFiltration.newFaces.findNew"
               in (i, v, (V.map findNew f))
         in
           if V.null simplices then simplices
@@ -117,11 +168,17 @@ makeFiltrationLight scales metric dataSet (numVerts, simplices) =
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
+-- | Given a list of scales in decreasing order, a metric, and a data set, this constructs the filtration of Vietoris-Rips complexes corresponding to the scales.
 makeVRFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
-makeVRFiltrationLight scales metric dataSet = makeFiltrationLight scales metric dataSet $ makeVRComplexLight (L.head scales) metric dataSet
+makeVRFiltrationLight scales metric dataSet = filterByWeightsLight scales metric dataSet $ makeVRComplexLight (L.head scales) metric dataSet
 
 --PERSISTENT HOMOLOGY-----------------------------------------------------
 
+{- |
+  Each index in the list is a list of barcodes whose dimension corresponds to the index.
+  That is, the first list will represent clusters, the second list will represent tunnels or punctures,
+  the third will represent hollow volumes, and the nth index list will represent n-dimensional holes in the data.
+-}
 persistentHomology :: Filtration -> [[BarCode]]
 persistentHomology (numVerts, allSimplices) =
   let

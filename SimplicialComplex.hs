@@ -1,10 +1,29 @@
+{- |
+Module     : Persistence.SimplicialComplex
+Copyright  : (c) Eben Cowley, 2018
+License    : BSD 3 Clause
+Maintainer : eben.cowley42@gmail.com
+Stability  : experimental
+
+This module provides functions for constructing neighborhood graphs, clique complexes, Vietoris-Rips complexes, as well as the computation of Betti numbers.
+
+An important thing to know about this module is the difference between "fast" and "light" functions. Fast functions encode the metric in a 2D vector, so that distances don't need to be computed over and over again and can instead be accessed in constant time. Unfortunately, this takes O(n^2) memory so I would strongly recomend against using it for larger data sets; this is why "light" functions exist.
+
+A neighborhood graph is a graph where an edge exists between two vertices if and only if the vertices fall within a given distance of each other. Graphs here are more of a helper data type for constructing filtrations, which is why they have a somewhat odd representation.
+
+The clique complex of a graph is a simplicial complex whose simplices are the complete subgraphs of the given graph. The Vietoris-Rips complex is the clique complex of the neighborhood graph.
+
+Betti numbers measure the number of n-dimensional holes in a given simplicial complex. The 0th Betti number is the number of connected components, or clusters; the 1st Betti number is the number of loops or tunnels; then 2nd Betti number measures voids or hollow volumes; and if you have high-dimensional data, you might have higher Betti numbers representing the number of high-dimensional holes.
+
+-}
+
 module SimplicialComplex
   ( SimplicialComplex
+  , Graph
   , sc2String
   , getDim
-  , Graph
   , makeNbrhdGraph
-  , makeFlagComplex
+  , makeCliqueComplex
   , makeVRComplexFast
   , makeVRComplexLight
   , simplicialHomology
@@ -13,44 +32,28 @@ module SimplicialComplex
   , bettiNumbersPar
   ) where
 
-{--OVERVIEW---------------------------------------------------------------
-
-Simplicial complexes are represented as a pair. The first component is an integer indicating the number of vertices and the second is a list of arrays of simplices whose dimension is given by the index in the outer list +2.
-
-This module provides functions for constructing the Vietoris-Rips complex and calculating homology over both the integers and the integers modulo 2 (represented with booleans).
-
-The Vietoris-Rips complex is constructed by first finding all maximal cliques of the data set given the metric and scale (all arrrays of points which fall within the scale of each other) and then enumerating all the faces of the cliques.
-
-An important aspect of this module, as well as the main Persistence.hs file, is the existence of "light" vs. "fast" functions. Since the distance between data points needs to be repeatedly evaluated for the construction of the Vietoris-Rips complex, "fast" functions construct a square array of distances between every single point in the data so that the distance can be retrieved extremely quickly. Since the memory cost of this array is n^2 wrt the number of data points, this could require a tremendous amount of memory for a substantially large data set - this is why "light" functions don't use this optimization.
-
-Integer homology groups are represented by integer lists. An element being 0 in the list represents a factor of the infinite cyclic group in the homology group. An element k /= 0 represents a factor of the cyclic group of order k in the homology group. So an element of 1 represents a factor of the trivial group, i.e. no factor.
-
-The nth homology group is the quotient of the kernel of the nth boundary operator by the image of the (n+1)th boundary operator. The boundary operators represented by rectangular 2D arrays.
-
-For homology over the integers, one must first put the nth boundary operator in column eschelon form and perform the corresponding inverse row operations on the n+1th boundary operator. After this process is complete the column space of the rows of the n+1th corresponding to zero columns in the column eschelon form is the image of the n+1th represented in the basis of the kernel of the nth (See the Stanford paper). These are the two modules we need to quotient; to get the representation of the quotient as a direct product of cyclic groups we look at the diagonal of the Smith normal form of the afformentioned matrix.
-
-Simplicial homology over F_2 (the field with 2 elements) is much simpler. The only information we could possibly need from any homology group is its dimension as an F_2 vector space. Since it is a quotient space, this is simply the number of n-simplices in the complex minus the rank of the nth boundary operator minus the rank of the n+1th boundary operator.
-
---------------------------------------------------------------------------}
-
 import Util
 import Matrix
-import MaximalCliques
 
 import Data.List as L
 import Data.Vector as V
 import Data.IntSet as S
 import Control.Parallel.Strategies
+import Data.Algorithm.MaximalCliques
 
 --BASIC STUFF-------------------------------------------------------------
 
---the first component of the pair is the number of vertices
---every element of the list is a vector of simplices whose dimension is given by the index +2
---a simplex is represented by a pair: the indices of its vertices and the indices of the faces in the previous entry of the list
---this is to speed up construction of the boundary operators
---the first entry in the list, the edges, do not point to their faces because that would be trivial
+{- |
+  The first component of the pair is the number of vertices.
+  The second component is a vector whose entries are vectors of simplices of the same dimension.
+  The dimension starts at 1 because there is no need to store individual vertices.
+  A simplex is represented as a pair: the vector of its vertices in the original data set from which the complex was constructed,
+  and the vector of the indices of the faces in the next lowest dimension. Edges are the exception - they do not store reference to their
+  faces because it would be redundant with their vertices.
+-}
 type SimplicialComplex = (Int, Vector (Vector (Vector Int, Vector Int)))
 
+-- | Show all the information in a simplicial complex.
 sc2String :: SimplicialComplex -> String
 sc2String (v, allSimplices) =
   if V.null allSimplices then (show v) L.++ " vertices"
@@ -64,13 +67,22 @@ sc2String (v, allSimplices) =
         else showSimplex (V.head sc) L.++ ('\n':(showAll (V.tail sc)))
   in (intercalate "\n" $ V.toList $ V.map (show . fst) edges) L.++ ('\n':(showAll simplices))
 
+-- | Get the dimension of the highest dimensional simplex (constant time).
 getDim :: SimplicialComplex -> Int
 getDim = L.length . snd
 
---structure for storing the distance between data points and whether or not there is a connection, used in "fast" functions
+{- |
+  This represents the (symmetric) adjacency matrix of some undirected graph. The type `a` is whatever distance is in your data analysis regime.
+  The reason graphs are represented like this is because their main function is too speed up the construction of simplicial complexes and filtrations.
+  If the clique complex of this graph were to be constructed, only the adjacencies would matter. But if a filtration is constructed all the distances
+  will be required over and over again - this allows them to be accessed in constant time.
+-}
 type Graph a = Vector (Vector (a, Bool))
 
---records the distance between every element of the data set and whether or not it is smaller than the given scale
+{- |
+  The first argument is a scale, the second is a metric, and the third is the data.
+  This function records the distance between every element of the data and whether or not it is smaller than the given scale.
+-}
 makeNbrhdGraph :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> Graph a
 makeNbrhdGraph scale metric dataSet =
   let vector      = V.fromList dataSet
@@ -78,9 +90,13 @@ makeNbrhdGraph scale metric dataSet =
 
 --CONSTRUCTION------------------------------------------------------------
 
---makes a simplicial complex where the simplices are the complete subgraphs of the given graph
-makeFlagComplex :: Graph a -> SimplicialComplex
-makeFlagComplex graph =
+{- |
+  Makes a simplicial complex where the simplices are the complete subgraphs (cliques) of the given graph.
+  Mainly a helper function for makeVRComplexFast, but it might be useful if you happen to have a graph you want to analyze.
+  This utilizes any available processors in parallel because the construction is quite expensive.
+-}
+makeCliqueComplex :: Graph a -> SimplicialComplex
+makeCliqueComplex graph =
   let numVerts = V.length graph
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
@@ -123,15 +139,21 @@ makeFlagComplex graph =
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
       in (numVerts, sc)
 
---makes the Vietoris-Rips complex given a scale, metric, and data set
---uses Bron-Kerbosch algorithm to find maximal cliques and then enumerates faces
---uses parallelism by default because the construction is expensive
+{- |
+  Constructs the Vietoris-Rips complex given a scale, metric, and data set.
+  Also uses O(n^2) memory (where n is the number of data points) for a graph storing all the distances between data points.
+  This utilizes any available processors in parallel because the construction is quite expensive.
+-}
 makeVRComplexFast :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> (SimplicialComplex, Graph a)
 makeVRComplexFast scale metric dataSet =
   let graph = makeNbrhdGraph scale metric dataSet
-      sc    = makeFlagComplex graph
+      sc    = makeCliqueComplex graph
   in (sc, graph)
 
+{- |
+  Constructs the Vietoris-Rips complex given a scale, metric, and data set.
+  This utilizes any available processors in parallel because the construction is quite expensive.
+-}
 makeVRComplexLight :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
 makeVRComplexLight scale metric dataSet =
   let numVerts = L.length dataSet
@@ -219,7 +241,12 @@ makeBoundaryOperatorsInt sc =
         else (makeBoundaryOperatorInt i sc) `cons` (calc $ i + 1)
   in calc 1
 
---calculates all homology groups of the complex
+{- |
+  Calculates all homology groups of the complex. An int list represents a single homology group.
+  Specifically, an int list represents a direct product of cyclic groups - a 0 entry corresponds to the
+  infinite cylic group (also known as the integers), and an entry of n corresponds to a cyclic group of
+  order n (also known as the integers modulo n). The nth index of the output represents the nth homology group.
+-}
 simplicialHomology :: SimplicialComplex -> [[Int]]
 simplicialHomology sc =
   let dim      = getDim sc
@@ -236,7 +263,7 @@ simplicialHomology sc =
     if L.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim
 
---calculates all homology groups of the complex in parallel using parallel matrix functions
+-- | Same as simplicialHomology except it computes each of the groups in parallel and uses parallel matric functions.
 simplicialHomologyPar :: SimplicialComplex -> [[Int]]
 simplicialHomologyPar sc =
   let dim      = getDim sc
@@ -286,7 +313,11 @@ makeBoundaryOperatorsBool sc =
         | otherwise = (makeBoundaryOperatorBool i sc) `cons` (calc (i + 1))
   in calc 1
 
---calculate the ranks of all homology groups
+{- |
+  The nth index of the output corresponds to the nth Betti number.
+  The zeroth Betti number is the number of connected components, the 1st is the number of tunnels/punctures,
+  the 2nd is the number of hollow volumes, and so on for higher-dimensional holes.
+-}
 bettiNumbers :: SimplicialComplex -> [Int]
 bettiNumbers sc =
   let dim      = (getDim sc) + 1
@@ -304,7 +335,7 @@ bettiNumbers sc =
     if L.null $ snd sc then [fst sc]
     else L.reverse $ calc dim
 
---calculate ranks of all homology groups in parallel
+-- | Calculates all of the Betti numbers in parallel.
 bettiNumbersPar :: SimplicialComplex -> [Int]
 bettiNumbersPar sc =
   let dim      = (getDim sc) + 1

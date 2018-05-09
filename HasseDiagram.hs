@@ -1,6 +1,6 @@
 module HasseDiagram where
 
-{--OVERVIEW---------------------------------------------------------------
+{--FOR DEVS---------------------------------------------------------------
 
 This module implements algorithms for admissible Hasse diagrams. A Hasse diagram is admissible if it is stratified and oriented. A diagram is stratified if all the vertices can be arranged in rows such that all the sources of each vertex are in the next highest row and all the targets are in the next lowest row. A diagram is oriented if every vertex has a linear ordering on its targets.
 

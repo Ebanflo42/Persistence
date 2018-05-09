@@ -1,13 +1,27 @@
---TODOS:
---make parallelism better
+{- |
+Module     : Persistence.Matrix
+Copyright  : (c) Eben Cowley, 2018
+License    : BSD 3 Clause
+Maintainer : eben.cowley42@gmail.com
+Stability  : experimental
+
+This module contains a variety of matrix utility functions, used in the computation of Betti numbers and simplicial homology groups.
+
+Most importantly, it includes functions for computing the rank, normal form, and kernel of matrices. For the computation of homology groups and Betti numbers, one must perform column operations on one matrix to get it into column echelon form and find its kernel while also performing the inverse row operations on the next matrix to be operated on.
+
+Bool is an instance of Num here (instance given in Util) so that functions can be somewhat generalized to act on both integers and integers modulo 2.
+
+-}
+
 module Matrix
-  ( getDiagonal
+  ( IMatrix
+  , BMatrix
+  , getDiagonal
   , getUnsignedDiagonal
   , transposeMat
   , transposePar
   , multiply
   , multiplyPar
-  , IMatrix
   , rankInt
   , rankIntPar
   , normalFormInt
@@ -16,13 +30,12 @@ module Matrix
   , kernelIntPar
   , imgInKerInt
   , imgInKerIntPar
-  , BMatrix
   , rankBool
   , kernelBool
   , imgInKerBool
   ) where
 
-{--OVERVIEW---------------------------------------------------------------
+{--FOR DEVS---------------------------------------------------------------
 
 Matrices are transformed by iterating through each row and selecting a pivot. Zero rows are skipped for finding column eschelon form but a row operation is performed (if possible) if there is a zero row for Smith normal form.
 
@@ -46,35 +59,42 @@ import Control.Parallel.Strategies
 
 --BASIC STUFF-------------------------------------------------------------
 
+-- | Matrix of integers.
 type IMatrix = Vector (Vector Int)
+
+-- | Matrix of integers modulo 2. Alternatively, matrix over the field wit h2 elements.
 type BMatrix = Vector (Vector Bool)
 
+-- | Take the transpose a matrix (no fancy optimizations, yet).
 transposeMat :: Vector (Vector a) -> Vector (Vector a)
 transposeMat mat =
   V.map (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
 
---takes the transpose of a matrix in parallel
+-- | Take the transpose of a matrix using parallel evaluation of rows.
 transposePar :: Vector (Vector a) -> Vector (Vector a)
 transposePar mat =
   parMapVec (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
 
+-- | Multiply two matrices
 multiply :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
 multiply mat1 mat2 =
   let t = transposeMat mat2
   in V.map (\row -> V.map (dotProduct row) t) mat1
 
---multiply matrices, evaluate rows in parallel if processors are available
+-- | Multiply matrices, evaluate rows in parallel if processors are available
 multiplyPar :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
 multiplyPar mat1 mat2 = runEval $ do
   let t = transposeMat mat2
   rseq t
   return $ parMapVec (\row -> V.map (dotProduct row) t) mat1
 
+-- | Get the diagonal elements.
 getDiagonal :: Vector (Vector a) -> [a]
 getDiagonal matrix =
   if V.null matrix then []
   else L.map (\i -> matrix ! i ! i) [0..(min (V.length matrix) (V.length $ V.head matrix)) - 1]
 
+-- | Get the absolute value of each of the diagonal elements in a list.
 getUnsignedDiagonal :: Num a => Vector (Vector a) -> [a]
 getUnsignedDiagonal matrix =
   if V.null matrix then []
@@ -188,8 +208,7 @@ elimRowInt (rowIndex, colIndex) elems =
 
   in calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
---finds the rank of integer matrix (number of linearly independent columns)
---found by transforming to column echelon form and counting non-zero cols
+-- | Finds the rank of integer matrix (number of linearly independent columns).
 rankInt :: IMatrix -> Int
 rankInt matrix =
   let rows     = V.length matrix
@@ -248,6 +267,7 @@ elimRowIntPar (rowIndex, colIndex) elems =
 
   in calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
+-- | Calculates the rank of a matrix by operating on multiple rows in parallel.
 rankIntPar :: IMatrix -> Int
 rankIntPar matrix =
   let rows     = V.length matrix
@@ -343,7 +363,7 @@ finish diagLen matrix =
       filtered = biFilter (\row -> existsVec (\x -> x /= 0) row) matrix
   in calc 0 $ (fst filtered) V.++ (snd filtered)
 
- --gets the Smith normal form of an integer matrix
+-- | Get the Smith normal form of an integer matrix.
 normalFormInt :: IMatrix -> IMatrix
 normalFormInt matrix =
   let rows = V.length matrix
@@ -402,7 +422,7 @@ elimColIntPar (rowIndex, colIndex) elems =
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
   in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
---gets the Smith normal form of a matrix, uses lots of parallelism if possible
+-- | Gets the Smith normal form of a matrix, uses lots of parallelism if processors are available.
 normalFormIntPar :: IMatrix -> IMatrix
 normalFormIntPar matrix =
   let rows = V.length matrix
@@ -459,7 +479,7 @@ elimRowIntWithId (rowIndex, colIndex) numCols (elems, pivot, identity) =
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
 
---finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
+-- | Finds a basis for the kernel of a matrix, arranges the basis vectors into the rows of a matrix.
 kernelInt :: IMatrix -> IMatrix
 kernelInt matrix =
   let rows     = V.length matrix
@@ -516,7 +536,7 @@ elimRowIntWithIdPar (rowIndex, colIndex) numCols (elems, pivot, identity) =
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
 
---computes kernel of an integer matrix in parallel
+-- | Computes basis vectors for the kernel of an integer matrix and arranges them into the rows of a matrix using lots of parallelism if processors are available.
 kernelIntPar :: IMatrix -> IMatrix
 kernelIntPar matrix =
   let rows     = V.length matrix
@@ -582,7 +602,7 @@ elimRowIntWithInv (rowIndex, colIndex) numCols (kernel, pivot, image) =
         where row = ker ! rowIndex
   in elim (colIndex + 1) kernel image
 
---calculates the image of the second matrix represented in the basis of the kernel of the first matrix
+-- | Calculates the image of the second matrix represented in the basis of the kernel of the first matrix.
 imgInKerInt :: IMatrix -> IMatrix -> IMatrix
 imgInKerInt toColEsch toImage =
   let rows     = V.length toColEsch
@@ -643,6 +663,10 @@ elimRowIntWithInvPar (rowIndex, colIndex) numCols (kernel, pivot, image) =
         where row = ker ! rowIndex
   in elim (colIndex + 1) kernel image
 
+{- |
+  Calculates the image of the second matrix represented in the basis of the kernel of the first matrix.
+  Uses lots of parallelism if processors are available.
+-}
 imgInKerIntPar :: IMatrix -> IMatrix -> IMatrix
 imgInKerIntPar toColEsch toImage =
   let rows     = V.length toColEsch
@@ -697,7 +721,7 @@ elimRowBool (rowIndex, colIndex) numCols elems =
         | otherwise     = elim (i + 1) $ V.map (\row -> replaceElem i ((row ! i) + (row ! colIndex)) row) mat
   in elim (colIndex + 1) elems
 
---find the rank of a mod 2 matrix
+-- | Find the rank of a mod 2 matrix (number of linearly independent columns).
 rankBool :: BMatrix -> Int
 rankBool matrix =
   let rows  = V.length matrix
@@ -731,7 +755,7 @@ elimRowBoolWithId (rowIndex, colIndex) numCols elems identity =
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
 
---finds the basis of the kernel of a matrix, arranges basis vectors into the rows of a matrix
+-- | Finds the basis of the kernel of a matrix, arranges the basis vectors into the rows of a matrix.
 kernelBool :: BMatrix -> BMatrix
 kernelBool matrix =
   let rows     = V.length matrix
@@ -772,6 +796,7 @@ elimRowBoolWithInv (rowIndex, colIndex) numCols toColEch toImage =
             in elim (i + 1) (transform1 ech) (transform2 img)
   in elim (colIndex + 1) toColEch toImage
 
+-- | Calculates the image of the second matrix represented in the basis of the kernel of the first matrix.
 imgInKerBool :: BMatrix -> BMatrix -> BMatrix
 imgInKerBool toColEch toImage =
   let rows  = V.length toColEch

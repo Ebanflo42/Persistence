@@ -1,2 +1,7 @@
 *.o
 *.hi
+*.js
+*.png
+*.css
+*.gif
+dist

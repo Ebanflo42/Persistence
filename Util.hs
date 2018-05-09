@@ -1,14 +1,21 @@
+{- |
+Module     : Persistence.Util
+Copyright  : (c) Eben Cowley, 2018
+License    : BSD 3 Clause
+Maintainer : eben.cowley42@gmail.com
+Stability  : experimental
+
+This module contains miscellaneous utility functions used throughout the Persistence library.
+
+-}
+
 module Util where
+
 import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies
 
-xor :: Bool -> Bool -> Bool
-xor False False = False
-xor True False  = True
-xor False True  = True
-xor True True   = False
-
+-- | Simple instance of Num where True is 1 and False is 0, all operations work like arithmetic modulo 2.
 instance Num Bool where
   p + q  = p `xor` q
   p * q  = p && q
@@ -19,25 +26,51 @@ instance Num Bool where
   fromInteger _ = True
   signum bool   = if bool then 1 else 0
 
+-- | Exclusive or.
+xor :: Bool -> Bool -> Bool
+xor False False = False
+xor True False  = True
+xor False True  = True
+xor True True   = False
+
+-- | First element of a triple.
 one (a, _, _) = a
+-- | Second element of a triple.
 two (_, b, _) = b
+-- | Third element of a triple.
 thr (_, _, c) = c
+-- | Last two elements of a triple.
 not1 (_, b, c) = (b, c)
+-- | First and last elements of a triple.
 not2 (a, _, c) = (a, c)
+-- | First two elements of a triple.
 not3 (a, b, _) = (a, b)
 
+-- | Concatenate a vector of vectors.
 flatten :: Vector (Vector a) -> Vector a
 flatten = V.foldl1 (V.++)
 
+-- | Multiply a vector by a scalar.
 mul :: Num a => a -> Vector a -> Vector a
 mul s = V.map (*s)
 
+{- |
+  Add two vectors together component-wise.
+  WARNING: If one vector is longer than the other,
+  the longer vector will simply be cut off.
+-}
 add :: Num a => Vector a -> Vector a -> Vector a
 add = V.zipWith (+)
 
+{- |
+  Subtract the second vector from the first vector component-wise.
+  WARNING: If one vector is longer than the other,
+  the longer vector will simply be cut off.
+-}
 subtr :: Num a => Vector a -> Vector a -> Vector a
 subtr = V.zipWith (\x y -> x - y)
 
+-- | Dot product.
 dotProduct :: Num a => Vector a -> Vector a -> a
 dotProduct vec1 vec2
   | a && b = fromIntegral 0
@@ -46,7 +79,7 @@ dotProduct vec1 vec2
   | otherwise   = (V.head vec1)*(V.head vec2) + (dotProduct (V.tail vec1) (V.tail vec2))
     where a = V.null vec1; b = V.null vec2
 
---extended Euclidean algorithm
+-- | Extended Euclidean algorithm. Finds the gcd of the two inputs plus the coefficients that multiply each input and sum to give the gcd.
 extEucAlg :: Integral a => a -> a -> (a, a, a)
 extEucAlg a b =
   let eeaHelper r s t =
@@ -64,6 +97,7 @@ extEucAlg a b =
             in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
   in (\(x, y, z) -> if x < 0 then (-x, -y, -z) else (x, y, z)) $ eeaHelper (a, b) (0, 1) (1, 0)
 
+-- | Returns whether or not the first number divides the second number.
 divides :: Int -> Int -> Bool
 0 `divides` b = False
 a `divides` b
@@ -71,6 +105,7 @@ a `divides` b
   | b == 0    = True
   | otherwise = a `divides` (b - (abs a))
 
+-- | Switches the elements of the vector at the given indices.
 switchElems ::Int -> Int -> Vector a -> Vector a
 switchElems i j vector
   | j == i    = vector
@@ -85,7 +120,7 @@ switchElems i j vector
         third  = V.drop (j + 1) vector
     in first V.++ (cons (vector ! j) second) V.++ (cons (vector ! i) third)
 
---all arrays missing one element from the original array
+-- | Return all vectors missing exactly one element from the original vector.
 getCombos :: Vector a -> Vector (Vector a)
 getCombos vector =
   let len    = V.length vector
@@ -96,14 +131,13 @@ getCombos vector =
           in ((V.take i vector) V.++ (V.drop i1 vector)) `cons` (calc i1)
   in calc 0
 
-concatVec :: Vector (Vector a) -> Vector a
-concatVec = V.foldl1 (V.++)
-
+-- | Returns whether or not every element satisfies the predicate.
 forallVec :: (a -> Bool) -> Vector a -> Bool
 forallVec p vector =
   if V.null vector then True
   else (p $ V.head vector) && (forallVec p $ V.tail vector)
 
+-- | Map a function that takes into account the index of each element.
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 mapWithIndex f vector =
   let helper i vec =
@@ -111,6 +145,7 @@ mapWithIndex f vector =
         else cons (f i $ V.head vec) $ helper (i + 1) (V.tail vec)
   in helper 0 vector
 
+-- | Map a function that takes into account the index of each element in parallel.
 parMapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
 parMapWithIndex f vector =
   let helper i vec = runEval $
@@ -120,16 +155,7 @@ parMapWithIndex f vector =
           in rpar current >> rseq rest >> (return $ current `cons` rest)
   in helper 0 vector
 
-parMapWithIndexList :: (Int -> a -> b) -> [a] -> Vector b
-parMapWithIndexList f list =
-  let helper i l = runEval $
-        if L.null l then return empty
-        else
-          let current = f i $ L.head l; rest = helper (i + 1) $ L.tail l
-          in rpar current >> rseq rest
-            >> (return $ current `cons` rest)
-  in helper 0 list
-
+-- | Return the element satisfying the predicate and its index if it exists.
 elemAndIndex :: (a -> Bool) -> Vector a -> Maybe (a, Int)
 elemAndIndex p vector =
   let helper i vec
@@ -138,6 +164,7 @@ elemAndIndex p vector =
         | otherwise      = helper (i + 1) $ V.tail vec
   in helper 0 vector
 
+-- | Return the elements satisfying the predicate and their indices.
 elemAndIndices :: (a -> Bool) -> Vector a -> [(a, Int)]
 elemAndIndices p vector =
   let helper i vec
@@ -146,6 +173,7 @@ elemAndIndices p vector =
         | otherwise      = helper (i + 1) $ V.tail vec
   in helper 0 vector
 
+-- | Given a relation and two vectors, find all pairs of elements satisfying the relation.
 findBothElems :: (a -> b -> Bool) -> Vector a -> Vector b -> Vector (a, b)
 findBothElems rel vector1 vector2 =
   let calc i result =
@@ -155,7 +183,10 @@ findBothElems rel vector1 vector2 =
           Nothing -> calc (i + 1) result
   in calc 0 V.empty
 
---fst vector satisfies predicate, snd vector does not
+{- |
+  Return the vector of elements that satisfy the predicate in the first component and
+  the vector of elements that don't satisfy the predicate in the second component.
+-}
 biFilter :: (a -> Bool) -> Vector a -> (Vector a, Vector a)
 biFilter p vector =
   let calc true false v
@@ -165,7 +196,7 @@ biFilter p vector =
         where x = V.head v
   in calc V.empty V.empty vector
 
---orders a list of vectors from greatest to least length
+-- | Orders a list of vectors from greatest to least length.
 sortVecs :: [Vector a] -> [Vector a]
 sortVecs []     = []
 sortVecs (v:vs) =
@@ -174,12 +205,11 @@ sortVecs (v:vs) =
       more = sortVecs $ L.filter (\u -> V.length u >= len) vs
   in more L.++ [v] L.++ less
 
+-- | Parallel map a function over a vector.
 parMapVec :: (a -> b) -> Vector a -> Vector b
 parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
 
-filterMap :: (a -> a -> b) -> (b -> Bool) -> a -> [a] -> Vector (a, a, b)
-filterMap f p x = V.fromList . L.filter (\(_, _, b) -> p b) . L.map (\y -> (x, y, f x y))
-
+-- | Filter a vector with a predicate that takes into account the index of the element.
 filterWithIndex :: (Int -> a -> Bool) -> Vector a -> Vector a
 filterWithIndex p vector =
   let maxIndex = V.length vector - 1
@@ -189,20 +219,18 @@ filterWithIndex p vector =
         | otherwise        = calc (i + 1)
   in calc 0
 
+-- | Generate a range of integers in vector form.
 range :: Int -> Int -> Vector Int
 range x y
   | x == y = x `cons` empty
   | x < y  = x `cons` (range (x + 1) y)
   | x > y  = (range x (y + 1)) `snoc` y
 
-vecConcat :: Vector (Vector a) -> Vector a
-vecConcat v =
-  if V.null v then empty
-  else V.head v V.++ (vecConcat $ V.tail v)
-
+-- | Replace the element at the given index with the given element.
 replaceElem :: Int -> a -> Vector a -> Vector a
 replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 
+-- | Quicksort treating the given predicate as the < operator. Works like this because its more convenient to make a lambda instead of a complete instance of Ord.
 quicksort :: (a -> a -> Bool) -> Vector a -> Vector a
 quicksort rel vector = --rel is the > operator
   if V.null vector then empty
@@ -213,6 +241,7 @@ quicksort rel vector = --rel is the > operator
         greater = V.filter (not . (rel x)) xs
     in (quicksort rel lesser) V.++ (x `cons` (quicksort rel greater))
 
+-- | Takes the union of all of the vectors.
 bigU :: Eq a => Vector (Vector a) -> Vector a
 bigU =
   let exists x v
@@ -228,7 +257,7 @@ bigU =
             else union (V.tail v1) (x `cons` v2)
   in V.foldl1 union
 
---list, value, low, high, return int
+-- | The element being searched for, the vector being searched, and the lower and upper bounds on the indices.
 binarySearch :: Ord a => a -> Vector a -> Int -> Int -> Maybe Int
 binarySearch value xs low high
   | high < low        = Nothing
@@ -237,7 +266,7 @@ binarySearch value xs low high
   | otherwise         = Just mid
   where mid = low + ((high - low) `div` 2)
 
---intersection of ordered vectors
+-- | Intersection of SORTED vectors.
 (|^|) :: Ord a => Vector a -> Vector a -> Vector a
 vector1 |^| vector2 =
   let len          = V.length vector2 - 1
@@ -250,16 +279,14 @@ vector1 |^| vector2 =
             Nothing -> calc acc xs
   in calc V.empty vector1
 
+-- | Returns whether or not there is an element that satisfies the predicate.
 existsVec :: (a -> Bool) -> Vector a -> Bool
 existsVec p v
   | V.null v     = False
   | p $ V.head v = True
   | otherwise    = existsVec p $ V.tail v
 
-findElems :: (a -> Bool) -> Vector a -> Vector a
-findElems p v = V.map ((!) v) $ V.findIndices p v
-
---if the relation is a "greater than" operator, this would find the minimum of the vector
+-- | If the relation were the "greater than" operator, this would find the minimum element of the vector.
 foldRelation :: (a -> a -> Bool) -> Vector a -> a
 foldRelation rel vec =
   let calc w v
@@ -269,38 +296,20 @@ foldRelation rel vec =
         where x = V.head v; xs = V.tail v
   in calc (V.head vec) (V.tail vec)
 
+-- | Unsafe index finding.
 elemIndexUnsafe :: Eq a => a -> Vector a -> Int
 elemIndexUnsafe elem vector =
   let find i v
-        | V.null v         = error "Element isn't here, Util.elemIndexUnsafe"
+        | V.null v         = error "Element isn't here, Persistence.Util.elemIndexUnsafe"
         | V.head v == elem = i
         | otherwise        = find (i + 1) $ V.tail v
   in find 0 vector
 
-reverseFind :: (a -> Bool) -> Vector a -> Maybe (a, Int)
-reverseFind p vector =
-  let find i
-        | i == (-1)      = Nothing
-        | p $ vector ! i = Just (vector ! i, i)
-        | otherwise      = find $ i - 1
-  in find $ (V.length vector) - 1
-
-replaceElemList :: Int -> a -> [a] -> [a]
-replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
-
+{- |
+  Spark the first argument for parallel evaluation and force evaluation of the second argument,
+  then return the first argument concatenated to the second. This is useful especially if the second
+  argument is a recursive call that calls evalPar again, so that every elemment of the list will be 
+  sparked for parallelism.
+-}
 evalPar :: a -> [a] -> [a]
 evalPar c r = runEval $ rpar c >> rseq r >> return (c:r)
-
-subscript :: Int -> String
-subscript = (\c -> c : "") . (!!) "₀₁₂₃₄₅₆₇₈₉"
-
-supscript :: Int -> String
-supscript i =
-  let str  = "⁰¹²³⁴⁵⁶⁷⁸⁹"
-      f s  =
-        let i10  = i `div` 10
-            im10 = i `mod` 10
-        in
-          if i10 == 0 then (str !! im10):[]
-          else (str !! im10):(supscript i10)
-  in L.reverse $ f str
