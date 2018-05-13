@@ -3,6 +3,8 @@ A topological data analysis library for Haskell.
 
 The objective of the library is to provide users with the ability to deduce topological features of metric spaces and graphs. If you have a function (a metric, for example) that takes two points in your data to an element of an ordered set then you can use Persistence to analyze the topology of your data.
 
+Visit https://hackage.haskell.org/package/Persistence to see the documentation of the stable version. There is also documentation in each module.
+
 Relevant files for development: Util.hs, Matrix.hs, SimplicialComplex.hs, HasseDiagram.hs, Persistence.hs, Testing.hs
 
 Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with 
