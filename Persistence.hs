@@ -53,6 +53,27 @@ import Data.Algorithm.MaximalCliques
 -}
 type Filtration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
 
+-- | Type for representing inifinite bottleneck distance.
+data Extended a = Finite a | Infinity deriving Eq
+
+instance (Ord a, Eq a) => Ord (Extended a) where
+  Infinity > Infinity  = False
+  Infinity > Finite _  = True
+  Finite a > Finite b  = a > b
+  Finite _ > Infinity  = False
+  Infinity >= Infinity = True
+  Infinity >= Finite _ = True
+  Finite _ >= Infinity = False
+  Finite a >= Finite b = a >= b
+  Infinity < Infinity  = False
+  Infinity < Finite a  = False
+  Finite _ < Infinity  = True
+  Finite a < Finite b  = a < b
+  Infinity <= Infinity = True
+  Infinity <= Finite _ = False
+  Finite _ <= Infinity = True
+  Finite a <= Finite b = a <= b
+
 -- | (i, Just j) is a feature that appears at filtration index i and disappears at index j, (i, Nothing) begins at i and doesn't disappear.
 type BarCode = (Int, Maybe Int)
 
@@ -212,7 +233,7 @@ persistentHomology (numVerts, allSimplices) =
           let maxindex = V.head d
               begin    = one $ allSimplices ! (dim - 1) ! maxindex
           in makeBarCodesAndMark dim (index + 1) marked (replaceElem maxindex (Just d) reduced) (V.tail simplices)
-              (if begin == i then codes else (begin, Just i):codes, newMarked)
+              ((begin, Just i):codes, newMarked)
         where (i, v, f) = V.head simplices
               d         = removePivotRows reduced $ removeUnmarked marked f
 
@@ -222,7 +243,7 @@ persistentHomology (numVerts, allSimplices) =
         | V.null d     =
           makeEdgeCodes (index + 1) reduced (V.tail edges) (codes, marked `snoc` index)
         | otherwise    =
-          makeEdgeCodes (index + 1) (replaceElem (V.head d) (Just d) reduced) (V.tail edges) (if i == 0 then codes else (0, Just i):codes, marked)
+          makeEdgeCodes (index + 1) (replaceElem (V.head d) (Just d) reduced) (V.tail edges) ((0, Just i):codes, marked)
         where (i, v, f) = V.head edges
               d         = removePivotRows reduced f
 
@@ -251,3 +272,25 @@ persistentHomology (numVerts, allSimplices) =
       verts = 0 `range` (numVerts - 1)
 
   in makeInfiniteBarCodes $ makeFiniteBarCodes 1 (V.length allSimplices) [fstCodes] (verts `cons` (fstMarked `cons` V.empty)) (fstSlots `cons` V.empty)
+
+-- | Return the maximum of minimum distances bewteen the bar codes. Note that this isn't actual bottleneck distance because the number of barcodes isn't required to be the same for each list.
+bottelNeckDistance :: [BarCode] -> [BarCode] -> Extended Double
+bottelNeckDistance diagram1 diagram2 =
+  let v1 = V.fromList diagram1
+      v2 = V.fromList diagram2
+
+      metric (x1, Just y1) (x2, Nothing) = Infinity
+      metric (x1, Nothing) (x2, Just y1) = Infinity
+      metric (x1, Just y1) (x2, Just y2) =
+        let dx = fromIntegral $ x2 - x1; dy = fromIntegral $ y2 - y1
+        in Finite $ sqrt $ dx*dx + dy*dy
+
+  in foldRelation (<) $ V.map (\p -> foldRelation (>) $ V.map (metric p) v2) v1
+
+-- |  Get's all the bottle neck distances; a good way to determine the similarity of the topology of two filtrations.
+bottelNeckDistances :: [[BarCode]] -> [[BarCode]] -> [Extended Double]
+bottelNeckDistances diagrams1 diagrams2 =
+  let d = (L.length diagrams1) - (L.length diagrams2)
+  in
+    if d >= 0 then (L.zipWith bottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate d Infinity)
+    else (L.zipWith bottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate (-d) Infinity)

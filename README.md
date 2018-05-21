@@ -49,7 +49,7 @@ https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
 
 `Testing.hs`:
 
-1) Document the expected homology outputs for each of the point clouds.
+1) Test the bottleneck distance.
 
 General:
 

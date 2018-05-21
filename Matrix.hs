@@ -171,7 +171,8 @@ chooseGaussPivotInt (rowIndex, colIndex) mat =
 improveRowInt :: (Int, Int) -> Int -> IMatrix -> IMatrix
 improveRowInt (rowIndex, colIndex) numCols matrix =
   let improve i mat =
-        if i == numCols then mat else
+        if i == numCols then mat
+        else
           let row   = mat ! rowIndex
               pivot = row ! colIndex
               x     = row ! i
@@ -183,6 +184,7 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
               in improve next $ colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
+
   in improve (colIndex + 1) matrix
 
 --given pivot index and pivot paired with matrix whose pivot row has been improved, eliminates the entries in the pivot row
@@ -198,7 +200,7 @@ elimRowInt (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, if pivot == 0 then error "line 181" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
 
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
@@ -206,7 +208,9 @@ elimRowInt (rowIndex, colIndex) elems =
         else let (i, coeff) = V.head ops in
           calc (mapWithIndex (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
 
-  in calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
+  in
+    if pivot == 0 then error "confirmed"
+    else calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Finds the rank of integer matrix (number of linearly independent columns).
 rankInt :: IMatrix -> Int
@@ -257,7 +261,7 @@ elimRowIntPar (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, if pivot == 0 then error "line 241" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
 
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
@@ -312,9 +316,8 @@ improveColInt :: Int -> Int -> IMatrix -> IMatrix
 improveColInt pIndex maxIndex matrix =
   let improve i mat =
         if i == maxIndex then mat else
-          let col   = V.map (\row -> row ! pIndex) mat
-              pivot = col ! pIndex
-              x     = col ! i
+          let pivot = matrix ! pIndex ! pIndex
+              x     = matrix ! i ! pIndex
               next  = i + 1
           in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
@@ -335,7 +338,7 @@ elimColInt (rowIndex, colIndex) elems =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, if pivot == 0 then error "line 318" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
         if V.null ops then mat
@@ -410,16 +413,19 @@ elimColIntPar (rowIndex, colIndex) elems =
   let pRow  = elems ! rowIndex
       pivot = pRow ! colIndex
       ri1   = rowIndex + 1
+
       makeCoeffs i v =
         if V.null v then empty
         else let x = V.head v; xs = V.tail v in
           if x == 0 then makeCoeffs (i + 1) xs
-          else (i, if pivot == 0 then error "line 397" else x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+          else (i, x `div` pivot) `cons` (makeCoeffs (i + 1) xs)
+
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
         if V.null ops then mat
         else let (i, coeff) = V.head ops in
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
+
   in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
 -- | Gets the Smith normal form of a matrix, uses lots of parallelism if processors are available.
@@ -464,6 +470,7 @@ improveRowIntWithId (rowIndex, colIndex) numCols elems identity =
                 gcd       = one gcdTriple
                 transform = colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
             in improve next (transform mat) (transform ide)
+
   in improve (colIndex + 1) elems identity
 
 --eliminates all the entries in the pivot row that come after the pivot, after the matrix has been improved
@@ -474,7 +481,7 @@ elimRowIntWithId (rowIndex, colIndex) numCols (elems, pivot, identity) =
       elim i mat ide =
         if i == numCols then (mat, ide)
         else
-          let coeff     = if pivot == 0 then error "line 457" else (row ! i) `div` pivot
+          let coeff     = (row ! i) `div` pivot
               transform = V.map (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
@@ -531,7 +538,7 @@ elimRowIntWithIdPar (rowIndex, colIndex) numCols (elems, pivot, identity) =
       elim i mat ide =
         if i == numCols then (mat, ide)
         else
-          let coeff     = if pivot == 0 then error "line 514" else (row ! i) `div` pivot
+          let coeff     = (row ! i) `div` pivot
               transform = parMapVec (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
@@ -595,7 +602,7 @@ elimRowIntWithInv (rowIndex, colIndex) numCols (kernel, pivot, image) =
         | i == numCols            = (ker, img)
         | row ! i == 0 = elim (i + 1) ker img
         | otherwise               =
-          let coeff      = if pivot == 0 then error "line 578" else (row ! i) `div` pivot
+          let coeff      = (row ! i) `div` pivot
               transform1 = V.map (\r -> replaceElem i ((r ! i) - coeff*(r ! colIndex)) r)
               transform2 = \mat -> replaceElem colIndex ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
           in elim (i + 1) (transform1 ker) (transform2 img)
@@ -656,7 +663,7 @@ elimRowIntWithInvPar (rowIndex, colIndex) numCols (kernel, pivot, image) =
         | i == numCols            = (ker, img)
         | row ! i == 0 = elim (i + 1) ker img
         | otherwise               =
-          let coeff      = if pivot == 0 then error "line 639" else (row ! i) `div` pivot
+          let coeff      = (row ! i) `div` pivot
               transform1 = parMapVec (\r -> replaceElem i ((r ! i) - coeff*(r ! colIndex)) r)
               transform2 = \mat -> replaceElem colIndex ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
           in elim (i + 1) (transform1 ker) (transform2 img)

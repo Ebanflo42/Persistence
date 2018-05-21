@@ -196,6 +196,50 @@ sqrCloud =
   , (0,1)
   ]
 
+dGraph1 =
+  [ ( 0,  1)
+  , ( 0,  2)
+  , ( 1,  2)
+  , ( 1,  3)
+  , ( 1,  4)
+  , ( 1,  6)
+  , ( 1,  7)
+  , ( 2,  6)
+  , ( 2,  7)
+  , ( 3,  2)
+  , ( 3,  4)
+  , ( 3,  6)
+  , ( 3,  7)
+  , ( 4,  5)
+  , ( 4,  6)
+  , ( 4,  7)
+  , ( 5,  9)
+  , ( 5, 11)
+  , ( 6,  7)
+  , ( 6, 10)
+  , ( 6, 12)
+  , ( 7,  8)
+  , ( 7, 12)
+  , ( 8,  4)
+  , ( 8,  5)
+  , ( 8,  9)
+  , (11,  8)
+  , (11,  9)
+  , (11, 14)
+  , (12, 10)
+  , (12, 13)
+  , (13, 15)
+  , (13, 17)
+  , (14, 13)
+  , (14, 15)
+  , (14, 16)
+  , (14, 17)
+  , (16, 13)
+  , (16, 15)
+  , (16, 17)
+  , (17, 15)
+  ]
+
 metric2 :: (Float, Float) -> (Float, Float) -> Float
 metric2 (a, b) (c, d) =
   let x = a - c; y = b - d in
@@ -297,8 +341,8 @@ main = do
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology testFiltration
   --}
   {--}
-  putStrLn "The homology groups of the point cloud, scale 5:"
-  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 5.0 metric2 pointCloud2
+  putStrLn "The homology groups of a hollow square:"
+  putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 1.0 metric2 sqrCloud
   --}
   {--
   putStrLn "Very simple filtration test:"
@@ -326,3 +370,5 @@ main = do
   putStrLn "Bar codes for a square:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology square
   --}
+  putStrLn "The directed clique complex of the directed graph:"
+  putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex $ encodeGraph 18 dGraph1

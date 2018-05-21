@@ -176,11 +176,16 @@ elemAndIndices p vector =
 -- | Given a relation and two vectors, find all pairs of elements satisfying the relation.
 findBothElems :: (a -> b -> Bool) -> Vector a -> Vector b -> Vector (a, b)
 findBothElems rel vector1 vector2 =
-  let calc i result =
+  let len = V.length vector1
+ 
+      calc i result =
         let a = vector1 ! i
-        in case V.find (\b -> rel a b) vector2 of
-          Just b  -> calc (i + 1) $ result `snoc` (a, b)
-          Nothing -> calc (i + 1) result
+        in
+          if i == len then result
+          else case V.find (\b -> rel a b) vector2 of
+            Just b  -> calc (i + 1) $ result `snoc` (a, b)
+            Nothing -> calc (i + 1) result
+
   in calc 0 V.empty
 
 {- |

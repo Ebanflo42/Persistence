@@ -48,10 +48,10 @@ cabal-version:       >=1.10
 
 library
   -- Modules exported by the library.
-  exposed-modules:     SimplicialComplex, Persistence
+  exposed-modules:     SimplicialComplex, Persistence, Testing, Util, HasseDiagram, Matrix
   
   -- Modules included in this library but not exported.
-  -- other-modules:       MaximalCliques, Testing, Util, HasseDiagram, Matrix
+  -- other-modules:       
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    

@@ -41,7 +41,6 @@ encodeGraph numVerts connections =
 directedFlagComplex :: HasseDiagram -> HasseDiagram
 directedFlagComplex directedGraph =
   let edges    = V.last directedGraph
-      fstSinks :: Vector (Vector Int)
       fstSinks =
         V.map (\e -> 
           V.map (\(e0, _) -> (two e0) ! 1) $
@@ -61,16 +60,15 @@ directedFlagComplex directedGraph =
 
                   --find all the faces of the new node by looking at the faces of the old node
                   testTargets i oldNode onodes newNode newSinks =
-                      let currentFace   = (V.last result) ! ((two oldNode) ! i)
-                          possibleFaces = V.map (\j -> (j, onodes ! j)) $ thr currentFace
-                      in
-                        if i == numFaces then (onodes, newNode, newSinks)
-                        else
-                      case V.find (\(_, (v, _, _)) -> V.head v == sink) possibleFaces of
-                        Just (j, n) ->
-                          let face = onodes ! j
-                          in testTargets (i + 1) oldNode (replaceElem j (one face, two face, newIndex `cons` (thr face)) onodes) (one newNode, j `cons` (two newNode), thr newNode) (newSinks |^| (oldSinks ! j))
-                        Nothing     -> error "Something went wrong, HasseDiagram.directedFlagComplex.makeDiagram.makeNode.testTargets"
+                    let currentFace   = (V.last result) ! ((two oldNode) ! i)
+                        possibleFaces = V.map (\j -> (j, onodes ! j)) $ thr currentFace --PROBLEM HERE
+                    in
+                      if i == numFaces then (onodes, newNode, newSinks)
+                      else
+                        case V.find (\(_, (v, _, _)) -> V.head v == sink) possibleFaces of
+                          Just (j, n) ->
+                            testTargets (i + 1) oldNode (replaceElem j (one n, two n, newIndex `cons` (thr face)) onodes) (one newNode, j `cons` (two newNode), thr newNode) (newSinks |^| (oldSinks ! j))
+                          Nothing     -> error "Face not found, HasseDiagram.directedFlagComplex.makeDiagram.makeNode.testTargets"
 
               in testTargets 0 node nodes (verts, oldIndex `cons` V.empty, V.empty) sinks
 
