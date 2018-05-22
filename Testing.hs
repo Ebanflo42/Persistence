@@ -336,11 +336,11 @@ main = do
   putStrLn "The filtration of pointCloud2 is:"
   putStrLn $ filtr2String testFiltration
   --}
-  {--
+  {--}
   putStrLn "The bar codes of pointCloud2 are:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology testFiltration
   --}
-  {--}
+  {--
   putStrLn "The homology groups of a hollow square:"
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 1.0 metric2 sqrCloud
   --}
@@ -370,5 +370,11 @@ main = do
   putStrLn "Bar codes for a square:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology square
   --}
+  {--
+  putStrLn "The Hasse Diagram of the directed graph encoded by [(0,1),(1,2),(2,3)]:"
+  putStrLn $ L.intercalate "\n" $ V.toList $ V.map show $ encodeGraph 3 [(0,1),(1,2),(2,3)]
+  --}
+  {--
   putStrLn "The directed clique complex of the directed graph:"
   putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex $ encodeGraph 18 dGraph1
+  --}

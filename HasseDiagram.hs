@@ -1,6 +1,9 @@
-module HasseDiagram where
-
-{--FOR DEVS---------------------------------------------------------------
+{- |
+Module     : Persistence.HasseDiagram
+Copyright  : (c) Eben Cowley, 2018
+License    : BSD 3 Clause
+Maintainer : eben.cowley42@gmail.com
+Stability  : experimental
 
 This module implements algorithms for admissible Hasse diagrams. A Hasse diagram is admissible if it is stratified and oriented. A diagram is stratified if all the vertices can be arranged in rows such that all the sources of each vertex are in the next highest row and all the targets are in the next lowest row. A diagram is oriented if every vertex has a linear ordering on its targets.
 
@@ -12,7 +15,15 @@ Any oriented simplicial complex can also be encoded as an admissible Hasse diagr
 
 The main feature of this module is an algorithm which takes the Hasse diagram of a directed graph and generates the Hasse diagram of the directed flag complex - the simplicial complex whose simplices are acyclic directed subgraphs of the given graph.
 
---}
+-}
+
+module HasseDiagram
+  ( Node
+  , HasseDiagram
+  , encodeGraph
+  , directedFlagComplex
+  , toSimplicialComplex
+  ) where
 
 import Util
 import SimplicialComplex
@@ -42,12 +53,12 @@ directedFlagComplex :: HasseDiagram -> HasseDiagram
 directedFlagComplex directedGraph =
   let edges    = V.last directedGraph
       fstSinks =
-        V.map (\e -> 
+        V.map (\e ->
           V.map (\(e0, _) -> (two e0) ! 1) $
             findBothElems (\e1 e2 -> (two e1) ! 1 == (two e2) ! 1)
               (V.filter (\e0 -> (two e0) ! 0 == (two e) ! 0) edges) (V.filter (\e0 -> (two e0) ! 0 == (two e) ! 1) edges)) edges
 
-      --take last level of nodes and their sinks. return modified lat level, new level, and new sinks
+      --take last level of nodes and their sinks. return modified last level, new level, and new sinks
       makeLevel :: HasseDiagram -> Vector Node -> Vector (Vector Int) -> (Vector Node, Vector Node, Vector (Vector Int))
       makeLevel result oldNodes oldSinks =
         let maxindex = V.length oldNodes
@@ -60,14 +71,15 @@ directedFlagComplex directedGraph =
 
                   --find all the faces of the new node by looking at the faces of the old node
                   testTargets i oldNode onodes newNode newSinks =
-                    let currentFace   = (V.last result) ! ((two oldNode) ! i)
-                        possibleFaces = V.map (\j -> (j, onodes ! j)) $ thr currentFace --PROBLEM HERE
+                    let faceVerts     = one $ (V.last result) ! ((two oldNode) ! i)
                     in
                       if i == numFaces then (onodes, newNode, newSinks)
                       else
-                        case V.find (\(_, (v, _, _)) -> V.head v == sink) possibleFaces of
+                        case V.find (\(_, (v, _, _)) -> V.head v == sink && V.tail v == faceVerts) $ mapWithIndex (\j n -> (j, n)) onodes of
                           Just (j, n) ->
-                            testTargets (i + 1) oldNode (replaceElem j (one n, two n, newIndex `cons` (thr face)) onodes) (one newNode, j `cons` (two newNode), thr newNode) (newSinks |^| (oldSinks ! j))
+                            testTargets (i + 1) oldNode
+                              (replaceElem j (one n, two n, newIndex `cons` (thr n)) onodes)
+                                (one newNode, j `cons` (two newNode), thr newNode) (newSinks |^| (oldSinks ! j))
                           Nothing     -> error "Face not found, HasseDiagram.directedFlagComplex.makeDiagram.makeNode.testTargets"
 
               in testTargets 0 node nodes (verts, oldIndex `cons` V.empty, V.empty) sinks

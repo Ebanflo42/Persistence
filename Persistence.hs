@@ -294,3 +294,28 @@ bottelNeckDistances diagrams1 diagrams2 =
   in
     if d >= 0 then (L.zipWith bottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate d Infinity)
     else (L.zipWith bottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate (-d) Infinity)
+
+
+-- | If the number of barcodes is the same, return the maximum of minimum distances bewteen the bar codes. Otherwise return nothing.
+safeBottelNeckDistance :: [BarCode] -> [BarCode] -> Maybe (Extended Double)
+safeBottelNeckDistance diagram1 diagram2 =
+  if L.length diagram1 /= L.length diagram2 then Nothing
+  else
+    let v1 = V.fromList diagram1
+        v2 = V.fromList diagram2
+
+        metric (x1, Just y1) (x2, Nothing) = Infinity
+        metric (x1, Nothing) (x2, Just y1) = Infinity
+        metric (x1, Just y1) (x2, Just y2) =
+          let dx = fromIntegral $ x2 - x1; dy = fromIntegral $ y2 - y1
+          in Finite $ sqrt $ dx*dx + dy*dy
+
+    in Just $ foldRelation (<) $ V.map (\p -> foldRelation (>) $ V.map (metric p) v2) v1
+
+-- |  Get's all the bottle neck distances; a good way to determine the similarity of the topology of two filtrations.
+safeBottelNeckDistances :: [[BarCode]] -> [[BarCode]] -> [Maybe (Extended Double)]
+safeBottelNeckDistances diagrams1 diagrams2 =
+  let d = (L.length diagrams1) - (L.length diagrams2)
+  in
+    if d >= 0 then (L.zipWith safeBottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate d Nothing)
+    else (L.zipWith safeBottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate (-d) Nothing)
