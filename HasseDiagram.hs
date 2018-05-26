@@ -118,4 +118,6 @@ directedFlagComplex directedGraph =
   in loopLevels directedGraph edges fstSinks
 
 toSimplicialComplex :: HasseDiagram -> SimplicialComplex
-toSimplicialComplex diagram = (V.length $ V.head diagram, V.map (V.map not3) $ V.tail diagram)
+toSimplicialComplex diagram =
+  let sc = V.map (V.map not3) $ V.tail diagram
+  in (V.length $ V.head diagram, (V.map (\(v, _) -> (v, V.empty)) $ sc ! 0) `cons` V.tail sc)

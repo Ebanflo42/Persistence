@@ -156,15 +156,16 @@ rowOperationPar index1 index2 (c11, c12, c21, c22) matrix =
 --the column switch performed (if there was one), returns Nothing if the row is all zeroes
 chooseGaussPivotInt :: (Int, Int) -> IMatrix -> Maybe (Bool, IMatrix, Maybe (Int, Int))
 chooseGaussPivotInt (rowIndex, colIndex) mat =
-  let row     = mat ! rowIndex --the following variable should be useful for quickly determining whether or not there are more entries to eleiminate
-      indices = V.filter (\index -> index > colIndex) $ V.findIndices (\x -> x /= 0) row --but that method is not working for some reason
+  let row     = mat ! rowIndex
+      indices = V.filter (\index -> index > colIndex) $ V.findIndices (\x -> x /= 0) row
   in
     if row ! colIndex == 0 then
-      case indices of
-        v | V.null v -> Nothing
-        v            ->
-          let j = V.head v
-          in Just (V.length v > 0, V.map (switchElems colIndex j) mat, Just (colIndex, j))
+      if V.null indices then Nothing
+      else
+        let j = V.head indices
+        in
+          if row ! j == 0 then error "The pivot was found to be zero, Matrix.hs line 167"
+          else Just (V.length indices > 1, V.map (switchElems colIndex j) mat, Just (colIndex, j))
     else Just (V.length indices > 0, mat, Nothing)
 
 --does gaussian elimination on the pivot row of an integer matrix
@@ -178,12 +179,16 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
               x     = row ! i
               next  = i + 1
           in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
-            if x == 0 || (x `mod` pivot == 0) then
-              improve next mat
+            if pivot == 0 then
+              if forallVec (\a -> a == 0) row then mat
+              else error "Pivot was found to be zero, Matrix.hs line 184"
             else
-              let gcdTriple = extEucAlg pivot x
-                  gcd       = one gcdTriple
-              in improve next $ colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
+              if x == 0 || (x `mod` pivot == 0) then
+                improve next mat
+              else
+                let gcdTriple = extEucAlg pivot x
+                    gcd       = one gcdTriple
+                in improve next $ colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
 
   in improve (colIndex + 1) matrix
 
@@ -205,11 +210,12 @@ elimRowInt (rowIndex, colIndex) elems =
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
         if V.null ops then mat
-        else let (i, coeff) = V.head ops in
-          calc (mapWithIndex (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
+        else
+          let (i, coeff) = V.head ops
+          in calc (mapWithIndex (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
 
   in
-    if pivot == 0 then error "confirmed"
+    if pivot == 0 then error "Pivot was found to be zero, Matrix.hs line 218"
     else calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Finds the rank of integer matrix (number of linearly independent columns).
@@ -707,15 +713,14 @@ imgInKerIntPar toColEsch toImage =
 --returns Nothing if the entire row is zero
 chooseGaussPivotBool :: (Int, Int) -> BMatrix -> Maybe (Bool, BMatrix, Maybe (Int, Int))
 chooseGaussPivotBool (rowIndex, colIndex) mat =
-  let row     = mat ! rowIndex --the following variable should be useful for quickly determining whether or not there are more entries to eleiminate
-      indices = V.filter (\index -> index > colIndex) $ V.findIndices id row --but that method is not working for some reason
+  let row     = mat ! rowIndex
+      indices = V.filter (\index -> index > colIndex) $ V.findIndices id row
   in
     if not $ row ! colIndex then
-      case indices of
-        v | V.null v -> Nothing
-        v            ->
-          let j = V.head v
-          in Just (V.length v > 0, V.map (switchElems colIndex j) mat, Just (colIndex, j))
+      if V.null indices then Nothing
+      else
+        let j = V.head indices
+        in Just (V.length indices > 0, V.map (switchElems colIndex j) mat, Just (colIndex, j))
     else Just (V.length indices > 0, mat, Nothing)
 
 --eliminates pivot row of a boolean matrix
