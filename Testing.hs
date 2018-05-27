@@ -54,16 +54,16 @@ snf4 =
 matrix5 :: IMatrix
 matrix5 =
   V.fromList $ L.map V.fromList $
-    [ [9, -36, 30]
-    , [-36, 192, -180]
-    , [30, -180, 180] ]
+    [ [  9,  -36,   30]
+    , [-36,  192, -180]
+    , [ 30, -180,  180] ]
 
 snf5 :: IMatrix
 snf5 =
   V.fromList $ L.map V.fromList $
-    [ [3, 0, 0]
-    , [0, 12, 0]
-    , [0, 0, 60] ]
+    [ [3,  0,  0]
+    , [0, 12,  0]
+    , [0,  0, 60] ]
 
 matrix6 :: IMatrix
 matrix6 =
@@ -71,29 +71,7 @@ matrix6 =
     [ [9,   0, -36,  30]
     , [0,   0,   0,   0]
     , [-36, 0,  19, -18]
-    , [30,  0, -18, 18] ]
-
-printMat :: IMatrix -> String
-printMat mat =
-  let printVec vec =
-        if V.null vec then ""
-        else
-          let x = V.head vec
-          in (show x) L.++ ((if x < 0 then " " else "  ") L.++ (printVec $ V.tail vec))
-      print m =
-        if V.null m then ""
-        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-  in print mat
-
-printMatBool :: BMatrix -> String
-printMatBool mat =
-  let printVec vec =
-        if V.null vec then ""
-        else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
-      print m =
-        if V.null m then ""
-        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-  in print mat
+    , [30,  0, -18,  18] ]
 
 pointCloud1 :: [(Float, Float)]
 pointCloud1 =
@@ -384,82 +362,73 @@ testFiltration = makeVRFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
 octahedron = makeVRFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
 
 --11 connected components from 0 to 1, 1 loop starting at 1
-square = makeVRFiltrationFast [3.5, 2.0, 0.5] metric2 sqrCloud
+square = makeVRFiltrationFast [1.5, 1.0, 0.5] metric2 sqrCloud
 
 mobiusStrip = makeVRFiltrationFast [0.35, 0.3, 0.25, 0.2] metric3 mobius
+
+directedGraph = encodeDirectedGraph 18 dGraph1
 
 main = do
 {--
   putStrLn "The first matrix is:"
-  putStrLn $ printMat matrix1
+  putStrLn $ iMat2String matrix1
   putStrLn "It's kernel is:"
-  putStrLn $ printMat $ kernelInt matrix1
+  putStrLn $ iMat2String $ kernelInt matrix1
   putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ printMat $ kernelIntPar matrix1
+  putStrLn $ iMat2String $ kernelIntPar matrix1
   putStrLn "The kernel should be:"
-  putStrLn $ printMat kernel1
+  putStrLn $ iMat2String kernel1
 
   putStrLn "The second matrix is:"
-  putStrLn $ printMat matrix2
+  putStrLn $ iMat2String matrix2
   putStrLn "It's kernel is:"
-  putStrLn $ printMat $ kernelInt matrix2
+  putStrLn $ iMat2String $ kernelInt matrix2
   putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ printMat $ kernelIntPar matrix2
+  putStrLn $ iMat2String $ kernelIntPar matrix2
   putStrLn "The kernel should be:"
-  putStrLn $ printMat kernel2
+  putStrLn $ iMat2String kernel2
 
   putStrLn "The third matrix is:"
-  putStrLn $ printMat matrix3
+  putStrLn $ iMat2String matrix3
   putStrLn "It's kernel is:"
-  putStrLn $ printMat $ kernelInt matrix3
+  putStrLn $ iMat2String $ kernelInt matrix3
   putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ printMat $ kernelIntPar matrix3
+  putStrLn $ iMat2String $ kernelIntPar matrix3
   putStrLn "The kernel should be:"
-  putStrLn $ printMat kernel3
+  putStrLn $ iMat2String kernel3
 
   putStrLn "The fourth matrix is:"
-  putStrLn $ printMat matrix4
+  putStrLn $ iMat2String matrix4
   putStrLn "It's Smith normal form is:"
-  putStrLn $ printMat $ normalFormInt matrix4
+  putStrLn $ iMat2String $ normalFormInt matrix4
   putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ printMat $ normalFormIntPar matrix4
+  putStrLn $ iMat2String $ normalFormIntPar matrix4
   putStrLn "The Smith Normal form should be:"
-  putStrLn $ printMat $ snf4
+  putStrLn $ iMat2String $ snf4
 
   putStrLn "The fifth matrix is:"
-  putStrLn $ printMat matrix5
+  putStrLn $ iMat2String matrix5
   putStrLn "It's Smith normal form is:"
-  putStrLn $ printMat $ normalFormInt matrix5
+  putStrLn $ iMat2String $ normalFormInt matrix5
   putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ printMat $ normalFormIntPar matrix5
+  putStrLn $ iMat2String $ normalFormIntPar matrix5
   putStrLn "The Smith Normal form should be:"
-  putStrLn $ printMat $ snf5
+  putStrLn $ iMat2String $ snf5
 
   putStrLn "The sixth matrix is:"
-  putStrLn $ printMat matrix6
+  putStrLn $ iMat2String matrix6
   putStrLn "It's Smith normal form is:"
-  putStrLn $ printMat $ normalFormInt matrix6
+  putStrLn $ iMat2String $ normalFormInt matrix6
   putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ printMat $ normalFormIntPar matrix6
+  putStrLn $ iMat2String $ normalFormIntPar matrix6
   --}
   {--
-  putStrLn "The Vietoris-Rips complex of the first point cloud, scale 10.0, is:"
-  putStrLn $ sc2String testVR
-  putStrLn "Distances in the neighborhood graph:"
-  putStrLn $ L.intercalate "\n" $
-    L.map show $ V.toList $ V.map (\e -> metric2 (pointCloud1 !! (e ! 0)) (pointCloud1 !! (e ! 1))) $ V.map fst $ (snd testVR) ! 0
-  --}
-  {--
-  putStrLn "The homology groups over the integers are:"
+  putStrLn "The homology groups of the first point cloud over the integers are:"
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology testVR
   --}
   {--
-  putStrLn "The Betti numbers are:"
+  putStrLn "The Betti numbers of the first point cloud are:"
   putStrLn $ intercalate "\n" $ L.map show $ bettiNumbersPar testVR
-  --}
-  {--
-  putStrLn "The filtration of pointCloud2 is:"
-  putStrLn $ filtr2String testFiltration
   --}
   {--
   putStrLn "The bar codes of pointCloud2 are:"
@@ -474,47 +443,34 @@ main = do
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 5.0 metric2 pointCloud2
   --}
   {--
-  putStrLn "Very simple filtration test:"
-  putStrLn $ filtr2String simpleFiltration
-  --putStrLn $ intercalate "\n" $ L.map show $ persistentHomology simpleFiltration
-  --}
-  {--
-  putStrLn "Filtration for the octahedron cloud:"
-  putStrLn $ filtr2String octahedron
-  --}
-  {--
   putStrLn "Bar codes for an octahedron:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology octahedron
-  --}
-  {--
-  putStrLn "VR Complex scale 5 for square cloud:"
-  --putStrLn $ show $ makeNbrhdGraph 5.0 metric2 sqrCloud
-  putStrLn $ sc2String $ fst $ makeVRComplexFast 3.5 metric2 sqrCloud
-  --}
-  {--
-  putStrLn "Square filtration:"
-  putStrLn $ filtr2String square
   --}
   {--
   putStrLn "Bar codes for a square:"
   putStrLn $ intercalate "\n" $ L.map show $ persistentHomology square
   --}
   {--
-  putStrLn "The Hasse Diagram of the directed graph encoded by [(0,1),(1,2),(2,3)]:"
-  putStrLn $ L.intercalate "\n" $ V.toList $ V.map show $ encodeGraph 4 [(0,1),(1,2),(2,3)]
+  putStrLn "The Hasse Diagram of the directed graph encoded by [(0,1),(1,2),(2,3),(3,0),(2,0)]:"
+  putStrLn $ L.intercalate "\n" $ V.toList $ V.map show $ encodeDirectedGraph 4 [(0,1),(1,2),(2,3),(3,0),(2,0)]
   --}
   {--
-  putStrLn "The directed flag complex:"
-  putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex $ encodeGraph 4 [(0,1),(1,2),(2,3),(3,0),(2,0)]
+  putStrLn "The directed flag complex of [(0,1),(1,2),(2,3),(3,0),(2,0)]:"
+  putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex $ encodeDirectedGraph 4 [(0,1),(1,2),(2,3),(3,0),(2,0)]
   --}
-  {--
+  {--}
+  putStrLn "The Hasse Diagram of the directed graph:"
+  putStrLn $ hsd2String directedGraph
+  {--}
   putStrLn "The directed clique complex of the directed graph:"
-  putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex $ encodeGraph 18 dGraph1
+  putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex directedGraph
   --}
   {--
   putStrLn "Persistent homology of points sampled from a mobius strip:"
   putStrLn $ intercalate "\n" $ L.map show $
     L.map (L.filter (\(a, b) -> case b of Nothing -> True; Just c -> c /= a)) $ persistentHomology mobiusStrip
   --}
+  {--
   putStrLn "Simplicial homology of a Mobius strip:"
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 0.3 metric3 mobius
+  --}

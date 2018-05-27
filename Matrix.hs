@@ -16,6 +16,8 @@ Bool is an instance of Num here (instance given in Util) so that functions can b
 module Matrix
   ( IMatrix
   , BMatrix
+  , iMat2String
+  , bMat2String
   , getDiagonal
   , getUnsignedDiagonal
   , transposeMat
@@ -64,6 +66,30 @@ type IMatrix = Vector (Vector Int)
 
 -- | Matrix of integers modulo 2. Alternatively, matrix over the field wit h2 elements.
 type BMatrix = Vector (Vector Bool)
+
+-- | Display an integer matrix.
+iMat2String :: IMatrix -> String
+iMat2String mat =
+  let printVec vec =
+        if V.null vec then ""
+        else
+          let x = V.head vec
+          in (show x) L.++ ((if x < 0 then " " else "  ") L.++ (printVec $ V.tail vec))
+      print m =
+        if V.null m then ""
+        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
+  in print mat
+
+-- | Display a boolean matrix (as 1's and 0's).
+bMat2String :: BMatrix -> String
+bMat2String mat =
+  let printVec vec =
+        if V.null vec then ""
+        else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
+      print m =
+        if V.null m then ""
+        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
+  in print mat
 
 -- | Take the transpose a matrix (no fancy optimizations, yet).
 transposeMat :: Vector (Vector a) -> Vector (Vector a)
@@ -164,7 +190,7 @@ chooseGaussPivotInt (rowIndex, colIndex) mat =
       else
         let j = V.head indices
         in
-          if row ! j == 0 then error "The pivot was found to be zero, Matrix.hs line 167"
+          if row ! j == 0 then error "The pivot was found to be zero, Matrix.hs line 193"
           else Just (V.length indices > 1, V.map (switchElems colIndex j) mat, Just (colIndex, j))
     else Just (V.length indices > 0, mat, Nothing)
 
@@ -181,7 +207,7 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
           in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if pivot == 0 then
               if forallVec (\a -> a == 0) row then mat
-              else error "Pivot was found to be zero, Matrix.hs line 184"
+              else error "Pivot was found to be zero, Matrix.hs line 210"
             else
               if x == 0 || (x `mod` pivot == 0) then
                 improve next mat

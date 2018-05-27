@@ -22,6 +22,7 @@ Persistent homology is the main event of topological data analysis. It allows on
 module Persistence
   ( Filtration
   , BarCode
+  , Extended
   , sim2String
   , filtr2String
   , getComplex
@@ -53,6 +54,9 @@ import Data.Algorithm.MaximalCliques
 -}
 type Filtration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
 
+-- | (i, Just j) is a feature that appears at filtration index i and disappears at index j, (i, Nothing) begins at i and doesn't disappear.
+type BarCode = (Int, Maybe Int)
+
 -- | Type for representing inifinite bottleneck distance.
 data Extended a = Finite a | Infinity deriving Eq
 
@@ -73,9 +77,6 @@ instance (Ord a, Eq a) => Ord (Extended a) where
   Infinity <= Finite _ = False
   Finite _ <= Infinity = True
   Finite a <= Finite b = a <= b
-
--- | (i, Just j) is a feature that appears at filtration index i and disappears at index j, (i, Nothing) begins at i and doesn't disappear.
-type BarCode = (Int, Maybe Int)
 
 -- | Shows all the information in a simplex.
 sim2String :: (Int, Vector Int, Vector Int) -> String

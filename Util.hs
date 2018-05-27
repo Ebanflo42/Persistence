@@ -284,6 +284,12 @@ vector1 |^| vector2 =
             Nothing -> calc acc xs
   in calc V.empty vector1
 
+smartSnoc :: Eq a => Vector a -> a -> Vector a
+smartSnoc v e =
+  case V.elemIndex e v of
+    Just _  -> v
+    Nothing -> v `snoc` e
+
 -- | Returns whether or not there is an element that satisfies the predicate.
 existsVec :: (a -> Bool) -> Vector a -> Bool
 existsVec p v
