@@ -284,6 +284,7 @@ vector1 |^| vector2 =
             Nothing -> calc acc xs
   in calc V.empty vector1
 
+-- | snocs the element if an only if it isn't already in the vector.
 smartSnoc :: Eq a => Vector a -> a -> Vector a
 smartSnoc v e =
   case V.elemIndex e v of

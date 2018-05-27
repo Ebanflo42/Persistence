@@ -182,6 +182,7 @@ dGraph1 =
   , ( 1,  4)
   , ( 1,  6)
   , ( 1,  7)
+  , ( 2,  4)
   , ( 2,  6)
   , ( 2,  7)
   , ( 3,  2)
@@ -368,6 +369,8 @@ mobiusStrip = makeVRFiltrationFast [0.35, 0.3, 0.25, 0.2] metric3 mobius
 
 directedGraph = encodeDirectedGraph 18 dGraph1
 
+dCliqueComplex = toSimplicialComplex $ directedFlagComplex directedGraph
+
 main = do
 {--
   putStrLn "The first matrix is:"
@@ -458,19 +461,20 @@ main = do
   putStrLn "The directed flag complex of [(0,1),(1,2),(2,3),(3,0),(2,0)]:"
   putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex $ encodeDirectedGraph 4 [(0,1),(1,2),(2,3),(3,0),(2,0)]
   --}
-  {--}
+  {--
   putStrLn "The Hasse Diagram of the directed graph:"
   putStrLn $ hsd2String directedGraph
+  --}
   {--}
   putStrLn "The directed clique complex of the directed graph:"
-  putStrLn $ sc2String $ toSimplicialComplex $ directedFlagComplex directedGraph
+  putStrLn $ sc2String dCliqueComplex
   --}
-  {--
+  {--}
   putStrLn "Persistent homology of points sampled from a mobius strip:"
   putStrLn $ intercalate "\n" $ L.map show $
     L.map (L.filter (\(a, b) -> case b of Nothing -> True; Just c -> c /= a)) $ persistentHomology mobiusStrip
   --}
-  {--
+  {--}
   putStrLn "Simplicial homology of a Mobius strip:"
   putStrLn $ intercalate "\n" $ L.map show $ simplicialHomology $ fst $ makeVRComplexFast 0.3 metric3 mobius
   --}

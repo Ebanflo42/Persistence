@@ -1,9 +1,11 @@
 # Persistence
 A topological data analysis library for Haskell.
 
-The objective of the library is to provide users with the ability to deduce topological features of metric spaces and graphs. If you have a function (a metric, for example) that takes two points in your data to an element of an ordered set then you can use Persistence to analyze the topology of your data.
+The objective of the library is to provide users with the ability to deduce the topological features of metric spaces and graphs. If you have a function (a metric, for example) that takes two points in your data to an element of an ordered set, you can use Persistence to analyze the topology of your data.
 
-Visit https://hackage.haskell.org/package/Persistence to see the documentation of the stable version. There is also documentation in each module.
+Visit https://hackage.haskell.org/package/Persistence to see the documentation for the stable version. There is also documentation in each module.
+
+GitHub: https://github.com/Ebanflo42/Persistence
 
 Relevant files for development: Util.hs, Matrix.hs, SimplicialComplex.hs, HasseDiagram.hs, Persistence.hs, Testing.hs
 
@@ -38,10 +40,6 @@ https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
 `SimplicialComplex.hs`:
 
 1) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
-
-`HasseDiagram.hs`:
-
-1) Test construction of the directed clique complex.
 
 `Persistence.hs`:
 

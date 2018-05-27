@@ -9,11 +9,13 @@ This module implements algorithms for admissible Hasse diagrams. A Hasse diagram
 
 A node in the diagram is represented as a tuple: the indices of the level 0 nodes in the diagram that are reachable from this node, the indices of targets in the next lowest level, and the indices of the sources in the next highest level. The entire diagram is simply an array where each entry is an array representing a particular level; index 0 represents level 0, etc.
 
-Any directed graph can be encoded as an admissible Hasse diagram with 2 levels. The edges are level 1 and the vertices are level 0. The ordering on the targets of a node representing an edge is simply the initial vertex first and the final vertex second.
+Any directed graph can be encoded as an admissible Hasse diagram with 2 levels. The edges are level 1 and the vertices are level 0. The ordering on the targets of a node representing an edge is simply the terminal vertex first and the initial vertex second. This may be counterintuitive, but its helpful to interpret an arrow between two vertices as the "<" operator. This induces a linear ordering on the vertices of any acyclic complete subgraph - which is what the nodes in the Hasse diagram of the directed clique complex represent.
 
-Any oriented simplicial complex can also be encoded as an admissible Hasse diagram. A node is a simplex, the targets are the faces of the simplex, and the sources are simplices of which this simplex is a face.
+Any oriented simplicial complex can also be encoded as an admissible Hasse diagram. A node is a simplex, the targets are the faces of the simplex, and the sources are simplices of which the given simplex is a face.
 
-The main feature of this module is an algorithm which takes the Hasse diagram of a directed graph and generates the Hasse diagram of the directed flag complex - the simplicial complex whose simplices are acyclic directed subgraphs of the given graph.
+The main feature of this module is an algorithm which takes the Hasse diagram of a directed graph and generates the Hasse diagram of the directed flag complex - the simplicial complex whose simplices are acyclic complete subgraphs of the given graph. Here acyclic refers to a directed graph without any sequence of arrows whose heads and tails match up an which has the same start and end vertex.
+
+The idea is that, if your directed graph represents any kind of information flow, "sub-modules" in the network that simply take input, process it using its nodes, and then output it without spinning the information around at all. These "sub-modules" are the directed cliques/flags which I've been referring to as acyclic complete subgraphs up to this point. Constructing a simplicial complex out of them will allow you to both simplify the 1-dimensional topology of the network and possibly detect higher-dimensional topological features.
 
 -}
 
@@ -32,14 +34,23 @@ import SimplicialComplex
 import Data.List as L
 import Data.Vector as V
 
---vertices, faces, parents
+{- |
+  Type representing a node in a Hasse diagram.
+  Hasse diagrams are being used to represent simplicial complexes so each node represents a simplex
+  Contents of the tuple in order: Vector of references to vertices of the underlying directed graph,
+  vector of references to the simplices faes in the next lowest level of the Hasse diagram,
+  vector of references to "parent" simplices (simplices who have this simplex as a face) in the next highest level of the Hasse diagram.
+-}
 type Node = (Vector Int, Vector Int, Vector Int)
 
+-- | Type representing an admissible Hasse diagram. Each entry in the vector represents a level in the Hasse diagram.
 type HasseDiagram = Vector (Vector Node)
 
+-- | Simple printing function for Hasse diagrams.
 hsd2String :: HasseDiagram -> String
 hsd2String = (L.intercalate "\n\n") . V.toList . (V.map (L.intercalate "\n" . V.toList . V.map show))
 
+-- | Given the number of vertices in a directed graph, and pairs representing the direction of each edge (initial, terminal), construct a Hasse diagram representing the graph.
 encodeDirectedGraph :: Int -> [(Int, Int)] -> HasseDiagram
 encodeDirectedGraph numVerts cxns =
   let verts       = V.map (\n -> (n `cons` V.empty, V.empty, V.empty)) $ 0 `range` (numVerts - 1)
@@ -54,6 +65,7 @@ encodeDirectedGraph numVerts cxns =
 
   in encodeEdges 0 verts V.empty cxns
 
+-- | Given a Hasse diagram representing a directed graph, construct the diagram representing the directed clique/flag complex of the graph.
 directedFlagComplex :: HasseDiagram -> HasseDiagram
 directedFlagComplex directedGraph =
   let edges    = V.last directedGraph
@@ -127,6 +139,7 @@ directedFlagComplex directedGraph =
 
   in loopLevels 0 directedGraph edges fstSinks
 
+-- | Convert a Hasse diagram to a simplicial complex.
 toSimplicialComplex :: HasseDiagram -> SimplicialComplex
 toSimplicialComplex diagram =
   let sc = V.map (V.map not3) $ V.tail diagram

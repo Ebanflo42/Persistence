@@ -17,6 +17,8 @@ IMPORTANT NOTE: This library currently only handles filtrations where all the ve
 
 Persistent homology is the main event of topological data analysis. It allows one to identify clusters, holes, and voids that persist in the data throughout many scales. The output of the persistence algorithm is a barcode diagram, which currently have a somewhat crude representation in this library. A single barcode represents the filtration index where a feature appears and the index where it disappears (if it does). Thus, short barcodes are typically interpretted as noise and long barcodes are interpretted as actual features.
 
+After you've got the persistent homology of a data set, you might want to compare it with that of a different data set. That's why this release includes two versions of "bottleneck distance," one works only if the number of features in each data set is the same and the other works regardless.
+
 -}
 
 module Persistence
@@ -112,7 +114,7 @@ getDimension = V.length . snd
 {- |
   Given a list of scales, a simplicial complex, and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
   this function creates a filtration out of a simplicial complex by removing simplices that contain edges that are too long for each scale in the list.
-  Really, this is a helper function to be called by makeVRFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
+  This is really a helper function to be called by makeVRFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
   The scales MUST be in decreasing order for this function.
 -}
 filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> Filtration
@@ -274,7 +276,11 @@ persistentHomology (numVerts, allSimplices) =
 
   in makeInfiniteBarCodes $ makeFiniteBarCodes 1 (V.length allSimplices) [fstCodes] (verts `cons` (fstMarked `cons` V.empty)) (fstSlots `cons` V.empty)
 
--- | Return the maximum of minimum distances bewteen the bar codes. Note that this isn't actual bottleneck distance because the number of barcodes isn't required to be the same for each list.
+{- |
+  Return the maximum of minimum distances bewteen the bar codes.
+  It's important to note that the function isn't "unsafe" in the sense that it will throw an exception,
+  it will just give you a distance regardless of whether or not there is the same number of barcodes is in each list.
+-}
 bottelNeckDistance :: [BarCode] -> [BarCode] -> Extended Double
 bottelNeckDistance diagram1 diagram2 =
   let v1 = V.fromList diagram1
@@ -313,7 +319,7 @@ safeBottelNeckDistance diagram1 diagram2 =
 
     in Just $ foldRelation (<) $ V.map (\p -> foldRelation (>) $ V.map (metric p) v2) v1
 
--- |  Get's all the bottle neck distances; a good way to determine the similarity of the topology of two filtrations.
+-- |  Safely get all the bottle neck distances; a good way to determine the similarity of the topology of two filtrations.
 safeBottelNeckDistances :: [[BarCode]] -> [[BarCode]] -> [Maybe (Extended Double)]
 safeBottelNeckDistances diagrams1 diagrams2 =
   let d = (L.length diagrams1) - (L.length diagrams2)

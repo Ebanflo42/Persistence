@@ -9,11 +9,11 @@ This module provides functions for constructing neighborhood graphs, clique comp
 
 An important thing to know about this module is the difference between "fast" and "light" functions. Fast functions encode the metric in a 2D vector, so that distances don't need to be computed over and over again and can instead be accessed in constant time. Unfortunately, this takes O(n^2) memory so I would strongly recomend against using it for larger data sets; this is why "light" functions exist.
 
-A neighborhood graph is a graph where an edge exists between two vertices if and only if the vertices fall within a given distance of each other. Graphs here are more of a helper data type for constructing filtrations, which is why they have a somewhat odd representation.
+A neighborhood graph is a graph where an edge exists between two vertices if and only if the vertices fall within a given distance of each other. Graphs here are more of a helper data type for constructing filtrations, which is why they have a somewhat odd representation. Not to worry though, I've supplied a way of encoding graphs of a more generic representation.
 
 The clique complex of a graph is a simplicial complex whose simplices are the complete subgraphs of the given graph. The Vietoris-Rips complex is the clique complex of the neighborhood graph.
 
-Betti numbers measure the number of n-dimensional holes in a given simplicial complex. The 0th Betti number is the number of connected components, or clusters; the 1st Betti number is the number of loops or tunnels; then 2nd Betti number measures voids or hollow volumes; and if you have high-dimensional data, you might have higher Betti numbers representing the number of high-dimensional holes.
+Betti numbers measure the number of n-dimensional holes in a given simplicial complex. The 0th Betti number is the number of connected components, or clusters; the 1st Betti number is the number of loops or tunnels; the 2nd Betti number measures voids or hollow volumes; and if you have high-dimensional data, you might have higher Betti numbers representing the number of high-dimensional holes.
 
 -}
 
@@ -22,6 +22,7 @@ module SimplicialComplex
   , Graph
   , sc2String
   , getDim
+  , encodeWeightedGraph
   , makeNbrhdGraph
   , makeCliqueComplex
   , makeVRComplexFast
@@ -46,12 +47,20 @@ import Data.Algorithm.MaximalCliques
 {- |
   The first component of the pair is the number of vertices.
   The second component is a vector whose entries are vectors of simplices of the same dimension.
-  The dimension starts at 1 because there is no need to store individual vertices.
-  A simplex is represented as a pair: the vector of its vertices in the original data set from which the complex was constructed,
-  and the vector of the indices of the faces in the next lowest dimension. Edges are the exception - they do not store reference to their
-  faces because it would be redundant with their vertices.
+  Index 0 of the vecor corresponds to dimension 1 because there is no need to store individual vertices.
+  A simplex is represented as a pair: the vector of its vertices (represent by their index in the original data set),
+  and the vector of the indices of the faces in the next lowest dimension. Edges are the exception to the last part -
+  they do not store reference to their faces because it would be redundant with their vertices.
 -}
 type SimplicialComplex = (Int, Vector (Vector (Vector Int, Vector Int)))
+
+{- |
+  This represents the (symmetric) adjacency matrix of some weighted undirected graph. The type `a` is whatever distance is in your data analysis regime.
+  The reason graphs are represented like this is because their main function is too speed up the construction of simplicial complexes and filtrations.
+  If the clique complex of this graph were to be constructed, only the adjacencies would matter. But if a filtration is constructed all the distances
+  will be required over and over again - this allows them to be accessed in constant time.
+-}
+type Graph a = Vector (Vector (a, Bool))
 
 -- | Show all the information in a simplicial complex.
 sc2String :: SimplicialComplex -> String
@@ -72,12 +81,14 @@ getDim :: SimplicialComplex -> Int
 getDim = L.length . snd
 
 {- |
-  This represents the (symmetric) adjacency matrix of some undirected graph. The type `a` is whatever distance is in your data analysis regime.
-  The reason graphs are represented like this is because their main function is too speed up the construction of simplicial complexes and filtrations.
-  If the clique complex of this graph were to be constructed, only the adjacencies would matter. But if a filtration is constructed all the distances
-  will be required over and over again - this allows them to be accessed in constant time.
+  Takes the number of vertices and each edge paired with its weight to output the graph encoded as a 2D vector.
+  If only you have an unweighted graph, you can still encode your graph by simply letting the type `a` be `()`.
+  If you have a weighted graph but there isn't a distance between every vertex, you can use the `Extended` type (essentially the same as Maybe)
+  from the Persistence module which is already an instance of Ord.
 -}
-type Graph a = Vector (Vector (a, Bool))
+encodeWeightedGraph :: Int -> (Int -> Int -> (a, Bool)) -> Graph a
+encodeWeightedGraph numVerts edge =
+  mapWithIndex (\i r -> mapWithIndex (\j _ -> edge i j) r) $ V.replicate numVerts (V.replicate numVerts ())
 
 {- |
   The first argument is a scale, the second is a metric, and the third is the data.

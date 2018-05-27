@@ -64,7 +64,7 @@ import Control.Parallel.Strategies
 -- | Matrix of integers.
 type IMatrix = Vector (Vector Int)
 
--- | Matrix of integers modulo 2. Alternatively, matrix over the field wit h2 elements.
+-- | Matrix of integers modulo 2. Alternatively, matrix over the field with 2 elements.
 type BMatrix = Vector (Vector Bool)
 
 -- | Display an integer matrix.
