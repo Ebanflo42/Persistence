@@ -4,7 +4,7 @@ version:             1.1
 
 synopsis:            Deduce topological features of metric spaces, graphs, or any data with a binary function into an ordered set.
 
-description:         Persistence is a topological data analysis library motivated by flexibility when it comes to the type of data being analyzed. If you have data that comes with a meaningful function into something of the Ord typeclass, you can use Persistence to detect clusters and holes in the data. You can also use the library to analyze the topology of directed/undirected weighted/unweighted graphs, and compare topologies of different data sets.
+description:         Persistence is a topological data analysis library motivated by flexibility when it comes to the type of data being analyzed. If you have data that comes with a meaningful function into something of the Ord typeclass, you can use Persistence to detect clusters and holes in the data. You can also use the library to analyze the topology of directed\/undirected weighted\/unweighted graphs, and compare topologies of different data sets.
 
 license:             BSD3
 

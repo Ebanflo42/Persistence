@@ -35,6 +35,10 @@ module Persistence
   , filterByWeightsLight
   , makeVRFiltrationLight
   , persistentHomology
+  , bottelNeckDistance
+  , bottelNeckDistances
+  , safeBottelNeckDistance
+  , safeBottelNeckDistances
   ) where
 
 import Util
