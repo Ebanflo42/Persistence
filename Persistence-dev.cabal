@@ -1,6 +1,6 @@
 name:                Persistence-dev
 
-version:             1.1
+version:             1.1.2
 
 synopsis:            Deduce topological features of metric spaces, graphs, or any data with a binary function into an ordered set.
 
@@ -38,7 +38,7 @@ library
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.10, containers >=0.5 && <0.6, vector >=0.12 && <0.13, parallel >=3.2 && <3.3, maximal-cliques >=0.1
+  build-depends:       base >=4.10 && <4.11.2, containers >=0.5 && <0.6, vector >=0.12 && <0.13, parallel >=3.2 && <3.3, maximal-cliques >=0.1
   
   -- Directories containing source files.
   -- hs-source-dirs:      
