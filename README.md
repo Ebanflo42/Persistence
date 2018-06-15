@@ -47,6 +47,8 @@ Many of these are breaking API changes and so will be included in Persistence-2.
 
 1) Rename to `Filtration.hs` (Persistent homology isn't the only thing that it does).
 
+2) Add a new type that can represent filtrations whose vertices don't all necessarily have filtration index 0 (this is unlikely to arise in applications, but its useful for approximating Morse functions).
+
 2) Change the type synonym for barcodes to `(a, Extended a)` so that bar codes can encode the scales at which features exist, not just the filtration indices. Bottleneck distance functions that account for these types of bar codes also need to be made.
 
 3) Persistent homology functions which identify the vertices where features occur also need to be implemented.
