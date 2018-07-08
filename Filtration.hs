@@ -1,5 +1,5 @@
 {- |
-Module     : Persistence.Persistence
+Module     : Persistence.Filtration
 Copyright  : (c) Eben Cowley, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
@@ -21,10 +21,11 @@ After you've got the persistent homology of a data set, you might want to compar
 
 -}
 
-module Persistence
-  ( Filtration
+module Filtration
+  ( SimpleFiltration
+  , Filtration
   , BarCode
-  , Extended
+  , Extended (Finite, Infinity)
   , sim2String
   , filtr2String
   , getComplex
@@ -53,19 +54,25 @@ import Data.Algorithm.MaximalCliques
 --DATA TYPES--------------------------------------------------------------
 
 {- |
+  A type representing a filtration whose vertices all have filtration index 0. Slightly faster and slightly less memory usage.
   The first component is simply the number of vertices (all vertices are assumed to have filtration index 0).
   The second component is a vector with an entry for each dimension of simplices, starting at dimension 1 for edges.
   Each simplex is represented as a triple: its filtration index, the indices of its vertices in the original data, and the indices of its faces in the next lowest dimension.
   Edges do not have reference to their faces, as it would be redundant with their vertices. All simplices are sorted according to filtration index upon construction of the filtration.
 -}
-type Filtration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
+type SimpleFiltration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
 
--- | (i, Just j) is a feature that appears at filtration index i and disappears at index j, (i, Nothing) begins at i and doesn't disappear.
-type BarCode = (Int, Maybe Int)
+
+-- | The same as SimpleFiltration except the first component is a vector representing each vertex's filtration index.
+type Filtration = (Vector Int, Vector (Vector (Int, Vector Int, Vector Int)))
 
 -- | Type for representing inifinite bottleneck distance.
-data Extended a = Finite a | Infinity deriving Eq
+data Extended a = Finite a | Infinity deriving (Eq, Show)
 
+-- | (i, Just j) is a feature that appears at filtration index i and disappears at index j, (i, Nothing) begins at i and doesn't disappear.
+type BarCode a = (a, Extended a)
+
+-- | The ordering is inherited from the type a, Infinity is greater than everything else.
 instance (Ord a, Eq a) => Ord (Extended a) where
   Infinity > Infinity  = False
   Infinity > Finite _  = True
@@ -92,26 +99,34 @@ sim2String (index, vertices, faces) =
       "; Boundary indices: " L.++ (show faces) L.++ "\n"
 
 -- | Shows all the information in a filtration.
-filtr2String :: Filtration -> String
-filtr2String = (intercalate "\n") . toList . (V.map (L.concat . toList . (V.map sim2String))) . snd
+filtr2String :: Either SimpleFiltration Filtration -> String
+filtr2String (Left f)  =
+  "Simple filtration:\n" L.++ ((intercalate "\n") $ toList $ V.map (L.concat . toList . (V.map sim2String)) $ snd f)
+filtr2String (Right f) =
+  ("Vertex filtration indices: " L.++ (intercalate " " $ V.toList $ V.map show $ fst f))
+    L.++ ((intercalate "\n") $ toList $ V.map (L.concat . toList . (V.map sim2String)) $ snd f)
 
 -- | Gets the simplicial complex specified by the filtration index. This is O(n) with respect to the number of simplices.
-getComplex :: Int -> Filtration -> SimplicialComplex
-getComplex index (n, simplices) = (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
+getComplex :: Int -> Either SimpleFiltration Filtration -> SimplicialComplex
+getComplex index (Left (n, simplices))  = (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
+getComplex index (Right (v, simplices)) =
+  (V.length $ V.filter (\i -> i <= index) v, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
 
 {- |
   The first argument is a list of dimensions, the second argument is a list of filtration indices.
   The function returns the number of simplices in the filtration whose dimension and index exist in the respective lists.
 -}
-getNumSimplices :: [Int] -> [Int] -> Filtration -> Int
-getNumSimplices dimensions indices (_, simplices) =
-  L.length $ L.concat $
-    L.map (\d -> V.toList $ V.filter (\(i, _, _) ->
-      L.elemIndex i indices /= Nothing) $ simplices ! (d - 1)) dimensions
+getNumSimplices :: [Int] -> [Int] -> Either SimpleFiltration Filtration -> Int
+getNumSimplices dimensions indices filtr =
+  let simplices = (\x -> case x of Left a -> snd a; Right b -> snd b) filtr
+  in
+    L.length $ L.concat $
+      L.map (\d -> V.toList $ V.filter (\(i, _, _) ->
+        L.elemIndex i indices /= Nothing) $ simplices ! (d - 1)) dimensions
 
 -- | Return the dimension of the highest dimensional simplex in the filtration (constant time).
-getDimension :: Filtration -> Int
-getDimension = V.length . snd
+getDimension :: Either SimpleFiltration Filtration -> Int
+getDimension = V.length . (\x -> case x of Left a -> snd a; Right b -> snd b)
 
 --FILTRATION CONSTRUCTION-------------------------------------------------
 
@@ -121,7 +136,7 @@ getDimension = V.length . snd
   This is really a helper function to be called by makeVRFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
   The scales MUST be in decreasing order for this function.
 -}
-filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> Filtration
+filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> SimpleFiltration
 filterByWeightsFast scales ((numVerts, simplices), graph) =
   let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
       edgeTooLong scale edge     = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
@@ -158,11 +173,11 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
   Given a list of scales, a metric, and a data set, this function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
   The scales MUST be in decreasing order. Note that this a fast function, meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
 -}
-makeVRFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
+makeVRFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> SimpleFiltration
 makeVRFiltrationFast scales metric dataSet = filterByWeightsFast scales $ makeVRComplexFast (L.head scales) metric dataSet
 
 -- | The same as filterbyWeightsFast except it uses far less memory at the cost of speed. Note that the scales must be in decreasing order.
-filterByWeightsLight :: Ord a => [a] -> (b -> b -> a) -> [b] -> SimplicialComplex -> Filtration
+filterByWeightsLight :: Ord a => [a] -> (b -> b -> a) -> [b] -> SimplicialComplex -> SimpleFiltration
 filterByWeightsLight scales metric dataSet (numVerts, simplices) =
   let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
       vector                     = V.fromList dataSet
@@ -197,7 +212,7 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
 -- | Given a list of scales in decreasing order, a metric, and a data set, this constructs the filtration of Vietoris-Rips complexes corresponding to the scales.
-makeVRFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> Filtration
+makeVRFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> SimpleFiltration
 makeVRFiltrationLight scales metric dataSet = filterByWeightsLight scales metric dataSet $ makeVRComplexLight (L.head scales) metric dataSet
 
 --PERSISTENT HOMOLOGY-----------------------------------------------------
@@ -207,7 +222,7 @@ makeVRFiltrationLight scales metric dataSet = filterByWeightsLight scales metric
   That is, the first list will represent clusters, the second list will represent tunnels or punctures,
   the third will represent hollow volumes, and the nth index list will represent n-dimensional holes in the data.
 -}
-persistentHomology :: Filtration -> [[BarCode]]
+persistentHomology :: SimpleFiltration -> [[BarCode Int]]
 persistentHomology (numVerts, allSimplices) =
   let
       --union minus intersection
@@ -232,7 +247,7 @@ persistentHomology (numVerts, allSimplices) =
             Nothing -> chain
             Just t  -> removePivotRows reduced (chain `uin` t) --eliminate the element corresponding to the pivot in a different chain
 
-      makeBarCodesAndMark :: Int -> Int -> Vector Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode], Vector Int) -> ([BarCode], Vector Int, Vector Int)
+      makeBarCodesAndMark :: Int -> Int -> Vector Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode Int], Vector Int) -> ([BarCode Int], Vector Int, Vector Int)
       makeBarCodesAndMark dim index marked reduced simplices (codes, newMarked)
         | V.null simplices = (codes, newMarked, V.findIndices (\x -> x == Nothing) reduced)
         | V.null d         = makeBarCodesAndMark dim (index + 1) marked reduced (V.tail simplices) (codes, newMarked `snoc` index)
@@ -240,34 +255,34 @@ persistentHomology (numVerts, allSimplices) =
           let maxindex = V.head d
               begin    = one $ allSimplices ! (dim - 1) ! maxindex
           in makeBarCodesAndMark dim (index + 1) marked (replaceElem maxindex (Just d) reduced) (V.tail simplices)
-              ((begin, Just i):codes, newMarked)
+              ((begin, Finite i):codes, newMarked)
         where (i, v, f) = V.head simplices
               d         = removePivotRows reduced $ removeUnmarked marked f
 
-      makeEdgeCodes :: Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode], Vector Int) -> ([BarCode], Vector Int, Vector Int)
+      makeEdgeCodes :: Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode Int], Vector Int) -> ([BarCode Int], Vector Int, Vector Int)
       makeEdgeCodes index reduced edges (codes, marked)
         | V.null edges = (codes, marked, V.findIndices (\x -> x == Nothing) reduced)
         | V.null d     =
           makeEdgeCodes (index + 1) reduced (V.tail edges) (codes, marked `snoc` index)
         | otherwise    =
-          makeEdgeCodes (index + 1) (replaceElem (V.head d) (Just d) reduced) (V.tail edges) ((0, Just i):codes, marked)
+          makeEdgeCodes (index + 1) (replaceElem (V.head d) (Just d) reduced) (V.tail edges) ((0, Finite i):codes, marked)
         where (i, v, f) = V.head edges
               d         = removePivotRows reduced f
 
-      makeFiniteBarCodes :: Int -> Int -> [[BarCode]] -> Vector (Vector Int) -> Vector (Vector Int) -> ([[BarCode]], Vector (Vector Int), Vector (Vector Int))
+      makeFiniteBarCodes :: Int -> Int -> [[BarCode Int]] -> Vector (Vector Int) -> Vector (Vector Int) -> ([[BarCode Int]], Vector (Vector Int), Vector (Vector Int))
       makeFiniteBarCodes dim maxdim barcodes marked slots =
         if dim == maxdim then (barcodes, marked, slots)
         else
           let (newCodes, newMarked, unusedSlots) = makeBarCodesAndMark dim 0 (V.last marked) (V.replicate (V.length $ allSimplices ! (dim - 1)) Nothing) (allSimplices ! dim) ([], V.empty)
           in makeFiniteBarCodes (dim + 1) maxdim (barcodes L.++ [newCodes]) (marked `snoc` newMarked) (slots `snoc` unusedSlots)
 
-      makeInfiniteBarCodes :: ([[BarCode]], Vector (Vector Int), Vector (Vector Int)) -> [[BarCode]]
+      makeInfiniteBarCodes :: ([[BarCode Int]], Vector (Vector Int), Vector (Vector Int)) -> [[BarCode Int]]
       makeInfiniteBarCodes (barcodes, marked, unusedSlots) =
         let makeCodes i codes =
               let slots = unusedSlots ! i; marks = marked ! i
-              in codes L.++ (V.toList $ V.map (\j -> (one $ allSimplices ! (i - 1) ! j, Nothing)) $ slots |^| marks)
+              in codes L.++ (V.toList $ V.map (\j -> (one $ allSimplices ! (i - 1) ! j, Infinity)) $ slots |^| marks)
             loop _ []     = []
-            loop 0 (x:xs) = (x L.++ (V.toList $ V.map (\j -> (0, Nothing)) $ (unusedSlots ! 0) |^| (marked ! 0))):(loop 1 xs)
+            loop 0 (x:xs) = (x L.++ (V.toList $ V.map (\j -> (0, Infinity)) $ (unusedSlots ! 0) |^| (marked ! 0))):(loop 1 xs)
             loop i (x:xs) = (makeCodes i x):(loop (i + 1) xs)
         in loop 0 barcodes
 
@@ -285,48 +300,33 @@ persistentHomology (numVerts, allSimplices) =
   It's important to note that the function isn't "unsafe" in the sense that it will throw an exception,
   it will just give you a distance regardless of whether or not there is the same number of barcodes is in each list.
 -}
-bottelNeckDistance :: [BarCode] -> [BarCode] -> Extended Double
-bottelNeckDistance diagram1 diagram2 =
+bottelNeckDistance :: Ord a => (BarCode a -> BarCode a -> Extended a) -> [BarCode a] -> [BarCode a] -> Extended a
+bottelNeckDistance metric diagram1 diagram2 =
   let v1 = V.fromList diagram1
       v2 = V.fromList diagram2
-
-      metric (x1, Just y1) (x2, Nothing) = Infinity
-      metric (x1, Nothing) (x2, Just y1) = Infinity
-      metric (x1, Just y1) (x2, Just y2) =
-        let dx = fromIntegral $ x2 - x1; dy = fromIntegral $ y2 - y1
-        in Finite $ sqrt $ dx*dx + dy*dy
-
   in foldRelation (<) $ V.map (\p -> foldRelation (>) $ V.map (metric p) v2) v1
 
 -- |  Get's all the bottle neck distances; a good way to determine the similarity of the topology of two filtrations.
-bottelNeckDistances :: [[BarCode]] -> [[BarCode]] -> [Extended Double]
-bottelNeckDistances diagrams1 diagrams2 =
+bottelNeckDistances :: Ord a => (BarCode a -> BarCode a -> Extended a) -> [[BarCode a]] -> [[BarCode a]] -> [Extended a]
+bottelNeckDistances metric diagrams1 diagrams2 =
   let d = (L.length diagrams1) - (L.length diagrams2)
   in
-    if d >= 0 then (L.zipWith bottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate d Infinity)
-    else (L.zipWith bottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate (-d) Infinity)
-
+    if d >= 0 then (L.zipWith (bottelNeckDistance metric) diagrams1 diagrams2) L.++ (L.replicate d Infinity)
+    else (L.zipWith (bottelNeckDistance metric) diagrams1 diagrams2) L.++ (L.replicate (-d) Infinity)
 
 -- | If the number of barcodes is the same, return the maximum of minimum distances bewteen the bar codes. Otherwise return nothing.
-safeBottelNeckDistance :: [BarCode] -> [BarCode] -> Maybe (Extended Double)
-safeBottelNeckDistance diagram1 diagram2 =
+safeBottelNeckDistance :: Ord a => (BarCode a -> BarCode a -> Extended a) -> [BarCode a] -> [BarCode a] -> Maybe (Extended a)
+safeBottelNeckDistance metric diagram1 diagram2 =
   if L.length diagram1 /= L.length diagram2 then Nothing
   else
     let v1 = V.fromList diagram1
         v2 = V.fromList diagram2
-
-        metric (x1, Just y1) (x2, Nothing) = Infinity
-        metric (x1, Nothing) (x2, Just y1) = Infinity
-        metric (x1, Just y1) (x2, Just y2) =
-          let dx = fromIntegral $ x2 - x1; dy = fromIntegral $ y2 - y1
-          in Finite $ sqrt $ dx*dx + dy*dy
-
     in Just $ foldRelation (<) $ V.map (\p -> foldRelation (>) $ V.map (metric p) v2) v1
 
 -- |  Safely get all the bottle neck distances; a good way to determine the similarity of the topology of two filtrations.
-safeBottelNeckDistances :: [[BarCode]] -> [[BarCode]] -> [Maybe (Extended Double)]
-safeBottelNeckDistances diagrams1 diagrams2 =
+safeBottelNeckDistances :: Ord a => (BarCode a -> BarCode a -> Extended a) -> [[BarCode a]] -> [[BarCode a]] -> [Maybe (Extended a)]
+safeBottelNeckDistances metric diagrams1 diagrams2 =
   let d = (L.length diagrams1) - (L.length diagrams2)
   in
-    if d >= 0 then (L.zipWith safeBottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate d Nothing)
-    else (L.zipWith safeBottelNeckDistance diagrams1 diagrams2) L.++ (L.replicate (-d) Nothing)
+    if d >= 0 then (L.zipWith (safeBottelNeckDistance metric) diagrams1 diagrams2) L.++ (L.replicate d Nothing)
+    else (L.zipWith (safeBottelNeckDistance metric) diagrams1 diagrams2) L.++ (L.replicate (-d) Nothing)

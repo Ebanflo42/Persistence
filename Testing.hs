@@ -2,7 +2,7 @@ import Util
 import Matrix
 import SimplicialComplex
 import HasseDiagram
-import Persistence
+import Filtration
 
 import Data.Vector as V
 import Data.List as L
@@ -472,7 +472,7 @@ main = do
   {--}
   putStrLn "Persistent homology of points sampled from a mobius strip:"
   putStrLn $ intercalate "\n" $ L.map show $
-    L.map (L.filter (\(a, b) -> case b of Nothing -> True; Just c -> c /= a)) $ persistentHomology mobiusStrip
+    L.map (L.filter (\(a, b) -> case b of Infinity -> True; Finite c -> c /= a)) $ persistentHomology mobiusStrip
   --}
   {--}
   putStrLn "Simplicial homology of a Mobius strip:"
