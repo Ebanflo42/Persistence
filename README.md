@@ -39,23 +39,27 @@ https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
 
 `SimplicialComplex.hs`:
 
-1) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
+1) Implement construction of the Cech complex (n points form an (n-1)-simplex if balls of a certain radius centered at each of the points intersect).
 
-`Persistence.hs`:
+2) Implement construction of the alpha-complex (sub-complex of the Delaunay triangulation where the vertices of every simplex are within a certain distance).
+
+3) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
+
+`Filtration.hs`:
 
 Many of these are breaking API changes and so will be included in Persistence-2.0.
 
-1) Add a new type that can represent filtrations whose vertices don't all necessarily have filtration index 0 (this is unlikely to arise in applications, but its useful for approximating Morse functions, and is necessary for a project on computing persistent homology of multiplication tables of finite groups that I want to start).
+1) Persistent homology functions which identify the vertices where features occur need to be implemented.
 
-2) Persistent homology functions which identify the vertices where features occur need to be implemented.
+2) Start implementing persistent homology and filtration construction with parallelism.
 
-4) Start implementing persistent homology and filtration construction with parallelism.
+3) Investigate the possibility of implementing persistence landscapes.
 
 `Testing.hs`:
 
 1) Test the bottleneck distance.
 
-2) Run all tests again using the new features.
+2) Test the persistent homology function that returns barcodes in terms of scales.
 
 3) Make some filtrations whose vertices don't all have index 0 and test persistent homology on them.
 

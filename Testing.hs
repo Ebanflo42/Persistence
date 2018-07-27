@@ -472,7 +472,7 @@ main = do
   {--}
   putStrLn "Persistent homology of points sampled from a mobius strip:"
   putStrLn $ intercalate "\n" $ L.map show $
-    L.map (L.filter (\(a, b) -> case b of Infinity -> True; Finite c -> c /= a)) $ persistentHomology mobiusStrip
+    L.map (L.filter (\(a, b) -> case b of Infinity -> True; Finite c -> c /= a)) $ indexBarCodesSimple mobiusStrip
   --}
   {--}
   putStrLn "Simplicial homology of a Mobius strip:"
