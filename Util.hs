@@ -235,6 +235,10 @@ range x y
 replaceElem :: Int -> a -> Vector a -> Vector a
 replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 
+-- | Replace the element at the given index with the given element.
+replaceElemList :: Int -> a -> [a] -> [a]
+replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
+
 -- | Quicksort treating the given predicate as the < operator. Works like this because its more convenient to make a lambda instead of a complete instance of Ord.
 quicksort :: (a -> a -> Bool) -> Vector a -> Vector a
 quicksort rel vector = --rel is the > operator
@@ -325,3 +329,17 @@ elemIndexUnsafe elem vector =
 -}
 evalPar :: a -> [a] -> [a]
 evalPar c r = runEval $ rpar c >> rseq r >> return (c:r)
+
+-- | Union minus intersection of ordered vectors.
+uin :: Ord a => Vector a -> Vector a -> Vector a
+u `uin` v =
+  let len = V.length v
+      findAndInsert i elem vec
+        | i == len  = vec `snoc` elem
+        | elem == x = (V.take i vec) V.++ (V.drop i1 vec)
+        | elem >  x = (V.take i vec) V.++ (elem `cons` (V.drop i vec))
+        | otherwise = findAndInsert i1 elem vec
+        where x = vec ! i; i1 = i + 1
+  in
+    if V.null u then v
+    else (V.tail u) `uin` (findAndInsert 0 (V.head u) v)
