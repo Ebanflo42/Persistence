@@ -95,8 +95,7 @@ printMatBool mat =
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
   in print mat
 
-pointCloud1 :: [(Float, Float)]
-pointCloud1 =
+pointCloud1 = Right
   [ ( -7, -19)
   , ( -6, -16)
   , (  2, -16)
@@ -117,8 +116,7 @@ pointCloud1 =
   , ( 17,  20)
   ]
 
-pointCloud2 :: [(Float, Float)]
-pointCloud2 =
+pointCloud2 = Right
   [ (  1, -22)
   , (  4, -21)
   , ( -3, -20)
@@ -168,7 +166,7 @@ pointCloud2 =
   , (  1,  16)
   ]
 
-octahedralCloud =
+octahedralCloud = Right
   [ ( 1, 0, 0)
   , (-1, 0, 0)
   , ( 0, 1, 0)
@@ -177,7 +175,7 @@ octahedralCloud =
   , ( 0, 0,-1)
   ]
 
-sqrCloud =
+sqrCloud = Right
   [ (0,0)
   , (1,0)
   , (2,0)
@@ -237,7 +235,7 @@ dGraph1 =
   , (17, 15)
   ]
 
-mobius =
+mobius = Right
   [ ( 1.250000,  0.000000,  0.000000)
   , ( 0.750000,  0.000000,  0.000000)
   , (-0.750000,  0.000000, -0.000000)
@@ -370,21 +368,21 @@ metric3 (x0, y0, z0) (x1, y1, z1) =
   let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
   sqrt (dx*dx + dy*dy + dz*dz)
 
-testFiltration1 = makeVRFiltrationFast [10.0, 8.0, 6.0] metric2 pointCloud1
+testFiltration1 = makeRipsFiltrationFast [10.0, 8.0, 6.0] metric2 pointCloud1
 nstestFiltration1 = simple2Filtr testFiltration1
 
 --8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
 --1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
-testFiltration2 = makeVRFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
+testFiltration2 = makeRipsFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
 nsTestFiltration2 = simple2Filtr testFiltration2
 
 --5 connected components from 0 to 2, 1 void from 2 to 3
-octahedron = makeVRFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
+octahedron = makeRipsFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
 
 --11 connected components from 0 to 1, 1 loop starting at 1
-square = makeVRFiltrationFast [1.5, 1.0, 0.5] metric2 sqrCloud
+square = makeRipsFiltrationFast [1.5, 1.0, 0.5] metric2 sqrCloud
 
-mobiusStrip = makeVRFiltrationFast [0.3, 0.25, 0.2, 0.15] metric3 mobius
+mobiusStrip = makeRipsFiltrationFast [0.3, 0.25, 0.2, 0.15] metric3 mobius
 
 directedGraph = encodeDirectedGraph 18 dGraph1
 
@@ -445,87 +443,93 @@ main = do
   putStrLn $ iMat2String $ normalFormIntPar matrix6
   --}
 
-  {--}
+  {--
   putStrLn "Index bar codes of point cloud 1:"
   let ipcs1 = indexBarCodesSimple testFiltration1
   putStrLn $ (intercalate "\n" $ L.map show $ L.map (L.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the point cloud 1:"
   let spcs1 = scaleBarCodesSimple [10.0, 8.0, 6.0] testFiltration1
   putStrLn $ (intercalate "\n" $ L.map show spcs1) L.++ "\n"
   --}
+  {--
   putStrLn "Index bar codes of point cloud 1 (non-simple):"
   let ipcs1 = indexBarCodes nstestFiltration1
   putStrLn $ (intercalate "\n" $ L.map show $ L.map (L.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the point cloud 1 (non-simple):"
   let spcns1 = scaleBarCodes [10.0, 8.0, 6.0] nstestFiltration1
   putStrLn $ (intercalate "\n" $ L.map show spcns1) L.++ "\n"
   --}
 
-  {--}
+  {--
   putStrLn "Index bar codes of point cloud 2:"
   let ipcs2 = indexBarCodesSimple testFiltration2
   putStrLn $ (intercalate "\n" $ L.map show $ L.map (L.filter (\(a, b) -> b /= Finite a)) ipcs2) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the point cloud 2:"
   let spcs2 = scaleBarCodesSimple [6.0, 5.0, 4.0] testFiltration2
   putStrLn $ (intercalate "\n" $ L.map show spcs2) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Index bar codes of point cloud 2 as a non-simple filtration:"
   let ipcns2 = indexBarCodes nsTestFiltration2
   putStrLn $ (intercalate "\n" $ L.map show ipcns2) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of point cloud 2 as a non-simple filtration:"
   let sbcns = scaleBarCodes [6.0, 5.0, 4.0] nsTestFiltration2
   putStrLn $ (intercalate "\n" $ L.map show sbcns) L.++ "\n"
   --}
 
-  {--}
+  {--
   putStrLn "Index bar codes of the octahedral cloud (simple):"
   let iocts = indexBarCodesSimple octahedron
   putStrLn $ (intercalate "\n" $ L.map show iocts) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the octahedral cloud (simple):"
   let socts = scaleBarCodesSimple [2.1, 1.6, 1.1, 0.5] octahedron
   putStrLn $ (intercalate "\n" $ L.map show socts) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Index bar codes of the octahedral cloud (non-simple):"
   let ioctns = indexBarCodes $ simple2Filtr octahedron
   putStrLn $ (intercalate "\n" $ L.map show ioctns) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the octahedral cloud (non-simple):"
   let soctns = scaleBarCodes [2.1, 1.6, 1.1, 0.5] $ simple2Filtr octahedron
   putStrLn $ (intercalate "\n" $ L.map show soctns) L.++ "\n"
   --}
 
-  {--}
+  {--
   putStrLn "Index bar codes of the square cloud (simple):"
   let isqrs = indexBarCodesSimple square
   putStrLn $ (intercalate "\n" $ L.map show isqrs) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the square cloud (simple):"
   let ssqrs = scaleBarCodesSimple [1.5, 1.0, 0.5] square
   putStrLn $ (intercalate "\n" $ L.map show ssqrs) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Index bar codes of the square cloud (non-simple):"
   let isqrns = indexBarCodes $ simple2Filtr square
   putStrLn $ (intercalate "\n" $ L.map show isqrns) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Scale bar codes of the square cloud (non-simple):"
   let ssqrns = scaleBarCodes [1.5, 1.0, 0.5] $ simple2Filtr square
   putStrLn $ (intercalate "\n" $ L.map show ssqrns) L.++ "\n"
+  --}
+  {--}
+  putStrLn "Index bar codes of the square cloud with cycle vertices (non-simple):"
+  let vertexTest = indexBarCodeVertices $ simple2Filtr square
+  putStrLn $ (intercalate "\n" $ L.map show vertexTest) L.++ "\n"
   --}
 
   {--
@@ -549,12 +553,12 @@ main = do
   putStrLn $ (intercalate "\n" $ L.map show smobns) L.++ "\n"
   --}
 
-  {--}
+  {--
   putStrLn "Bottleneck distances between point cloud 1 & 2:"
   let pc12 = bottleNeckDistances indexMetric ipcs1 ipcs2
   putStrLn $ (intercalate "\n" $ L.map show pc12) L.++ "\n"
   --}
-  {--}
+  {--
   putStrLn "Bottleneck distances between octahedron barcodes and square barcodes:"
   let sqroct = bottleNeckDistances indexMetric iocts isqrs
   putStrLn $ (intercalate "\n" $ L.map show sqroct) L.++ "\n"

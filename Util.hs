@@ -239,16 +239,16 @@ replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 replaceElemList :: Int -> a -> [a] -> [a]
 replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 
--- | Quicksort treating the given predicate as the < operator. Works like this because its more convenient to make a lambda instead of a complete instance of Ord.
+-- | Quicksort treating the given predicate as the <= operator. Sorts in decreasing order.
 quicksort :: (a -> a -> Bool) -> Vector a -> Vector a
-quicksort rel vector = --rel is the > operator
+quicksort rel vector = --rel is the <= operator
   if V.null vector then empty
   else
     let x       = V.head vector
         xs      = V.tail vector
-        lesser  = V.filter (rel x) xs
-        greater = V.filter (not . (rel x)) xs
-    in (quicksort rel lesser) V.++ (x `cons` (quicksort rel greater))
+        greater = V.filter (rel x) xs
+        lesser  = V.filter (not . (rel x)) xs
+    in (quicksort rel greater) V.++ (x `cons` (quicksort rel lesser))
 
 -- | Takes the union of all of the vectors.
 bigU :: Eq a => Vector (Vector a) -> Vector a

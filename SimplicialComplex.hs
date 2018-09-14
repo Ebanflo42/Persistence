@@ -25,8 +25,8 @@ module SimplicialComplex
   , encodeWeightedGraph
   , makeNbrhdGraph
   , makeCliqueComplex
-  , makeVRComplexFast
-  , makeVRComplexLight
+  , makeRipsComplexFast
+  , makeRipsComplexLight
   , simplicialHomology
   , simplicialHomologyPar
   , bettiNumbers
@@ -45,14 +45,18 @@ import Data.Algorithm.MaximalCliques
 --BASIC STUFF-------------------------------------------------------------
 
 {- |
-  The first component of the pair is the number of vertices.
-  The second component is a vector whose entries are vectors of simplices of the same dimension.
-  Index 0 of the vecor corresponds to dimension 1 because there is no need to store individual vertices.
   A simplex is represented as a pair: the vector of its vertices (represent by their index in the original data set),
   and the vector of the indices of the faces in the next lowest dimension. Edges are the exception to the last part -
   they do not store reference to their faces because it would be redundant with their vertices.
 -}
-type SimplicialComplex = (Int, Vector (Vector (Vector Int, Vector Int)))
+type Simplex = (Vector Int, Vector Int)
+
+{- |
+  The first component of the pair is the number of vertices.
+  The second component is a vector whose entries are vectors of simplices of the same dimension.
+  Index 0 of the vecor corresponds to dimension 1 because there is no need to store individual vertices.
+-}
+type SimplicialComplex = (Int, Vector (Vector Simplex))
 
 {- |
   This represents the (symmetric) adjacency matrix of some weighted undirected graph. The type `a` is whatever distance is in your data analysis regime.
@@ -94,16 +98,16 @@ encodeWeightedGraph numVerts edge =
   The first argument is a scale, the second is a metric, and the third is the data.
   This function records the distance between every element of the data and whether or not it is smaller than the given scale.
 -}
-makeNbrhdGraph :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> Graph a
+makeNbrhdGraph :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> Graph a
 makeNbrhdGraph scale metric dataSet =
-  let vector      = V.fromList dataSet
+  let vector = case dataSet of Left v -> v; Right l -> V.fromList l
   in V.map (\x -> V.map (\y -> let d = metric x y in (d, d <= scale)) vector) vector
 
 --CONSTRUCTION------------------------------------------------------------
 
 {- |
   Makes a simplicial complex where the simplices are the complete subgraphs (cliques) of the given graph.
-  Mainly a helper function for makeVRComplexFast, but it might be useful if you happen to have a graph you want to analyze.
+  Mainly a helper function for makeRipsComplexFast, but it might be useful if you happen to have a graph you want to analyze.
   This utilizes any available processors in parallel because the construction is quite expensive.
 -}
 makeCliqueComplex :: Graph a -> SimplicialComplex
@@ -155,8 +159,8 @@ makeCliqueComplex graph =
   Also uses O(n^2) memory (where n is the number of data points) for a graph storing all the distances between data points.
   This utilizes any available processors in parallel because the construction is quite expensive.
 -}
-makeVRComplexFast :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> (SimplicialComplex, Graph a)
-makeVRComplexFast scale metric dataSet =
+makeRipsComplexFast :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> (SimplicialComplex, Graph a)
+makeRipsComplexFast scale metric dataSet =
   let graph = makeNbrhdGraph scale metric dataSet
       sc    = makeCliqueComplex graph
   in (sc, graph)
@@ -165,10 +169,10 @@ makeVRComplexFast scale metric dataSet =
   Constructs the Vietoris-Rips complex given a scale, metric, and data set.
   This utilizes any available processors in parallel because the construction is quite expensive.
 -}
-makeVRComplexLight :: (Ord a, Eq b) => a -> (b -> b -> a) -> [b] -> SimplicialComplex
-makeVRComplexLight scale metric dataSet =
+makeRipsComplexLight :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> SimplicialComplex
+makeRipsComplexLight scale metric dataSet =
   let numVerts = L.length dataSet
-      vector   = V.fromList dataSet
+      vector   = case dataSet of Left v -> v; Right l -> V.fromList l
 
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []

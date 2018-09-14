@@ -9,7 +9,7 @@ This module contains functions for constructing filtrations, computing persisten
 
 A filtration is a finite sequence of simplicial complexes where each complex is a subset of the next. This means that a filtration can be thought of as a single simplicial complex where each of the simplices is labeled with a "filtration index" that represents the index in the sequence where that simplex enters the filtration.
 
-One way to create a filtration, given a simplicial complex, a metric for the vertices, and a list of distances, is to loop through the distances from greatest to least: create a simplicial complex each iteration which excludes simplices that contain pairs of vertices which are further than the current distance apart. This method will produce a filtration of Vietoris-Rips complexes - each filtration index will correspond to a VR complex whose scale is the corresponding distance.
+One way to create a filtration, given a simplicial complex, a metric for the vertices, and a list of distances, is to loop through the distances from greatest to least: create a simplicial complex each iteration which excludes simplices that contain pairs of vertices which are further than the current distance apart. This method will produce a filtration of Vietoris-Rips complexes - each filtration index will correspond to a Rips complex whose scale is the corresponding distance.
 
 NOTE: It's important that, even though the smallest filtration index represents the smallest scale at which the data is being anaylzed, all functions in this library receive your list of scales sorted in *decreasing* order.
 
@@ -32,10 +32,11 @@ module Filtration
   , getDimension
   , simple2Filtr
   , filterByWeightsFast
-  , makeVRFiltrationFast
+  , makeRipsFiltrationFast
   , filterByWeightsLight
-  , makeVRFiltrationLight
+  , makeRipsFiltrationLight
   , indexBarCodes
+  , indexBarCodeVertices
   , indexBarCodesSimple
   , scaleBarCodes
   , scaleBarCodesSimple
@@ -56,12 +57,20 @@ import Data.Algorithm.MaximalCliques
 --DATA TYPES--------------------------------------------------------------
 
 {- |
-  A type representing a filtration whose vertices all have filtration index 0. Slightly faster and slightly less memory usage.
-  The first component is simply the number of vertices.
+  Each simplex in a filtration is represented as a triple: its filtration index,
+  the indices of its vertices in the original data, and the indices of its faces in the next lowest dimension.
+  Edges do not have reference to their faces, as it would be redundant with their vertices.
+  All simplices are sorted according to filtration index upon construction of the filtration. 
+  In each dimension, all simplices are sorted in increasing order of filtration index, 
+  and every simplices face indices are sorted in decreasing order; 
+  both of these facts are important for the computation of persistent homology.
+-}
+type FilterSimplex = (Int, Vector Int, Vector Int)
+
+{- |
+  A type representing a filtration whose vertices all have filtration index 0.
+  Slightly faster and slightly less memory usage. The first component is simply the number of vertices.
   The second component is a vector with an entry for each dimension of simplices, starting at dimension 1 for edges.
-  Each simplex is represented as a triple: its filtration index, the indices of its vertices in the original data, and the indices of its faces in the next lowest dimension.
-  Edges do not have reference to their faces, as it would be redundant with their vertices. All simplices are sorted according to filtration index upon construction of the filtration.
-  In each dimension, all simplices are sorted in increasing order of filtration index, and every simplices face indices are sorted in decreasing order; both of these facts are important for the computation of persistent homology.
 -}
 type SimpleFiltration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
 
@@ -132,7 +141,7 @@ simple2Filtr (n, x) =
 {- |
   Given a list of scales, a simplicial complex, and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
   this function creates a filtration out of a simplicial complex by removing simplices that contain edges that are too long for each scale in the list.
-  This is really a helper function to be called by makeVRFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
+  This is really a helper function to be called by makeRipsFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
   The scales MUST be in decreasing order.
 -}
 filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> SimpleFiltration
@@ -152,7 +161,7 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quicksort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $
+              V.map (quicksort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in reverse order
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (i, v, f) =
               let findNew j =
@@ -164,7 +173,7 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
           if V.null simplices then simplices
           else mapWithIndex (\i ss -> V.map ((newFaces i) . fst) ss) sortedSimplices
 
-      sortBoundaries = V.map (V.map (\(i, v, f) -> (i, v, quicksort (\a b -> a < b) f)))
+      sortBoundaries = V.map (V.map (\(i, v, f) -> (i, v, quicksort (\a b -> a <= b) f)))
 
   in (numVerts, sortBoundaries $ sortFiltration $ --sort the simplices by filtration index, then sort boundaries so that the boundary chains can be acquired easily
       calcIndices maxIndex (L.tail scales) $
@@ -174,14 +183,14 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
   Given a list of scales, a metric, and a data set, this function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
   The scales MUST be in decreasing order. Note that this a fast function, meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
 -}
-makeVRFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> SimpleFiltration
-makeVRFiltrationFast scales metric dataSet = filterByWeightsFast scales $ makeVRComplexFast (L.head scales) metric dataSet
+makeRipsFiltrationFast :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> Either (Vector b) [b] -> SimpleFiltration
+makeRipsFiltrationFast scales metric dataSet = filterByWeightsFast scales $ makeRipsComplexFast (L.head scales) metric dataSet
 
 -- | The same as filterbyWeightsFast except it uses far less memory at the cost of speed. Note that the scales must be in decreasing order.
-filterByWeightsLight :: Ord a => [a] -> (b -> b -> a) -> [b] -> SimplicialComplex -> SimpleFiltration
+filterByWeightsLight :: Ord a => [a] -> (b -> b -> a) -> Either (Vector b) [b] -> SimplicialComplex -> SimpleFiltration
 filterByWeightsLight scales metric dataSet (numVerts, simplices) =
   let edgeInSimplex edge simplex = (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
-      vector                     = V.fromList dataSet
+      vector                     = case dataSet of Left v -> v; Right l -> V.fromList l
       edgeTooLong scale edge     = scale <= (metric (vector ! (edge ! 0)) (vector ! (edge ! 1)))
       maxIndex                   = (L.length scales) - 1
 
@@ -196,7 +205,7 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quicksort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $
+              V.map (quicksort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in increasing order
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (i, v, f) =
               let findNew j =
@@ -213,12 +222,12 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
 -- | Given a list of scales in decreasing order, a metric, and a data set, this constructs the filtration of Vietoris-Rips complexes corresponding to the scales.
-makeVRFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> [b] -> SimpleFiltration
-makeVRFiltrationLight scales metric dataSet = filterByWeightsLight scales metric dataSet $ makeVRComplexLight (L.head scales) metric dataSet
+makeRipsFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> Either (Vector b) [b] -> SimpleFiltration
+makeRipsFiltrationLight scales metric dataSet = filterByWeightsLight scales metric dataSet $ makeRipsComplexLight (L.head scales) metric dataSet
 
 --PERSISTENT HOMOLOGY-----------------------------------------------------
 
-type Chain   = Vector Int --indices of the simplices in the sum
+type Chain = Vector Int --indices of the simplices in the sum
 
 {- |
   The nth entry in the list will describe the n-dimensional topology of the filtration.
@@ -284,6 +293,75 @@ indexBarCodes filtration =
           loopInfiniteBarCodes (dim + 1) (marked, slots, replaceElemList dim ((barcodes !! dim) L.++ (makeInfiniteBarCodes dim (marked ! dim) (slots ! dim))) barcodes)
 
   in L.map (L.filter (\(a, b) -> b /= Finite a)) $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty []
+
+{--}
+{- |
+  Same as indexBarCodes above except this function pairs every barcode with the indices of the vertices that
+  start the barcode.
+-}
+indexBarCodeVertices :: Filtration -> [[(BarCode Int, Vector Int)]]
+indexBarCodeVertices filtration =
+  let maxdim = getDimension (Right filtration)
+
+      --given a vector of indices of simplices which are marked and a vector of boundary chains paired with the indices of their simplices
+      --remove the unmarked simplices from the chain
+      removeUnmarked :: Vector Int -> Vector (Int, Chain) -> Vector (Int, Chain)
+      removeUnmarked marked = V.map (\(i, c) -> (i, V.filter (\j -> V.elem j marked) c))
+
+      --eliminate monomials in the boundary chain until it is no longer or there is a monomial which can't be eliminated
+      --also keeps track of which simplex boundaries are added in the process of elimination
+      removePivotRows :: Vector (Maybe (Chain, Int)) -> (Chain, Vector Int) -> (Chain, Vector Int)
+      removePivotRows slots (chain, simplices) =
+        if V.null chain then (V.empty, simplices)
+        else
+          case slots ! (V.head chain) of
+            Nothing     -> (chain, simplices)
+            Just (c, s) -> removePivotRows slots ((chain `uin` c), simplices `snoc` s)
+
+      --given the indices of the marked simplices from the last iteration, slots from the last iteration, and boundary chains
+      --mark the appropriate simplices, fill in the appropriate slots, and identify bar codes
+      --boundary chains are paired with the index of their coresponding simplex
+      makeFiniteBarCodes :: Int -> Int -> Vector (Int, Vector Int) -> Vector (Maybe (Chain, Int)) -> Vector (Int, Chain) -> [(BarCode Int, Vector Int)] -> (Vector (Int, Vector Int), Vector (Maybe (Chain, Int)), [(BarCode Int, Vector Int)])
+      makeFiniteBarCodes dim index newMarked slots boundaries barcodes =
+        if V.null boundaries then (newMarked, slots, barcodes)
+        else
+          let boundary             = V.head boundaries
+              (reduced, simplices) = removePivotRows slots (snd boundary, V.empty)
+              vertices             = V.foldl1 (V.++) $ V.map (\i -> two $ filtration ! dim ! i) simplices
+          in
+            --mark the simplex if its boundary chain is reduced to null
+            if V.null reduced then makeFiniteBarCodes dim (index + 1) (newMarked `snoc` (fst boundary, vertices)) slots (V.tail boundaries) barcodes
+            else
+              let pivot = V.head reduced
+              --put the pivot chain in the pivot's slot, add the new barcode to the list together with all the indices of the vertices of the simplices in the reduced chain
+              in makeFiniteBarCodes dim (index + 1) newMarked (replaceElem pivot (Just (reduced, index)) slots) (V.tail boundaries)
+                (((one $ filtration ! (dim - 1) ! pivot, Finite $ one $ filtration ! dim ! (fst boundary)), vertices):barcodes)
+
+      --get the finite bar codes for each dimension
+      loopFiniteBarCodes :: Int -> Vector (Vector (Int, Vector Int)) -> Vector (Vector (Maybe (Chain, Int))) -> [[(BarCode Int, Vector Int)]] -> (Vector (Vector (Int, Vector Int)), Vector (Vector (Maybe (Chain, Int))), [[(BarCode Int, Vector Int)]])
+      loopFiniteBarCodes dim marked slots barcodes =
+        if dim > maxdim then (marked, V.tail slots, (L.tail barcodes) L.++ [[]]) --the slots vector made when looping over the vertices will be null
+        else
+          let numSlots = if dim == 0 then 0 else V.length $ filtration ! (dim - 1) --see above
+              boundaries = removeUnmarked (V.map fst $ V.last marked) $ mapWithIndex (\i (_, _, f) -> (i, f)) $ filtration ! dim
+              (newMarked, newSlots, newCodes) = makeFiniteBarCodes 0 dim V.empty (V.replicate numSlots Nothing) boundaries []
+          in loopFiniteBarCodes (dim + 1) (marked `snoc` newMarked) (slots `snoc` newSlots) (barcodes L.++ [newCodes])
+
+      --if a simplex isn't marked and has an empty slot, an infinite bar code begins at it's filtration index
+      makeInfiniteBarCodes :: Int -> Vector (Int, Vector Int) -> Vector (Maybe (Chain, Int)) -> [(BarCode Int, Vector Int)]
+      makeInfiniteBarCodes dim marked slots =
+        V.toList $ V.map (\(i, v) -> ((one $ filtration ! dim ! i, Infinity), v)) $ V.filter (\(i, _) -> slots ! i == Nothing) marked
+
+      --add the infinite bar codes to the list of bar codes in each dimension
+      loopInfiniteBarCodes :: Int -> (Vector (Vector (Int, Vector Int)), Vector (Vector (Maybe (Chain, Int))), [[(BarCode Int, Vector Int)]]) -> [[(BarCode Int, Vector Int)]]
+      loopInfiniteBarCodes dim (marked, slots, barcodes) =
+        if dim > maxdim then barcodes
+        else
+          loopInfiniteBarCodes (dim + 1) (marked, slots, replaceElemList dim ((barcodes !! dim)
+            L.++ (makeInfiniteBarCodes dim (marked ! dim) (slots ! dim))) barcodes)
+
+  in L.map (L.filter (\((a, b), _) -> b /= Finite a)) $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty []
+--}
 
 -- | Same as above except this function acts on filtrations whose vertices all have filtration index zero (for a ver slight speedup).
 indexBarCodesSimple :: SimpleFiltration -> [[BarCode Int]]
@@ -352,135 +430,25 @@ indexBarCodesSimple (numVerts, allSimplices) =
 -}
 scaleBarCodes :: [a] -> Filtration -> [[BarCode a]]
 scaleBarCodes scales filtration =
-  let maxdim = getDimension (Right filtration)
-
-      --given a vector of indices of simplices which are marked and a vector of boundary chains paired with the indices of their simplices
-      --remove the unmarked simplices from the chain
-      removeUnmarked :: Vector Int -> Vector (Int, Chain) -> Vector (Int, Chain)
-      removeUnmarked marked = V.map (\(i, c) -> (i, V.filter (\j -> V.elem j marked) c))
-
-      --eliminate monomials in the boundary chain until it is no longer or there is a monomial which can't be eliminated
-      removePivotRows :: Vector (Maybe Chain) -> Chain -> Chain
-      removePivotRows slots chain =
-        if V.null chain then V.empty
-        else
-          case slots ! (V.head chain) of
-            Nothing -> chain
-            Just c  -> removePivotRows slots (chain `uin` c)
-
-      --given the indices of the marked simplices from the last iteration, slots from the last iteration, and boundary chains
-      --mark the appropriate simplices, fill in the appropriate slots, and identify bar codes
-      --boundary chains are paired with the index of their coresponding simplex
-      makeFiniteBarCodes :: Int -> Vector Int -> Vector (Maybe Chain) -> Vector (Int, Chain) -> [BarCode Int] -> (Vector Int, Vector (Maybe Chain), [BarCode Int])
-      makeFiniteBarCodes dim newMarked slots boundaries barcodes =
-        if V.null boundaries then (newMarked, slots, barcodes)
-        else
-          let boundary = V.head boundaries
-              reduced  = removePivotRows slots $ snd boundary
-          in
-            --mark the simplex if its boundary chain is reduced to null
-            if V.null reduced then makeFiniteBarCodes dim (newMarked `snoc` (fst boundary)) slots (V.tail boundaries) barcodes
-            else
-              let pivot = V.head reduced
-              --put the pivot chain in the pivot's slot, add the new barcode to the list
-              in makeFiniteBarCodes dim newMarked (replaceElem pivot (Just reduced) slots) (V.tail boundaries) ((one $ filtration ! (dim - 1) ! pivot, Finite $ one $ filtration ! dim ! (fst boundary)):barcodes)
-
-      --get the finite bar codes for each dimension
-      loopFiniteBarCodes :: Int -> Vector (Vector Int) -> Vector (Vector (Maybe Chain)) -> [[BarCode Int]] -> (Vector (Vector Int), Vector (Vector (Maybe Chain)), [[BarCode Int]])
-      loopFiniteBarCodes dim marked slots barcodes =
-        if dim > maxdim then (marked, V.tail slots, (L.tail barcodes) L.++ [[]]) --the slots vector made when looping over the vertices will be null
-        else
-          let numSlots = if dim == 0 then 0 else V.length $ filtration ! (dim - 1) --see above
-              boundaries = removeUnmarked (V.last marked) $ mapWithIndex (\i (_, _, f) -> (i, f)) $ filtration ! dim
-              (newMarked, newSlots, newCodes) = makeFiniteBarCodes dim V.empty (V.replicate numSlots Nothing) boundaries []
-          in loopFiniteBarCodes (dim + 1) (marked `snoc` newMarked) (slots `snoc` newSlots) (barcodes L.++ [newCodes])
-
-      --if a simplex isn't marked and has an empty slot, an infinite bar code begins at it's filtration index
-      makeInfiniteBarCodes :: Int -> Vector Int -> Vector (Maybe Chain) -> [BarCode Int]
-      makeInfiniteBarCodes dim marked slots =
-        V.toList $ V.map (\i -> (one $ filtration ! dim ! i, Infinity)) $ V.filter (\i -> slots ! i == Nothing) marked
-
-      --add the infinite bar codes to the list of bar codes in each dimension
-      loopInfiniteBarCodes :: Int -> (Vector (Vector Int), Vector (Vector (Maybe Chain)), [[BarCode Int]]) -> [[BarCode Int]]
-      loopInfiniteBarCodes dim (marked, slots, barcodes) =
-        if dim > maxdim then barcodes
-        else
-          loopInfiniteBarCodes (dim + 1) (marked, slots, replaceElemList dim ((barcodes !! dim) L.++ (makeInfiniteBarCodes dim (marked ! dim) (slots ! dim))) barcodes)
-
-      s = L.reverse scales
+  let s = L.reverse scales
 
       translateBarCode (i, Infinity) = (s !! i, Infinity)
       translateBarCode (i, Finite j) = (s !! i, Finite $ s !! j)
 
-  in L.map (L.map translateBarCode) $ L.map (L.filter (\(a, b) -> b /= Finite a)) $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty []
+  in L.map (L.map translateBarCode) $ indexBarCodes filtration
 
 {- |
   Same as above except acts only on filtrations whose vertices all have filtration index 0.
   Note that scales must be in decreasing order.
 -}
 scaleBarCodesSimple :: [a] -> SimpleFiltration -> [[BarCode a]]
-scaleBarCodesSimple scales (numVerts, allSimplices) =
-  let removeUnmarked marked = V.filter (\x -> V.elem x marked)
-
-      removePivotRows reduced chain =
-        if V.null chain then chain
-        else
-          case reduced ! (V.head chain) of
-            Nothing -> chain
-            Just t  -> removePivotRows reduced (chain `uin` t) --eliminate the element corresponding to the pivot in a different chain
-
-      makeBarCodesAndMark :: Int -> Int -> Vector Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode Int], Vector Int) -> ([BarCode Int], Vector Int, Vector Int)
-      makeBarCodesAndMark dim index marked reduced simplices (codes, newMarked)
-        | V.null simplices = (codes, newMarked, V.findIndices (\x -> x == Nothing) reduced)
-        | V.null d         = makeBarCodesAndMark dim (index + 1) marked reduced (V.tail simplices) (codes, newMarked `snoc` index)
-        | otherwise        =
-          let maxindex = V.head d
-              begin    = one $ allSimplices ! (dim - 1) ! maxindex
-          in makeBarCodesAndMark dim (index + 1) marked (replaceElem maxindex (Just d) reduced) (V.tail simplices)
-              ((begin, Finite i):codes, newMarked)
-        where (i, v, f) = V.head simplices
-              d         = removePivotRows reduced $ removeUnmarked marked f
-
-      makeEdgeCodes :: Int -> Vector (Maybe (Vector Int)) -> Vector (Int, Vector Int, Vector Int) -> ([BarCode Int], Vector Int) -> ([BarCode Int], Vector Int, Vector Int)
-      makeEdgeCodes index reduced edges (codes, marked)
-        | V.null edges = (codes, marked, V.findIndices (\x -> x == Nothing) reduced)
-        | V.null d     =
-          makeEdgeCodes (index + 1) reduced (V.tail edges) (codes, marked `snoc` index)
-        | otherwise    =
-          makeEdgeCodes (index + 1) (replaceElem (V.head d) (Just d) reduced) (V.tail edges) ((0, Finite i):codes, marked)
-        where (i, v, f) = V.head edges
-              d         = removePivotRows reduced f
-
-      makeFiniteBarCodes :: Int -> Int -> [[BarCode Int]] -> Vector (Vector Int) -> Vector (Vector Int) -> ([[BarCode Int]], Vector (Vector Int), Vector (Vector Int))
-      makeFiniteBarCodes dim maxdim barcodes marked slots =
-        if dim == maxdim then (barcodes, marked, slots)
-        else
-          let (newCodes, newMarked, unusedSlots) = makeBarCodesAndMark dim 0 (V.last marked) (V.replicate (V.length $ allSimplices ! (dim - 1)) Nothing) (allSimplices ! dim) ([], V.empty)
-          in makeFiniteBarCodes (dim + 1) maxdim (barcodes L.++ [newCodes]) (marked `snoc` newMarked) (slots `snoc` unusedSlots)
-
-      makeInfiniteBarCodes :: ([[BarCode Int]], Vector (Vector Int), Vector (Vector Int)) -> [[BarCode Int]]
-      makeInfiniteBarCodes (barcodes, marked, unusedSlots) =
-        let makeCodes i codes =
-              let slots = unusedSlots ! i; marks = marked ! i
-              in codes L.++ (V.toList $ V.map (\j -> (one $ allSimplices ! (i - 1) ! j, Infinity)) $ slots |^| marks)
-            loop _ []     = []
-            loop 0 (x:xs) = (x L.++ (V.toList $ V.map (\j -> (0, Infinity)) $ (unusedSlots ! 0) |^| (marked ! 0))):(loop 1 xs)
-            loop i (x:xs) = (makeCodes i x):(loop (i + 1) xs)
-        in loop 0 barcodes
-
-      edges    = V.map (\(i, v, f) -> (i, v, (V.reverse v))) $ V.head allSimplices
-      numEdges = V.length edges
-
-      (fstCodes, fstMarked, fstSlots) = makeEdgeCodes 0 (V.replicate numVerts Nothing) edges ([], V.empty)
-
-      verts = 0 `range` (numVerts - 1)
-
-      s = L.reverse scales
+scaleBarCodesSimple scales filtration =
+  let s = L.reverse scales
 
       translateBarCode (i, Infinity) = (s !! i, Infinity)
       translateBarCode (i, Finite j) = (s !! i, Finite $ s !! j)
 
-  in L.map (L.map translateBarCode) $ L.map (L.filter (\(a, b) -> b /= Finite a)) $ makeInfiniteBarCodes $ makeFiniteBarCodes 1 (V.length allSimplices) [fstCodes] (verts `cons` (fstMarked `cons` V.empty)) (fstSlots `cons` V.empty)
+  in L.map (L.map translateBarCode) $ indexBarCodesSimple filtration
 
 
 -- | The standard (Euclidean) metric between index barcodes.
