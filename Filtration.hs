@@ -5,7 +5,7 @@ License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
 
-This module contains functions for constructing filtrations, computing persistent homology, computing bottleneck distance between barcode diagrams, as well as a few utility functions for working with filtrations.
+This module contains functions for constructing filtrations and computing persistent homology, persistence landscapes, and computing bottleneck distance between barcode diagrams.
 
 A filtration is a finite sequence of simplicial complexes where each complex is a subset of the next. This means that a filtration can be thought of as a single simplicial complex where each of the simplices is labeled with a "filtration index" that represents the index in the sequence where that simplex enters the filtration.
 
@@ -17,29 +17,34 @@ An essential thing to note about the way this library is set up is the distincti
 
 Persistent homology is the main event of topological data analysis. It allows one to identify clusters, tunnels, cavities, and higher dimensional holes that persist in the data throughout many scales. The output of the persistence algorithm is a barcode diagram. A single barcode represents the filtration index where a feature appears and the index where it disappears (if it does). Alternatively, a barcode can represent the scale at which a feature and the scale at which it ends. Thus, short barcodes are typically interpretted as sampling irregularities and long barcodes are interpretted as actual features of whatever the underlying data set represents.
 
-After you've got the barcodes of a data set, you might want to compare it with that of a different data set. That's why this release includes two versions of "bottleneck distance," one works only if the number of features in each data set is the same and the other works regardless. If we were working with two point sets in the plane, the bottleneck distance between them would be the maximum of all minimum distance between pairs (one from each set) of points. That's exactly what bottleneck distance does for lists of barcodes, except you're free to decide the metric that determines how different two barcodes are. If that didn't make sense, look up "Hausdorff distance," which is a more widely-known and general concept.
+After you've got the barcodes of a data set, you might want to compare it with that of a different data set. This is the purpose of bottleneck distance, which corresponds to the Hausdorff distance between barcode diagrams.
 
 -}
 
-module Filtration
-  ( SimpleFiltration
+module Filtration (
+  -- * Types
+    FilterSimplex
+  , SimpleFiltration
   , Filtration
-  , BarCode
   , Extended (Finite, Infinity)
+  , BarCode
+  -- * Utilities
   , sim2String
   , filtr2String
   , getComplex
   , getDimension
   , simple2Filtr
+  -- * Construction
   , filterByWeightsFast
   , makeRipsFiltrationFast
   , filterByWeightsLight
   , makeRipsFiltrationLight
+  -- * Persistent homology
   , indexBarCodes
-  , indexBarCodeVertices
   , indexBarCodesSimple
   , scaleBarCodes
   , scaleBarCodesSimple
+  -- * Bottleneck distance
   , indexMetric
   , bottleNeckDistance
   , bottleNeckDistances
@@ -54,16 +59,17 @@ import Data.Vector as V
 import Control.Parallel.Strategies
 import Data.Algorithm.MaximalCliques
 
---DATA TYPES--------------------------------------------------------------
+-- * Types
 
 {- |
+  This type synonym exists to make other synonyms more concise.
   Each simplex in a filtration is represented as a triple: its filtration index,
   the indices of its vertices in the original data, and the indices of its faces in the next lowest dimension.
   Edges do not have reference to their faces, as it would be redundant with their vertices.
   All simplices are sorted according to filtration index upon construction of the filtration. 
   In each dimension, all simplices are sorted in increasing order of filtration index, 
   and every simplices face indices are sorted in decreasing order; 
-  both of these facts are important for the computation of persistent homology.
+  both of these facts are critical to the computation of persistent homology.
 -}
 type FilterSimplex = (Int, Vector Int, Vector Int)
 
@@ -72,19 +78,24 @@ type FilterSimplex = (Int, Vector Int, Vector Int)
   Slightly faster and slightly less memory usage. The first component is simply the number of vertices.
   The second component is a vector with an entry for each dimension of simplices, starting at dimension 1 for edges.
 -}
-type SimpleFiltration = (Int, Vector (Vector (Int, Vector Int, Vector Int)))
+type SimpleFiltration = (Int, Vector (Vector FilterSimplex))
 
 {- |
   Representation of a filtration which, unlike `SimpleFiltration`, can cope with vertices that have a non-zero
   filtration index. Vertices of the filtration are represented like all other simplices except that they don't their own have vertices or faces.
 -}
-type Filtration = Vector (Vector (Int, Vector Int, Vector Int))
+type Filtration = Vector (Vector FilterSimplex)
 
 -- | Type for representing inifinite bottleneck distance and infinite bar codes.
-data Extended a = Finite a | Infinity deriving (Eq, Show)
+data Extended a = Finite a | Infinity deriving Eq
 
 -- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
 type BarCode a = (a, Extended a)
+
+-- | Convert the extended value to a string in the generic way.
+instance Show a => Show (Extended a) where
+  show (Finite a) = "Finite " L.++ (show a)
+  show Infinity   = "infinity"
 
 -- | The ordering is inherited from the type a, Infinity is greater than everything else.
 instance (Ord a, Eq a) => Ord (Extended a) where
@@ -105,8 +116,10 @@ instance (Ord a, Eq a) => Ord (Extended a) where
   Finite _ <= Infinity = True
   Finite a <= Finite b = a <= b
 
+-- * Filtration utilities
+
 -- | Shows all the information in a simplex.
-sim2String :: (Int, Vector Int, Vector Int) -> String
+sim2String :: FilterSimplex -> String
 sim2String (index, vertices, faces) =
   "Filtration index: " L.++ (show index) L.++
     "; Vertex indices: " L.++ (show vertices) L.++
@@ -136,7 +149,7 @@ simple2Filtr (n, x) =
   let x' = (V.map (\(i, v, _) -> (i, v, V.reverse v)) $ V.head x) `cons` (V.tail x)
   in (mapWithIndex (\i (a,b,c) -> (a,i `cons` V.empty,c)) $ V.replicate n (0, V.empty, V.empty)) `cons` x'
 
---FILTRATION CONSTRUCTION-------------------------------------------------
+-- * Filtration construction
 
 {- |
   Given a list of scales, a simplicial complex, and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
@@ -225,15 +238,16 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
 makeRipsFiltrationLight :: (Ord a, Eq b) => [a] -> (b -> b -> a) -> Either (Vector b) [b] -> SimpleFiltration
 makeRipsFiltrationLight scales metric dataSet = filterByWeightsLight scales metric dataSet $ makeRipsComplexLight (L.head scales) metric dataSet
 
---PERSISTENT HOMOLOGY-----------------------------------------------------
+-- * Persistent Homology
 
 type Chain = Vector Int --indices of the simplices in the sum
 
 {- |
   The nth entry in the list will describe the n-dimensional topology of the filtration.
   That is, the first list will represent clusters, the second list will represent tunnels or punctures,
-  the third will represent hollow volumes, and the nth index list will represent n-dimensional holes in the data;
-  where features are encoded by the filtration indices where they appear and disappear.
+  the third will represent hollow volumes,
+  and the nth index list will represent n-dimensional holes in the data.
+  Features are encoded by the filtration indices where they appear and disappear.
 -}
 indexBarCodes :: Filtration -> [[BarCode Int]]
 indexBarCodes filtration =
@@ -294,7 +308,7 @@ indexBarCodes filtration =
 
   in L.map (L.filter (\(a, b) -> b /= Finite a)) $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty []
 
-{--}
+{--
 {- |
   Same as indexBarCodes above except this function pairs every barcode with the indices of the vertices that
   start the barcode.
@@ -363,7 +377,7 @@ indexBarCodeVertices filtration =
   in L.map (L.filter (\((a, b), _) -> b /= Finite a)) $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty []
 --}
 
--- | Same as above except this function acts on filtrations whose vertices all have filtration index zero (for a ver slight speedup).
+-- | Same as above except this function acts on filtrations whose vertices all have filtration index zero (for a very slight speedup).
 indexBarCodesSimple :: SimpleFiltration -> [[BarCode Int]]
 indexBarCodesSimple (numVerts, allSimplices) =
   let removeUnmarked marked = V.filter (\x -> V.elem x marked)
@@ -450,8 +464,14 @@ scaleBarCodesSimple scales filtration =
 
   in L.map (L.map translateBarCode) $ indexBarCodesSimple filtration
 
+-- * Bottleneck distance
 
--- | The standard (Euclidean) metric between index barcodes.
+{- |
+  The standard (Euclidean) metric between index barcodes.
+  The distance between infinite and finite barcodes is infinite,
+  and the distance between two infinite barcodes is the absolute value of the
+  difference of their fst component.
+-}
 indexMetric :: BarCode Int -> BarCode Int -> Extended Double
 indexMetric (_, Finite _) (_, Infinity) = Infinity
 indexMetric (_, Infinity) (_, Finite _) = Infinity
@@ -462,14 +482,18 @@ indexMetric (i, Finite j) (k, Finite l) =
   in Finite $ sqrt $ fromIntegral $ x*x + y*y
 
 {- |
-  Given a metric, return the maximum of minimum distances bewteen the bar codes.
+  Given a metric, return the Hausdorff distance
+  (referred to as bottleneck distance in TDA) between the two sets.
   Returns noting if either list of barcodes is empty.
 -}
 bottleNeckDistance :: Ord b => (BarCode a -> BarCode a -> Extended b) -> [BarCode a] -> [BarCode a] -> Maybe (Extended b)
 bottleNeckDistance metric diagram1 diagram2
   | L.null diagram1 = Nothing
   | L.null diagram2 = Nothing
-  | otherwise       = Just $ L.maximum $ L.map (\p -> L.minimum $ L.map (metric p) diagram2) diagram1
+  | otherwise       =
+    let first  = L.maximum $ L.map (\p -> L.minimum $ L.map (metric p) diagram2) diagram1
+        second = L.maximum $ L.map (\p -> L.minimum $ L.map (metric p) diagram1) diagram2
+    in Just $ max first second
 
 -- |  Get's all the bottleneck distances; a good way to determine the similarity of the topology of two filtrations.
 bottleNeckDistances :: Ord b => (BarCode a -> BarCode a -> Extended b) -> [[BarCode a]] -> [[BarCode a]] -> [Maybe (Extended b)]

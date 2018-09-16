@@ -5,7 +5,7 @@ License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
 
-This module provides functions for constructing neighborhood graphs, clique complexes, Vietoris-Rips complexes, as well as the computation of Betti numbers.
+This module provides functions for constructing neighborhood graphs, clique complexes, Vietoris-Rips complexes, and Čech complexes, as well as the computation of Betti numbers.
 
 An important thing to know about this module is the difference between "fast" and "light" functions. Fast functions encode the metric in a 2D vector, so that distances don't need to be computed over and over again and can instead be accessed in constant time. Unfortunately, this takes O(n^2) memory so I would strongly recomend against using it for larger data sets; this is why "light" functions exist.
 
@@ -13,20 +13,27 @@ A neighborhood graph is a graph where an edge exists between two vertices if and
 
 The clique complex of a graph is a simplicial complex whose simplices are the complete subgraphs of the given graph. The Vietoris-Rips complex is the clique complex of the neighborhood graph.
 
+The Čech complex of scale r is a simplicial complex where n+1 points form an n-simplex if and only if the intersection of n+1 balls of radius r centered at each of the points intersect.
+
 Betti numbers measure the number of n-dimensional holes in a given simplicial complex. The 0th Betti number is the number of connected components, or clusters; the 1st Betti number is the number of loops or tunnels; the 2nd Betti number measures voids or hollow volumes; and if you have high-dimensional data, you might have higher Betti numbers representing the number of high-dimensional holes.
 
 -}
 
-module SimplicialComplex
-  ( SimplicialComplex
+module SimplicialComplex (
+  -- * Types
+    Simplex
+  , SimplicialComplex
   , Graph
+  -- * Utilities
   , sc2String
   , getDim
   , encodeWeightedGraph
+  -- * Construction
   , makeNbrhdGraph
   , makeCliqueComplex
   , makeRipsComplexFast
   , makeRipsComplexLight
+  -- * Betti numbers
   , simplicialHomology
   , simplicialHomologyPar
   , bettiNumbers
@@ -42,11 +49,13 @@ import Data.IntSet as S
 import Control.Parallel.Strategies
 import Data.Algorithm.MaximalCliques
 
---BASIC STUFF-------------------------------------------------------------
+-- * Types
 
 {- |
-  A simplex is represented as a pair: the vector of its vertices (represent by their index in the original data set),
-  and the vector of the indices of the faces in the next lowest dimension. Edges are the exception to the last part -
+  This is type synonym exists to make other synonyms more concise.
+  A simplex is represented as a pair: the vector of its vertices (their index in the original data set),
+  and the vector of the indices of the faces in the next lowest dimension of the simplicial complex.
+  1-simplices are the exception:
   they do not store reference to their faces because it would be redundant with their vertices.
 -}
 type Simplex = (Vector Int, Vector Int)
@@ -59,12 +68,14 @@ type Simplex = (Vector Int, Vector Int)
 type SimplicialComplex = (Int, Vector (Vector Simplex))
 
 {- |
-  This represents the (symmetric) adjacency matrix of some weighted undirected graph. The type `a` is whatever distance is in your data analysis regime.
-  The reason graphs are represented like this is because their main function is too speed up the construction of simplicial complexes and filtrations.
+  This represents the (symmetric) adjacency matrix of some weighted, undirected graph. The type `a` is whatever distance is in your data analysis procedure.
+  The reason graphs are represented like this is because their main purpose is too speed up the construction of simplicial complexes and filtrations.
   If the clique complex of this graph were to be constructed, only the adjacencies would matter. But if a filtration is constructed all the distances
   will be required over and over again - this allows them to be accessed in constant time.
 -}
 type Graph a = Vector (Vector (a, Bool))
+
+-- * Simplicial complex utilities
 
 -- | Show all the information in a simplicial complex.
 sc2String :: SimplicialComplex -> String
@@ -88,7 +99,7 @@ getDim = L.length . snd
   Takes the number of vertices and each edge paired with its weight to output the graph encoded as a 2D vector.
   If only you have an unweighted graph, you can still encode your graph by simply letting the type `a` be `()`.
   If you have a weighted graph but there isn't a distance between every vertex, you can use the `Extended` type (essentially the same as Maybe)
-  from the Persistence module which is already an instance of Ord.
+  from the `Filtration` module which is already an instance of Ord.
 -}
 encodeWeightedGraph :: Int -> (Int -> Int -> (a, Bool)) -> Graph a
 encodeWeightedGraph numVerts edge =
@@ -103,11 +114,11 @@ makeNbrhdGraph scale metric dataSet =
   let vector = case dataSet of Left v -> v; Right l -> V.fromList l
   in V.map (\x -> V.map (\y -> let d = metric x y in (d, d <= scale)) vector) vector
 
---CONSTRUCTION------------------------------------------------------------
+-- * Simplicial complex construction
 
 {- |
   Makes a simplicial complex where the simplices are the complete subgraphs (cliques) of the given graph.
-  Mainly a helper function for makeRipsComplexFast, but it might be useful if you happen to have a graph you want to analyze.
+  Mainly a helper function for `makeRipsComplexFast`, but it might be useful if you happen to have a graph you want to analyze.
   This utilizes any available processors in parallel because the construction is quite expensive.
 -}
 makeCliqueComplex :: Graph a -> SimplicialComplex
@@ -215,7 +226,7 @@ makeRipsComplexLight scale metric dataSet =
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
       in (numVerts, sc)
 
---INTEGER HOMOLOGY--------------------------------------------------------
+-- * Simplicial homology over the integers
 
 --gets the first boundary operator (because edges don't need to point to their faces)
 makeEdgeBoundariesInt :: SimplicialComplex -> IMatrix
@@ -296,7 +307,7 @@ simplicialHomologyPar sc =
     if L.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim
 
---BOOLEAN HOMOLOGY--------------------------------------------------------
+-- * Betti numbers
 
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
 makeEdgeBoundariesBool :: SimplicialComplex -> BMatrix
