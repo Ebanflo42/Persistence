@@ -28,6 +28,7 @@ module Filtration (
   , Filtration
   , Extended (Finite, Infinity)
   , BarCode
+  , Landscape
   -- * Utilities
   , sim2String
   , filtr2String
@@ -44,10 +45,11 @@ module Filtration (
   , indexBarCodesSimple
   , scaleBarCodes
   , scaleBarCodesSimple
-  -- * Bottleneck distance
+  -- * Comparing barcode diagrams
   , indexMetric
   , bottleNeckDistance
   , bottleNeckDistances
+  , calcLandscape
   ) where
 
 import Util
@@ -87,34 +89,54 @@ type SimpleFiltration = (Int, Vector (Vector FilterSimplex))
 type Filtration = Vector (Vector FilterSimplex)
 
 -- | Type for representing inifinite bottleneck distance and infinite bar codes.
-data Extended a = Finite a | Infinity deriving Eq
-
--- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
-type BarCode a = (a, Extended a)
+data Extended a = Finite a
+                | Infinity
+                | MinusInfty
+                deriving Eq
 
 -- | Convert the extended value to a string in the generic way.
 instance Show a => Show (Extended a) where
   show (Finite a) = "Finite " L.++ (show a)
   show Infinity   = "infinity"
 
--- | The ordering is inherited from the type a, Infinity is greater than everything else.
+{- |
+  The ordering is inherited from the type a,
+  Infinity is greater than everything else and MinusInfty is less than everything else.
+-}
 instance (Ord a, Eq a) => Ord (Extended a) where
-  Infinity > Infinity  = False
-  Infinity > Finite _  = True
-  Finite a > Finite b  = a > b
-  Finite _ > Infinity  = False
-  Infinity >= Infinity = True
-  Infinity >= Finite _ = True
-  Finite _ >= Infinity = False
-  Finite a >= Finite b = a >= b
-  Infinity < Infinity  = False
-  Infinity < Finite a  = False
-  Finite _ < Infinity  = True
-  Finite a < Finite b  = a < b
-  Infinity <= Infinity = True
-  Infinity <= Finite _ = False
-  Finite _ <= Infinity = True
+
+  _ > Infinity        = False
+  Infinity > _        = True
+  Finite a > Finite b = a > b
+  MinusInfty > _      = False
+  _ > MinusInfty      = True
+
+  Infinity >= _            = True
+  _ >= Infinity            = False
+  Finite a >= Finite b     = a >= b
+  MinusInfty >= MinusInfty = True
+  MinusInfty >= _          = False
+
+  Infinity < _            = False
+  _ < Infinity            = True
+  Finite a < Finite b     = a < b
+  MinusInfty < MinusInfty = False
+  MinusInfty < _          = True
+
+  _ <= Infinity        = True
+  Infinity <= _        = False
   Finite a <= Finite b = a <= b
+  MinusInfty <= _      = True
+  _ <= MinusInfty      = False
+
+-- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
+type BarCode a = (a, Extended a)
+
+{- |
+  A Persistence landscape is a certain type of piecewise linear function based on a barcode diagram.
+  It can be represented simply as a list of critical points paired with critical values.
+-}
+type Landscape = [(Extended Int, Extended Int)]
 
 -- * Filtration utilities
 
@@ -502,3 +524,19 @@ bottleNeckDistances metric diagrams1 diagrams2 =
   in
     if d >= 0 then (L.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) L.++ (L.replicate d Nothing)
     else (L.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) L.++ (L.replicate (-d) Nothing)
+
+calcLandscape :: [BarCode Int] -> Landscape
+calcLandscape = L.map (\(a, b) -> (Finite a, b))
+{--
+calcLandscape barcodes =
+  let rel (i,j) (k,l)
+        if i > k  then True
+        else if i == k && j <= l then True
+        else False
+
+      loop :: Int -> Int -> Landscape -> [BarCode] -> Landscape
+      loop _ _ result []                     = result
+      loop k index result ((i, Finite j):xs) =
+      loop k index result ((i, Infinity):xs) =
+        loop (k + 1) (index + 1) ((MinusInfinityTo 0):(IntToInt i 0):())
+--}
