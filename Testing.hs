@@ -446,118 +446,118 @@ main = do
   {--
   putStrLn "Index bar codes of point cloud 1:"
   let ipcs1 = indexBarCodesSimple testFiltration1
-  putStrLn $ (intercalate "\n" $ L.map show $ L.map (L.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show $ V.map (V.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the point cloud 1:"
   let spcs1 = scaleBarCodesSimple [10.0, 8.0, 6.0] testFiltration1
-  putStrLn $ (intercalate "\n" $ L.map show spcs1) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show spcs1) L.++ "\n"
   --}
   {--}
   putStrLn "Index bar codes of point cloud 1 (non-simple):"
   let ipcs1 = indexBarCodes nstestFiltration1
-  putStrLn $ (intercalate "\n" $ L.map show $ L.map (L.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show $ V.map (V.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the point cloud 1 (non-simple):"
   let spcns1 = scaleBarCodes [10.0, 8.0, 6.0] nstestFiltration1
-  putStrLn $ (intercalate "\n" $ L.map show spcns1) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show spcns1) L.++ "\n"
   --}
 
   {--}
   putStrLn "Index bar codes of point cloud 2:"
   let ipcs2 = indexBarCodesSimple testFiltration2
-  putStrLn $ (intercalate "\n" $ L.map show $ L.map (L.filter (\(a, b) -> b /= Finite a)) ipcs2) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show $ V.map (V.filter (\(a, b) -> b /= Finite a)) ipcs2) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the point cloud 2:"
   let spcs2 = scaleBarCodesSimple [6.0, 5.0, 4.0] testFiltration2
-  putStrLn $ (intercalate "\n" $ L.map show spcs2) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show spcs2) L.++ "\n"
   --}
   {--
   putStrLn "Index bar codes of point cloud 2 as a non-simple filtration:"
   let ipcns2 = indexBarCodes nsTestFiltration2
-  putStrLn $ (intercalate "\n" $ L.map show ipcns2) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show ipcns2) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of point cloud 2 as a non-simple filtration:"
   let sbcns = scaleBarCodes [6.0, 5.0, 4.0] nsTestFiltration2
-  putStrLn $ (intercalate "\n" $ L.map show sbcns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show sbcns) L.++ "\n"
   --}
 
   {--}
   putStrLn "Index bar codes of the octahedral cloud (simple):"
   let iocts = indexBarCodesSimple octahedron
-  putStrLn $ (intercalate "\n" $ L.map show iocts) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show iocts) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the octahedral cloud (simple):"
   let socts = scaleBarCodesSimple [2.1, 1.6, 1.1, 0.5] octahedron
-  putStrLn $ (intercalate "\n" $ L.map show socts) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show socts) L.++ "\n"
   --}
   {--
   putStrLn "Index bar codes of the octahedral cloud (non-simple):"
   let ioctns = indexBarCodes $ simple2Filtr octahedron
-  putStrLn $ (intercalate "\n" $ L.map show ioctns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show ioctns) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the octahedral cloud (non-simple):"
   let soctns = scaleBarCodes [2.1, 1.6, 1.1, 0.5] $ simple2Filtr octahedron
-  putStrLn $ (intercalate "\n" $ L.map show soctns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show soctns) L.++ "\n"
   --}
 
   {--}
   putStrLn "Index bar codes of the square cloud (simple):"
   let isqrs = indexBarCodesSimple square
-  putStrLn $ (intercalate "\n" $ L.map show isqrs) L.++ "\n"
+  putStrLn $ (intercalate "\n" $V.toList $  V.map show isqrs) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the square cloud (simple):"
   let ssqrs = scaleBarCodesSimple [1.5, 1.0, 0.5] square
-  putStrLn $ (intercalate "\n" $ L.map show ssqrs) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show ssqrs) L.++ "\n"
   --}
   {--
   putStrLn "Index bar codes of the square cloud (non-simple):"
   let isqrns = indexBarCodes $ simple2Filtr square
-  putStrLn $ (intercalate "\n" $ L.map show isqrns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show isqrns) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of the square cloud (non-simple):"
   let ssqrns = scaleBarCodes [1.5, 1.0, 0.5] $ simple2Filtr square
-  putStrLn $ (intercalate "\n" $ L.map show ssqrns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show ssqrns) L.++ "\n"
   --}
 
   {--
   putStrLn "Index bar codes of Mobius strip (simple):"
   let imobs = indexBarCodesSimple mobiusStrip
-  putStrLn $ (intercalate "\n" $ L.map show imobs) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show imobs) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of Mobius strip (simple):"
   let smobs = scaleBarCodesSimple [0.3, 0.25, 0.2, 0.15] mobiusStrip
-  putStrLn $ (intercalate "\n" $ L.map show smobs) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show smobs) L.++ "\n"
   --}
   {--}
   putStrLn "Index bar codes of Mobius strip (non-simple):"
   let imobns = indexBarCodes $ simple2Filtr mobiusStrip
-  putStrLn $ (intercalate "\n" $ L.map show imobns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show imobns) L.++ "\n"
   --}
   {--
   putStrLn "Scale bar codes of Mobius strip (non-simple):"
   let smobns = scaleBarCodes [0.3, 0.25, 0.2, 0.15] $ simple2Filtr mobiusStrip
-  putStrLn $ (intercalate "\n" $ L.map show smobns) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.map show smobns) L.++ "\n"
   --}
 
   {--}
   putStrLn "Bottleneck distances between point cloud 1 & 2:"
   let pc12 = bottleNeckDistances indexMetric ipcs1 ipcs2
-  putStrLn $ (intercalate "\n" $ L.map show pc12) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show pc12) L.++ "\n"
   --}
   {--}
   putStrLn "Bottleneck distances between octahedron barcodes and square barcodes:"
   let sqroct = bottleNeckDistances indexMetric iocts isqrs
-  putStrLn $ (intercalate "\n" $ L.map show sqroct) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show sqroct) L.++ "\n"
   --}
   putStrLn "Bottleneck distance between square and mobius barcodes:"
   let sqmob = bottleNeckDistances indexMetric isqrs imobns
-  putStrLn $ (intercalate "\n" $ L.map show sqmob) L.++ "\n"
+  putStrLn $ (intercalate "\n" $ V.toList $ V.map show sqmob) L.++ "\n"

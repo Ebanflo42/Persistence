@@ -15,21 +15,29 @@ Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with
 
 # Learning about Topological Data Analysis
 
-Simplicial homology:
+Computing simplicial homology:
 
 https://jeremykun.com/2013/04/10/computing-homology/
 
-The Vietoris-Rips complex:
+Constructing the Vietoris-Rips complex:
 
 https://pdfs.semanticscholar.org/e503/c24dcc7a8110a001ae653913ccd064c1044b.pdf
 
-Persistent homology:
+Constructing the Cech complex:
+
+https://www.academia.edu/15228439/Efficient_construction_of_the_%C4%8Cech_complex
+
+Computing persistent homology:
 
 http://geometry.stanford.edu/papers/zc-cph-05/zc-cph-05.pdf
 
 The algorithm for finding the directed clique complex is inspired by the pseudocode in the supplementary materials of this paper:
 
 https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
+
+Computing and working with persistence landscapes:
+
+https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 # Major TODOs:
 
@@ -49,11 +57,9 @@ https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
 
 Many of these are breaking API changes and so will be included in Persistence-2.0.
 
-1) Persistent homology functions which identify the vertices where features occur need to be implemented.
+1) Implement persistence landscape functions.
 
-2) Start implementing persistent homology and filtration construction with parallelism.
-
-3) Investigate the possibility of implementing persistence landscapes.
+2) Investigate the possibility of making persistent homology functions which identify the vertices where features occur.
 
 `Testing.hs`:
 
