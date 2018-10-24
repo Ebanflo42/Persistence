@@ -17,6 +17,8 @@ The main feature of this module is an algorithm which takes the Hasse diagram of
 
 The idea is that, if your directed graph represents any kind of information flow, "sub-modules" in the network that simply take input, process it using its nodes, and then output it without spinning the information around at all. These "sub-modules" are the directed cliques/flags which I've been referring to as acyclic complete subgraphs up to this point. Constructing a simplicial complex out of them will allow you to both simplify the 1-dimensional topology of the network and possibly detect higher-dimensional topological features.
 
+The algorithm for constructing the directed clique complex comes from this paper by Markram et al: https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full.
+
 -}
 
 module HasseDiagram
@@ -65,7 +67,10 @@ encodeDirectedGraph numVerts cxns =
 
   in encodeEdges 0 verts V.empty cxns
 
--- | Given a Hasse diagram representing a directed graph, construct the diagram representing the directed clique/flag complex of the graph.
+{- |
+Given a Hasse diagram representing a directed graph, construct the diagram representing the directed clique/flag complex of the graph.
+Algorithm adapted from the one shown in the supplementary materials of this paper: https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full
+-}
 directedFlagComplex :: HasseDiagram -> HasseDiagram
 directedFlagComplex directedGraph =
   let edges    = V.last directedGraph

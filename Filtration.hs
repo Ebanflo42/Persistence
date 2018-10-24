@@ -129,6 +129,30 @@ instance (Ord a, Eq a) => Ord (Extended a) where
   MinusInfty <= _      = True
   _ <= MinusInfty      = False
 
+instance Num a => Num (Extended a) where
+
+  _ + Infinity        = Infinity
+  _ + MinusInfty      = MinusInfnty
+  Infinity   + _      = Infinity
+  MinusInfty + _      = MinusInfnty
+  Finite x + Finite y = Finite (x + y)
+
+  _ - Infinity        = MinusInfty
+  _ - MinusInfty      = Infinity
+  Infinity   - _      = Infinity
+  MinusInfty - _      = MinusInfnty
+  Finite x - Finite y = Finite (x - y)
+
+  _ * Infinity        = Infinity
+  _ * MinusInfty      = MinusInfnty
+  Infinity   * _      = Infinity
+  MinusInfty * _      = MinusInfnty
+  Finite x * Finite y = Finite (x * y)
+
+  abs Infinity    = Infinity
+  abs MinustInfty = Infinity
+  abs (Finite x)  = Finite $ abs x
+
 -- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
 type BarCode a = (a, Extended a)
 
@@ -136,7 +160,7 @@ type BarCode a = (a, Extended a)
   A Persistence landscape is a certain type of piecewise linear function based on a barcode diagram.
   It can be represented simply as a list of critical points paired with critical values.
 -}
-type Landscape = Floating a => Vector (Vector (Extended Double, Extended Double))
+type Landscape = Vector (Vector (Extended Double, Extended Double))
 
 -- * Filtration utilities
 
@@ -605,37 +629,81 @@ calcLandscape barcodes =
         else if i == k && j <= l then True
         else False
 
-      rel2 (i,j) (k,l) =
+      greaterThan (i,j) (k,l) =
         case j of
-          Infinity    -> GT
-          MinusInfnty -> LT
+          Infinity    -> True
+          MinusInfnty -> False
           Finite j'   ->
             case l of
-              Infinity    -> LT
-              MinusInfnty -> GT
+              Infinity    -> True
+              MinusInfnty -> False
               Finite l'   ->
-                if l' == j' then EQ
-                else if l' < j' then LT
-                else GT
+                if l' == j' then False
+                else if l' < j' then False
+                else True
 
-      loop :: Floating a => Int -> Landscape -> Vector (BarCode a) -> Landscape
+      loop :: Int -> Landscape -> Vector (BarCode Double) -> Landscape
       loop index result barcodes =
-        if V.null barcodes then result
-        else let (b, d) = V.head barcodes; xs = V.tail barcodes in
-          case d of
-            Infinity   ->
-              let new = V.fromList
-                      $ [ (MinusInfty, Finite 0.0)
-                      , (Finite b, Finite 0.0)
-                      , (Infinity, Infinity)
-                      ]
-              in
-            Finite d0  ->
-              let new = V.fromList
-                      $ [ (MinusInfty, Finite 0.0)
-                      , (Finite b, Finite 0.0)
-                      , (0.5*(d0 + b), 0.5*(d0 - b))
-                      ]
-              in
-            MinusInfty -> error "Barcode that ends at minus infinity??"
+        let 
+            loop' :: Int -> Landscape -> BarCode Double -> Vector (BarCode Double) -> Landscape
+            loop' i r (b, d) xs =
+              case V.findIndex (greaterThan (b, d)) xs of
+                Nothing ->
+                  let r1 = V.head r; r2 = V.last r
+                  in r1 `snoc` (r2 V.++ (V.fromList [(Finite d, 0.0), (0.0, Infinity)]))
+                Just j  ->
+                  let (b', d') = xs ! j
+                      xs'      = (V.take j xs) V.++ (V.drop (j + 1) xs)
+                      new      =
+                        if b' >= d then
+                          if b' == d then [(Finite 0.0, b')]
+                          else [(Finite 0.0, d), (Finite 0.0, b')]
+                        else []
+                  in
+                    case new of
+                      [] ->
+                        let new' = ((Finite 0.5)*(d + b'), (Finite 0.5)*(d - b'))
+                            xs'' = orderedInsert new' xs'
+                        in
+                          if d' == Infinity then
+                            let r1 = V.head r; r2 = V.last r
+                            in r1 `snoc` (r2 V.++ (V.fromList [new', (Infinity, Infinity)]))
+                          else
+                            let new'' = (V.empty `snoc` new') `snoc` ((Finite 0.5)*(b' + d'), (Finite 0.5)*(d' - b'))
+                            in loop' j (r1 `snoc` (r2 V.++ new'')) (b', d') xs''
+                      _  ->
+                        if d' == Infinity then
+                          let r1 = V.head r; r2 = V.last r
+                          in r1 `snoc` (r2 V.++ (V.fromList [new', (Infinity, Infinity)]))
+                        else
+                          let new'' = (V.empty `snoc` new') `snoc` ((Finite 0.5)*(b' + d'), (Finite 0.5)*(d' - b'))
+                          in loop' j (r1 `snoc` (r2 V.++ new'')) (b', d') xs''
+
+        in
+          if V.null barcodes then result
+          else
+            let (b, d) = V.head barcodes; xs = V.tail barcodes in
+            in
+              if d == Infinity then
+                if b == MinusInfty then
+                  let result' = result
+                        `snoc` (V.fromList [(MinusInfty, Infinity), (Infinity, Infinity)])
+                          `snoc` (V.fromList [(MinusInfty, Finite 0.0), (b, Finite 0.0), (Infinity, Infinity)])
+                  in
+                    if b == Infinity then
+                      let result'' = (V.init result') `snoc` ((V.last result) V.++ (MinusInfty, Infinity))
+                      in loop' index result (b, d) xs
+                let new = V.fromList
+                        $ [ (MinusInfty, Finite 0.0)
+                        , (Finite b, Finite 0.0)
+                        , (Infinity, Infinity)
+                        ]
+                in
+              else
+                let new = V.fromList
+                        $ [ (MinusInfty, Finite 0.0)
+                        , (Finite b, Finite 0.0)
+                        , (0.5*(d0 + b), 0.5*(d0 - b))
+                        ]
+                in
 --}
