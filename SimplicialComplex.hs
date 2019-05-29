@@ -13,8 +13,6 @@ A neighborhood graph is a graph where an edge exists between two vertices if and
 
 The clique complex of a graph is a simplicial complex whose simplices are the complete subgraphs of the given graph. The Vietoris-Rips complex is the clique complex of the neighborhood graph.
 
-The Čech complex of scale r is a simplicial complex where n+1 points form an n-simplex if and only if the intersection of n+1 balls of radius r centered at each of the points intersect.
-
 Betti numbers measure the number of n-dimensional holes in a given simplicial complex. The 0th Betti number is the number of connected components, or clusters; the 1st Betti number is the number of loops or tunnels; the 2nd Betti number measures voids or hollow volumes; and if you have high-dimensional data, you might have higher Betti numbers representing the number of high-dimensional holes.
 
 -}
@@ -38,8 +36,8 @@ module SimplicialComplex (
   , makeRipsComplexLight
   , makeRipsComplexLightPar
   -- * Betti numbers
-  , simplicialHomology --not working, bottom of priorites
-  , simplicialHomologyPar --see above
+  --, simplicialHomology --not working, bottom of priorites
+  --, simplicialHomologyPar --see above
   , bettiNumbers
   , bettiNumbersPar
   ) where

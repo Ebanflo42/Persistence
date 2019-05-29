@@ -7,7 +7,7 @@ Stability  : experimental
 
 This module implements algorithms for admissible Hasse diagrams. A Hasse diagram is admissible if it is stratified and oriented. A diagram is stratified if all the vertices can be arranged in rows such that all the sources of each vertex are in the next highest row and all the targets are in the next lowest row. A diagram is oriented if every vertex has a linear ordering on its targets.
 
-A node in the diagram is represented as a tuple: the indices of the level 0 nodes in the diagram that are reachable from this node, the indices of targets in the next lowest level, and the indices of the sources in the next highest level. The entire diagram is simply an array where each entry is an array representing a particular level; index 0 represents level 0, etc.
+A node in the diagram is represented as a tuple: the indices of the level 0 nodes in the diagram that are reachable from this node, the indices of targets in the next lowest level, and the indices of the sources in the next highest level. The entire diagram is simply an array of arrays representing each particular level; index 0 represents level 0, etc.
 
 Any directed graph can be encoded as an admissible Hasse diagram with 2 levels. The edges are level 1 and the vertices are level 0. The ordering on the targets of a node representing an edge is simply the terminal vertex first and the initial vertex second. This may be counterintuitive, but its helpful to interpret an arrow between two vertices as the "<" operator. This induces a linear ordering on the vertices of any acyclic complete subgraph - which is what the nodes in the Hasse diagram of the directed clique complex represent.
 
@@ -15,7 +15,7 @@ Any oriented simplicial complex can also be encoded as an admissible Hasse diagr
 
 The main feature of this module is an algorithm which takes the Hasse diagram of a directed graph and generates the Hasse diagram of the directed flag complex - the simplicial complex whose simplices are acyclic complete subgraphs of the given graph. Here acyclic refers to a directed graph without any sequence of arrows whose heads and tails match up an which has the same start and end vertex.
 
-The idea is that, if your directed graph represents any kind of information flow, "sub-modules" in the network that simply take input, process it using its nodes, and then output it without spinning the information around at all. These "sub-modules" are the directed cliques/flags which I've been referring to as acyclic complete subgraphs up to this point. Constructing a simplicial complex out of them will allow you to both simplify the 1-dimensional topology of the network and possibly detect higher-dimensional topological features.
+The idea is that, if your directed graph represents any kind of information flow, "sub-modules" in the network are groups of nodes that simply take input, process it, and then output it without spinning the information around at all. These "sub-modules" are the directed cliques/flags which I've been referring to as acyclic complete subgraphs up to this point. Constructing a simplicial complex out of them will allow you to both simplify the 1-dimensional topology of the network and possibly detect higher-dimensional topological features.
 
 The algorithm for constructing the directed clique complex comes from this paper by Markram et al: https://www.frontiersin.org/articles/10.3389/fncom.2017.00048/full.
 

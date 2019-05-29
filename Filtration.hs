@@ -26,7 +26,7 @@ module Filtration (
     FilterSimplex
   , SimpleFiltration
   , Filtration
-  , Extended (Finite, Infinity)
+  , Extended (MinusInfty, Finite, Infinity)
   , BarCode
   , Landscape
   -- * Utilities
@@ -58,6 +58,7 @@ import SimplicialComplex
 
 import Data.List as L
 import Data.Vector as V
+import Control.Monad.ST.Lazy
 import Control.Parallel.Strategies
 import Data.Algorithm.MaximalCliques
 
@@ -132,33 +133,39 @@ instance (Ord a, Eq a) => Ord (Extended a) where
 instance Num a => Num (Extended a) where
 
   _ + Infinity        = Infinity
-  _ + MinusInfty      = MinusInfnty
+  _ + MinusInfty      = MinusInfty
   Infinity   + _      = Infinity
-  MinusInfty + _      = MinusInfnty
+  MinusInfty + _      = MinusInfty
   Finite x + Finite y = Finite (x + y)
 
   _ - Infinity        = MinusInfty
   _ - MinusInfty      = Infinity
   Infinity   - _      = Infinity
-  MinusInfty - _      = MinusInfnty
+  MinusInfty - _      = MinusInfty
   Finite x - Finite y = Finite (x - y)
 
   _ * Infinity        = Infinity
-  _ * MinusInfty      = MinusInfnty
+  _ * MinusInfty      = MinusInfty
   Infinity   * _      = Infinity
-  MinusInfty * _      = MinusInfnty
+  MinusInfty * _      = MinusInfty
   Finite x * Finite y = Finite (x * y)
 
   abs Infinity    = Infinity
-  abs MinustInfty = Infinity
+  abs MinusInfty  = Infinity
   abs (Finite x)  = Finite $ abs x
+
+  fromInteger = Finite . fromInteger
+
+  signum Infinity   = Finite (fromInteger 1)
+  signum MinusInfty = Finite (fromInteger (-1))
+  signum (Finite x) = Finite (signum x)
 
 -- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
 type BarCode a = (a, Extended a)
 
 {- |
   A Persistence landscape is a certain type of piecewise linear function based on a barcode diagram.
-  It can be represented simply as a list of critical points paired with critical values.
+  It can be represented as a list of critical points paired with critical values.
 -}
 type Landscape = Vector (Vector (Extended Double, Extended Double))
 
@@ -201,9 +208,12 @@ simple2Filtr (n, x) =
 -- * Filtration construction
 
 {- |
-  Given a list of scales, a simplicial complex, and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
-  this function creates a filtration out of a simplicial complex by removing simplices that contain edges that are too long for each scale in the list.
-  This is really a helper function to be called by makeRipsFiltrationFast, but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
+  Given a list of scales, a simplicial complex,
+  and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
+  this function creates a filtration out of a simplicial complex by removing simplices
+  that contain edges that are too long for each scale in the list.
+  This is really a helper function to be called by makeRipsFiltrationFast,
+  but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
   The scales MUST be in decreasing order.
 -}
 filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> SimpleFiltration
@@ -215,16 +225,21 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
 
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
-        let longEdges = V.filter (edgeTooLong scl) $ V.map (\(i, v, f) -> v) $ V.head sc --find edges excluded by this scale
+        --find edges excluded by this scale
+        let longEdges = V.filter (edgeTooLong scl) $ V.map (\(i, v, f) -> v) $ V.head sc
         in calcIndices (i - 1) scls $ V.map (V.map (\(j, v, f) ->
-          if j == 0 then --if the simplex has not yet been assigned a fitration index
-            if existsVec (\edge -> edgeInSimplex edge v) longEdges then (i, v, f) --if a long edge is in the simplex, assign it the current index
-            else (0, v, f) --otherwise wait until next iteration
-          else (j, v, f))) sc --otherwise leave it alone
+          --if the simplex has not yet been assigned a fitration index
+          if j == 0 then
+            --if a long edge is in the simplex, assign it the current index
+            if existsVec (\edge -> edgeInSimplex edge v) longEdges then (i, v, f)
+            --otherwise wait until next iteration
+            else (0, v, f)
+          --otherwise leave it alone
+          else (j, v, f))) sc
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quicksort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in reverse order
+              V.map (quickSort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in reverse order
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (i, v, f) =
               let findNew j =
@@ -236,15 +251,19 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
           if V.null simplices then simplices
           else mapWithIndex (\i ss -> V.map ((newFaces i) . fst) ss) sortedSimplices
 
-      sortBoundaries = V.map (V.map (\(i, v, f) -> (i, v, quicksort (\a b -> a <= b) f)))
+      sortBoundaries = V.map (V.map (\(i, v, f) -> (i, v, quickSort (\a b -> a <= b) f)))
 
-  in (numVerts, sortBoundaries $ sortFiltration $ --sort the simplices by filtration index, then sort boundaries so that the boundary chains can be acquired easily
+  --sort the simplices by filtration index,
+  --then sort boundaries so that the boundary chains can be acquired easily
+  in (numVerts, sortBoundaries $ sortFiltration $
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
 {- |
-  Given a list of scales, a metric, and a data set, this function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
-  The scales MUST be in decreasing order. Note that this a fast function, meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
+  Given a list of scales, a metric, and a data set,
+  this function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
+  The scales MUST be in decreasing order. Note that this a fast function,
+  meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
 -}
 makeRipsFiltrationFast :: (Ord a, Eq b) => [a]
                        -> (b -> b -> a)
@@ -253,8 +272,16 @@ makeRipsFiltrationFast :: (Ord a, Eq b) => [a]
 makeRipsFiltrationFast scales metric dataSet =
   filterByWeightsFast scales $ makeRipsComplexFast (L.head scales) metric dataSet
 
--- | The same as filterbyWeightsFast except it uses far less memory at the cost of speed. Note that the scales must be in decreasing order.
-filterByWeightsLight :: Ord a => [a] -> (b -> b -> a) -> Either (Vector b) [b] -> SimplicialComplex -> SimpleFiltration
+{- |
+  The same as filterbyWeightsFast except it uses far less memory at the cost of speed.
+  Note that the scales must be in decreasing order.
+-}
+filterByWeightsLight :: Ord a
+                     => [a]
+                     -> (b -> b -> a)
+                     -> Either (Vector b) [b]
+                     -> SimplicialComplex
+                     -> SimpleFiltration
 filterByWeightsLight scales metric dataSet (numVerts, simplices) =
   let edgeInSimplex edge simplex =
         (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
@@ -264,16 +291,21 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
 
       calcIndices 0 [] sc         = sc
       calcIndices i (scl:scls) sc =
-        let longEdges = V.filter (edgeTooLong scl) $ V.map (\(i, v, f) -> v) $ V.head sc --find edges excluded by this scale
+        --find edges excluded by this scale
+        let longEdges = V.filter (edgeTooLong scl) $ V.map (\(i, v, f) -> v) $ V.head sc
         in calcIndices (i - 1) scls $ V.map (V.map (\(j, v, f) ->
-          if j == 0 then --if the simplex has not yet been assigned a fitration index
-            if existsVec (\edge -> edgeInSimplex edge v) longEdges then (i, v, f) --if a long edge is in the simplex, assign it the current index
-            else (0, v, f) --otherwise wait until next iteration
-          else (j, v, f))) sc --otherwise leave it alone
+          --if the simplex has not yet been assigned a fitration index
+          if j == 0 then
+            --if a long edge is in the simplex, assign it the current index
+            if existsVec (\edge -> edgeInSimplex edge v) longEdges then (i, v, f)
+            --otherwise wait until next iteration
+            else (0, v, f)
+          --otherwise leave it alone
+          else (j, v, f))) sc
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quicksort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in increasing order
+              V.map (quickSort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in increasing order
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (i, v, f) =
               let findNew j =
@@ -289,7 +321,10 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
       calcIndices maxIndex (L.tail scales) $
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
--- | Given a list of scales in decreasing order, a metric, and a data set, this constructs the filtration of Vietoris-Rips complexes corresponding to the scales.
+{- |
+  Given a list of scales in decreasing order, a metric, and a data set,
+  this constructs the filtration of Vietoris-Rips complexes corresponding to the scales.
+-}
 makeRipsFiltrationLight :: (Ord a, Eq b) => [a]
                         -> (b -> b -> a)
                         -> Either (Vector b) [b]
@@ -312,12 +347,14 @@ indexBarCodes :: Filtration -> Vector (Vector (BarCode Int))
 indexBarCodes filtration =
   let maxdim = getDimension (Right filtration)
 
-      --given a vector of indices of simplices which are marked and a vector of boundary chains paired with the indices of their simplices
+      --given a vector of indices of simplices which are marked
+      --and a vector of boundary chains paired with the indices of their simplices
       --remove the unmarked simplices from the chain
       removeUnmarked :: Vector Int -> Vector (Int, Chain) -> Vector (Int, Chain)
       removeUnmarked marked = V.map (\(i, c) -> (i, V.filter (\j -> V.elem j marked) c))
 
-      --eliminate monomials in the boundary chain until it is no longer or there is a monomial which can't be eliminated
+      --eliminate monomials in the boundary chain until it is no longer
+      --or there is a monomial which can't be eliminated
       removePivotRows :: Vector (Maybe Chain) -> Chain -> Chain
       removePivotRows slots chain =
         if V.null chain then V.empty
@@ -326,7 +363,8 @@ indexBarCodes filtration =
             Nothing -> chain
             Just c  -> removePivotRows slots (chain `uin` c)
 
-      --given the indices of the marked simplices from the last iteration, slots from the last iteration, and boundary chains
+      --given the indices of the marked simplices from the last iteration,
+      --slots from the last iteration,and boundary chains
       --mark the appropriate simplices, fill in the appropriate slots, and identify bar codes
       --boundary chains are paired with the index of their coresponding simplex
       makeFiniteBarCodes :: Int
@@ -356,9 +394,11 @@ indexBarCodes filtration =
                          -> Vector (Vector Int)
                          -> Vector (Vector (Maybe Chain))
                          -> Vector (Vector (BarCode Int))
-                         -> (Vector (Vector Int), Vector (Vector (Maybe Chain)), Vector (Vector (BarCode Int)))
+                         -> ( Vector (Vector Int), Vector (Vector (Maybe Chain))
+                            , Vector (Vector (BarCode Int)))
       loopFiniteBarCodes dim marked slots barcodes =
-        if dim > maxdim then (marked, V.tail slots, (V.tail barcodes) V.++ (V.empty `cons` V.empty)) --the slots vector made when looping over the vertices will be null
+        --the slots vector made when looping over the vertices will be null
+        if dim > maxdim then (marked, V.tail slots, (V.tail barcodes) V.++ (V.empty `cons` V.empty))
         else
           let numSlots = if dim == 0 then 0 else V.length $ filtration ! (dim - 1) --see above
               boundaries =
@@ -368,14 +408,17 @@ indexBarCodes filtration =
           in loopFiniteBarCodes (dim + 1) (marked `snoc` newMarked)
             (slots `snoc` newSlots) (barcodes V.++ (newCodes `cons` V.empty))
 
-      --if a simplex isn't marked and has an empty slot, an infinite bar code begins at it's filtration index
+      --if a simplex isn't marked and has an empty slot,
+      --an infinite bar code begins at it's filtration index
       makeInfiniteBarCodes :: Int -> Vector Int -> Vector (Maybe Chain) -> Vector (BarCode Int)
       makeInfiniteBarCodes dim marked slots =
-        V.map (\i -> (one $ filtration ! dim ! i, Infinity)) $ V.filter (\i -> slots ! i == Nothing) marked
+        V.map (\i -> (one $ filtration ! dim ! i, Infinity))
+          $ V.filter (\i -> slots ! i == Nothing) marked
 
       --add the infinite bar codes to the list of bar codes in each dimension
       loopInfiniteBarCodes :: Int
-                           -> (Vector (Vector Int), Vector (Vector (Maybe Chain)), Vector (Vector (BarCode Int)))
+                           -> ( Vector (Vector Int), Vector (Vector (Maybe Chain))
+                              , Vector (Vector (BarCode Int)))
                            -> Vector (Vector (BarCode Int))
       loopInfiniteBarCodes dim (marked, slots, barcodes) =
         if dim > maxdim then barcodes
@@ -386,76 +429,10 @@ indexBarCodes filtration =
   in V.map (V.filter (\(a, b) -> b /= Finite a))
     $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty V.empty
 
-{--
 {- |
-  Same as indexBarCodes above except this function pairs every barcode with the indices of the vertices that
-  start the barcode.
+  Same as above except this function acts on filtrations whose vertices all have filtration index zero
+  (for a very slight speedup).
 -}
-indexBarCodeVertices :: Filtration -> [[(BarCode Int, Vector Int)]]
-indexBarCodeVertices filtration =
-  let maxdim = getDimension (Right filtration)
-
-      --given a vector of indices of simplices which are marked and a vector of boundary chains paired with the indices of their simplices
-      --remove the unmarked simplices from the chain
-      removeUnmarked :: Vector Int -> Vector (Int, Chain) -> Vector (Int, Chain)
-      removeUnmarked marked = V.map (\(i, c) -> (i, V.filter (\j -> V.elem j marked) c))
-
-      --eliminate monomials in the boundary chain until it is no longer or there is a monomial which can't be eliminated
-      --also keeps track of which simplex boundaries are added in the process of elimination
-      removePivotRows :: Vector (Maybe (Chain, Int)) -> (Chain, Vector Int) -> (Chain, Vector Int)
-      removePivotRows slots (chain, simplices) =
-        if V.null chain then (V.empty, simplices)
-        else
-          case slots ! (V.head chain) of
-            Nothing     -> (chain, simplices)
-            Just (c, s) -> removePivotRows slots ((chain `uin` c), simplices `snoc` s)
-
-      --given the indices of the marked simplices from the last iteration, slots from the last iteration, and boundary chains
-      --mark the appropriate simplices, fill in the appropriate slots, and identify bar codes
-      --boundary chains are paired with the index of their coresponding simplex
-      makeFiniteBarCodes :: Int -> Int -> Vector (Int, Vector Int) -> Vector (Maybe (Chain, Int)) -> Vector (Int, Chain) -> [(BarCode Int, Vector Int)] -> (Vector (Int, Vector Int), Vector (Maybe (Chain, Int)), [(BarCode Int, Vector Int)])
-      makeFiniteBarCodes dim index newMarked slots boundaries barcodes =
-        if V.null boundaries then (newMarked, slots, barcodes)
-        else
-          let boundary             = V.head boundaries
-              (reduced, simplices) = removePivotRows slots (snd boundary, V.empty)
-              vertices             = V.foldl1 (V.++) $ V.map (\i -> two $ filtration ! dim ! i) simplices
-          in
-            --mark the simplex if its boundary chain is reduced to null
-            if V.null reduced then makeFiniteBarCodes dim (index + 1) (newMarked `snoc` (fst boundary, vertices)) slots (V.tail boundaries) barcodes
-            else
-              let pivot = V.head reduced
-              --put the pivot chain in the pivot's slot, add the new barcode to the list together with all the indices of the vertices of the simplices in the reduced chain
-              in makeFiniteBarCodes dim (index + 1) newMarked (replaceElem pivot (Just (reduced, index)) slots) (V.tail boundaries)
-                (((one $ filtration ! (dim - 1) ! pivot, Finite $ one $ filtration ! dim ! (fst boundary)), vertices):barcodes)
-
-      --get the finite bar codes for each dimension
-      loopFiniteBarCodes :: Int -> Vector (Vector (Int, Vector Int)) -> Vector (Vector (Maybe (Chain, Int))) -> [[(BarCode Int, Vector Int)]] -> (Vector (Vector (Int, Vector Int)), Vector (Vector (Maybe (Chain, Int))), [[(BarCode Int, Vector Int)]])
-      loopFiniteBarCodes dim marked slots barcodes =
-        if dim > maxdim then (marked, V.tail slots, (L.tail barcodes) L.++ [[]]) --the slots vector made when looping over the vertices will be null
-        else
-          let numSlots = if dim == 0 then 0 else V.length $ filtration ! (dim - 1) --see above
-              boundaries = removeUnmarked (V.map fst $ V.last marked) $ mapWithIndex (\i (_, _, f) -> (i, f)) $ filtration ! dim
-              (newMarked, newSlots, newCodes) = makeFiniteBarCodes 0 dim V.empty (V.replicate numSlots Nothing) boundaries []
-          in loopFiniteBarCodes (dim + 1) (marked `snoc` newMarked) (slots `snoc` newSlots) (barcodes L.++ [newCodes])
-
-      --if a simplex isn't marked and has an empty slot, an infinite bar code begins at it's filtration index
-      makeInfiniteBarCodes :: Int -> Vector (Int, Vector Int) -> Vector (Maybe (Chain, Int)) -> [(BarCode Int, Vector Int)]
-      makeInfiniteBarCodes dim marked slots =
-        V.toList $ V.map (\(i, v) -> ((one $ filtration ! dim ! i, Infinity), v)) $ V.filter (\(i, _) -> slots ! i == Nothing) marked
-
-      --add the infinite bar codes to the list of bar codes in each dimension
-      loopInfiniteBarCodes :: Int -> (Vector (Vector (Int, Vector Int)), Vector (Vector (Maybe (Chain, Int))), [[(BarCode Int, Vector Int)]]) -> [[(BarCode Int, Vector Int)]]
-      loopInfiniteBarCodes dim (marked, slots, barcodes) =
-        if dim > maxdim then barcodes
-        else
-          loopInfiniteBarCodes (dim + 1) (marked, slots, replaceElemList dim ((barcodes !! dim)
-            L.++ (makeInfiniteBarCodes dim (marked ! dim) (slots ! dim))) barcodes)
-
-  in L.map (L.filter (\((a, b), _) -> b /= Finite a)) $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty []
---}
-
--- | Same as above except this function acts on filtrations whose vertices all have filtration index zero (for a very slight speedup).
 indexBarCodesSimple :: SimpleFiltration -> Vector (Vector (BarCode Int))
 indexBarCodesSimple (numVerts, allSimplices) =
   let removeUnmarked marked = V.filter (\x -> V.elem x marked)
@@ -465,7 +442,7 @@ indexBarCodesSimple (numVerts, allSimplices) =
         else
           case reduced ! (V.head chain) of
             Nothing -> chain
-            Just t  -> removePivotRows reduced (chain `uin` t) --eliminate the element corresponding to the pivot in a different chain
+            Just t  -> removePivotRows reduced (chain `uin` t)
 
       makeBarCodesAndMark :: Int
                           -> Int
@@ -596,7 +573,7 @@ indexMetric (i, Finite j) (k, Finite l) =
 {- |
   Given a metric, return the Hausdorff distance
   (referred to as bottleneck distance in TDA) between the two sets.
-  Returns noting if either list of barcodes is empty.
+  Returns nothing if either list of barcodes is empty.
 -}
 bottleNeckDistance :: Ord b => (BarCode a -> BarCode a -> Extended b)
                    -> Vector (BarCode a)
@@ -610,7 +587,10 @@ bottleNeckDistance metric diagram1 diagram2
         second = V.maximum $ V.map (\p -> V.minimum $ V.map (metric p) diagram1) diagram2
     in Just $ max first second
 
--- |  Get's all the bottleneck distances; a good way to determine the similarity of the topology of two filtrations.
+{- |
+  Get's all the bottleneck distances;
+  a good way to determine the similarity of the topology of two filtrations.
+-}
 bottleNeckDistances :: Ord b => (BarCode a -> BarCode a -> Extended b)
                     -> Vector (Vector (BarCode a))
                     -> Vector (Vector (BarCode a))
@@ -618,92 +598,49 @@ bottleNeckDistances :: Ord b => (BarCode a -> BarCode a -> Extended b)
 bottleNeckDistances metric diagrams1 diagrams2 =
   let d = (L.length diagrams1) - (L.length diagrams2)
   in
-    if d >= 0 then (V.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) V.++ (V.replicate d Nothing)
+    if d >= 0
+    then (V.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) V.++ (V.replicate d Nothing)
     else (V.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) V.++ (V.replicate (-d) Nothing)
 
-{--}
-calcLandscape :: Vector (BarCode Int) -> Landscape
+{--
+{- |
+  Compute the persistence landscape of the barcodes for a single dimension.
+  Returns `Nothing` if infinite barcodes are included.
+-}
+calcLandscape :: Vector (BarCode Int) -> Maybe Landscape
 calcLandscape barcodes =
-  let rel1 (i,j) (k,l) --should be double checked
-        if i > k  then True
-        else if i == k && j <= l then True
-        else False
+  if V.exists (\(_, i) -> i == Infinity) barcodes
+  then Nothing
+  else
+    let rel1 (i,j) (k,l) --should be double checked
+          if i > k  then True
+          else if i == k && j <= l then True
+          else False
 
-      greaterThan (i,j) (k,l) =
-        case j of
-          Infinity    -> True
-          MinusInfnty -> False
-          Finite j'   ->
-            case l of
-              Infinity    -> True
-              MinusInfnty -> False
-              Finite l'   ->
-                if l' == j' then False
-                else if l' < j' then False
-                else True
-
-      loop :: Int -> Landscape -> Vector (BarCode Double) -> Landscape
-      loop index result barcodes =
-        let 
-            loop' :: Int -> Landscape -> BarCode Double -> Vector (BarCode Double) -> Landscape
-            loop' i r (b, d) xs =
-              case V.findIndex (greaterThan (b, d)) xs of
-                Nothing ->
-                  let r1 = V.head r; r2 = V.last r
-                  in r1 `snoc` (r2 V.++ (V.fromList [(Finite d, 0.0), (0.0, Infinity)]))
-                Just j  ->
-                  let (b', d') = xs ! j
-                      xs'      = (V.take j xs) V.++ (V.drop (j + 1) xs)
-                      new      =
-                        if b' >= d then
-                          if b' == d then [(Finite 0.0, b')]
-                          else [(Finite 0.0, d), (Finite 0.0, b')]
-                        else []
-                  in
-                    case new of
-                      [] ->
-                        let new' = ((Finite 0.5)*(d + b'), (Finite 0.5)*(d - b'))
-                            xs'' = orderedInsert new' xs'
-                        in
-                          if d' == Infinity then
-                            let r1 = V.head r; r2 = V.last r
-                            in r1 `snoc` (r2 V.++ (V.fromList [new', (Infinity, Infinity)]))
-                          else
-                            let new'' = (V.empty `snoc` new') `snoc` ((Finite 0.5)*(b' + d'), (Finite 0.5)*(d' - b'))
-                            in loop' j (r1 `snoc` (r2 V.++ new'')) (b', d') xs''
-                      _  ->
-                        if d' == Infinity then
-                          let r1 = V.head r; r2 = V.last r
-                          in r1 `snoc` (r2 V.++ (V.fromList [new', (Infinity, Infinity)]))
-                        else
-                          let new'' = (V.empty `snoc` new') `snoc` ((Finite 0.5)*(b' + d'), (Finite 0.5)*(d' - b'))
-                          in loop' j (r1 `snoc` (r2 V.++ new'')) (b', d') xs''
-
-        in
-          if V.null barcodes then result
-          else
-            let (b, d) = V.head barcodes; xs = V.tail barcodes in
-            in
-              if d == Infinity then
-                if b == MinusInfty then
-                  let result' = result
-                        `snoc` (V.fromList [(MinusInfty, Infinity), (Infinity, Infinity)])
-                          `snoc` (V.fromList [(MinusInfty, Finite 0.0), (b, Finite 0.0), (Infinity, Infinity)])
-                  in
-                    if b == Infinity then
-                      let result'' = (V.init result') `snoc` ((V.last result) V.++ (MinusInfty, Infinity))
-                      in loop' index result (b, d) xs
-                let new = V.fromList
-                        $ [ (MinusInfty, Finite 0.0)
-                        , (Finite b, Finite 0.0)
-                        , (Infinity, Infinity)
-                        ]
-                in
-              else
-                let new = V.fromList
-                        $ [ (MinusInfty, Finite 0.0)
-                        , (Finite b, Finite 0.0)
-                        , (0.5*(d0 + b), 0.5*(d0 - b))
-                        ]
-                in
+        greaterThan (i,j) (k,l) =
+          case j of
+            Infinity    -> True
+            MinusInfty -> False
+            Finite j'   ->
+              case l of
+                Infinity    -> True
+                MinusInfty -> False
+                Finite l'   ->
+                  if l' == j' then False
+                  else if l' < j' then False
+                  else True
+            
+        outerLoop :: Bool
+                  -> Int
+                  -> State (Vector (Barcode Int)) Maybe Landscape
+                  -> State (Vector (Barcode Int)) Maybe Landscape
+        outerLoop condition index state = do
+          barcodes <- get state
+          unless (L.null barcodes) ( do
+            let (b,d) = L.head barcodes
+            let newLandscape
+            outerLoop newCondition (index + 1) s
+          )
+          state
+  
 --}
