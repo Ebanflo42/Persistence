@@ -58,7 +58,7 @@ import SimplicialComplex
 
 import Data.List as L
 import Data.Vector as V
-import Control.Monad.ST.Lazy
+import Control.Monad.State.Lazy
 import Control.Parallel.Strategies
 import Data.Algorithm.MaximalCliques
 
@@ -159,6 +159,11 @@ instance Num a => Num (Extended a) where
   signum Infinity   = Finite (fromInteger 1)
   signum MinusInfty = Finite (fromInteger (-1))
   signum (Finite x) = Finite (signum x)
+
+fi :: (Integral a, Floating b) => Extended a -> Extended b
+fi (Finite i) = Finite $ fromIntegral i
+fi Infinity   = Infinity
+fi MinusInfty = MinusInfty
 
 -- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
 type BarCode a = (a, Extended a)
@@ -602,45 +607,81 @@ bottleNeckDistances metric diagrams1 diagrams2 =
     then (V.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) V.++ (V.replicate d Nothing)
     else (V.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) V.++ (V.replicate (-d) Nothing)
 
-{--
+{--}
 {- |
   Compute the persistence landscape of the barcodes for a single dimension.
   Returns `Nothing` if infinite barcodes are included.
 -}
-calcLandscape :: Vector (BarCode Int) -> Maybe Landscape
-calcLandscape barcodes =
-  if V.exists (\(_, i) -> i == Infinity) barcodes
-  then Nothing
-  else
-    let rel1 (i,j) (k,l) --should be double checked
-          if i > k  then True
-          else if i == k && j <= l then True
-          else False
+calcLandscape :: Vector (BarCode Int) -> Landscape
+calcLandscape brcds =
+  let half = Finite 0.5
+    
+      (i,j) `leq` (k,l) = i > k || j <= l
 
-        greaterThan (i,j) (k,l) =
-          case j of
-            Infinity    -> True
-            MinusInfty -> False
-            Finite j'   ->
-              case l of
-                Infinity    -> True
-                MinusInfty -> False
-                Finite l'   ->
-                  if l' == j' then False
-                  else if l' < j' then False
-                  else True
-            
-        outerLoop :: Bool
-                  -> Int
-                  -> State (Vector (Barcode Int)) Maybe Landscape
-                  -> State (Vector (Barcode Int)) Maybe Landscape
-        outerLoop condition index state = do
-          barcodes <- get state
-          unless (L.null barcodes) ( do
-            let (b,d) = L.head barcodes
-            let newLandscape
-            outerLoop newCondition (index + 1) s
-          )
-          state
-  
+      innerLoop :: (Extended Double, Extended Double)
+                -> Vector (Extended Double, Extended Double)
+                -> Landscape
+                -> Landscape
+      innerLoop (b, d) barcodes result =
+        case V.findIndex (\(b', d') -> d' > d) barcodes of
+          Nothing ->
+            outerLoop barcodes (((V.fromList [(0, b), (Infinity, 0)])
+              V.++ (V.head result)) `cons` (V.tail result))
+          Just i  -> let (b', d') = barcodes ! i in
+            if b' >= d then
+              if b == d then
+                let new = [(Finite 0.0, b')]
+                in
+                  if d' == Infinity then
+                    outerLoop (rmElement i barcodes) (((V.fromList ((Infinity, Infinity):new))
+                      V.++ (V.head result)) `cons` (V.tail result))
+                  else
+                    innerLoop (b', d') (rmElement i barcodes)
+                      ((V.fromList ((half*(b' + d'), half*(d' - b')):new)
+                        V.++ (V.head result)) `cons` (V.tail result))
+              else
+                let new = [(Finite 0.0, d), (Finite 0.0, b')]
+                in
+                  if d' == Infinity then
+                    outerLoop (rmElement i barcodes) (((V.fromList ((Infinity, Infinity):new))
+                      V.++ (V.head result)) `cons` (V.tail result))
+                  else
+                    innerLoop (b', d') (rmElement i barcodes)
+                      (((V.fromList ((half*(b' + d'), half*(d' - b')):new))
+                        V.++ (V.head result)) `cons` (V.tail result))
+            else
+              let newbr = (half*(b' + d), half*(d - b'))
+              in
+                if d' == Infinity then
+                  outerLoop (orderedInsert leq newbr barcodes)
+                    (((V.fromList [(Infinity, Infinity), newbr])
+                      V.++ (V.head result)) `cons` (V.tail result))
+                else
+                  innerLoop (b', d') (orderedInsert leq newbr barcodes)
+                    (((V.fromList [(half*(b' + d'), half*(d' - b')), newbr])
+                      V.++ (V.head result)) `cons` (V.tail result))
+
+      outerLoop :: Vector (Extended Double, Extended Double) -> Landscape -> Landscape
+      outerLoop barcodes result =
+        if not $ V.null barcodes then
+          let (b, d) = V.head barcodes
+          in
+            if (b, d) == (MinusInfty, Infinity)
+            then
+              outerLoop (V.tail barcodes)
+                ((V.fromList [(MinusInfty, Infinity),
+                  (Infinity, Infinity)]) `cons` result)
+            else if d == Infinity
+            then
+              outerLoop (V.tail barcodes) ((V.fromList
+                [(MinusInfty, Finite 0.0),(b, Finite 0.0),(Infinity,Infinity)]) `cons` result)
+            else
+              let newCritPoints =
+                    if b == Infinity
+                    then [(MinusInfty, Infinity)]
+                    else [(MinusInfty, Finite 0.0), (half*(b + d), half*(d - b))]
+              in innerLoop (b, d) (V.tail barcodes) ((V.fromList newCritPoints) `cons` result)
+        else result
+
+  in outerLoop (quickSort leq $ V.map (\(i, j) -> (fi $ Finite i, fi j)) brcds) V.empty
 --}

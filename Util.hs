@@ -120,6 +120,12 @@ switchElems i j vector
         third  = V.drop (j + 1) vector
     in first V.++ (cons (vector ! j) second) V.++ (cons (vector ! i) third)
 
+-- | Remove the element at the given index. Unsafe.
+rmElement :: Int -> Vector a -> Vector a
+rmElement i v = (V.take i v) V.++ (V.drop i v)
+
+-- | Insert an element into a sorted list.
+
 -- | Return all vectors missing exactly one element from the original vector.
 getCombos :: Vector a -> Vector (Vector a)
 getCombos vector =
@@ -257,7 +263,10 @@ quickSort rel vector = --rel is the <= operator
 orderedInsert :: (a -> a -> Bool) -> a -> Vector a -> Vector a
 orderedInsert rel x vector = --rel is the <= operator
   case V.findIndex (\y -> y `rel` x) vector of
-    Just i  -> (V.take i vector) V.++ (x `cons` (V.drop (i + 1) vector))
+    Just i  ->
+      case V.findIndex (\y -> x `rel` y) $ V.drop i vector of
+        Just j  -> (V.take (i + j) vector) V.++ (x `cons` (V.drop (i + j) vector))
+        Nothing -> (V.take i vector) V.++ (x `cons` (V.drop i vector))
     Nothing -> vector `snoc` x
 
 -- | Takes the union of all of the vectors.
