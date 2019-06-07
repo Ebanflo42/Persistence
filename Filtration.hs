@@ -58,9 +58,9 @@ import SimplicialComplex
 
 import Data.List as L
 import Data.Vector as V
-import Control.Monad.State.Lazy
-import Control.Parallel.Strategies
 import Data.Algorithm.MaximalCliques
+
+import Control.Parallel.Strategies
 
 -- * Types
 
@@ -224,7 +224,7 @@ simple2Filtr (n, x) =
 filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> SimpleFiltration
 filterByWeightsFast scales ((numVerts, simplices), graph) =
   let edgeInSimplex edge simplex =
-        (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
+        (V.any (\x -> V.head edge == x) simplex) && (V.any (\x -> V.last edge == x) simplex)
       edgeTooLong scale edge     = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
       maxIndex                   = (L.length scales) - 1
 
@@ -236,7 +236,7 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
           --if the simplex has not yet been assigned a fitration index
           if j == 0 then
             --if a long edge is in the simplex, assign it the current index
-            if existsVec (\edge -> edgeInSimplex edge v) longEdges then (i, v, f)
+            if V.any (\edge -> edgeInSimplex edge v) longEdges then (i, v, f)
             --otherwise wait until next iteration
             else (0, v, f)
           --otherwise leave it alone
@@ -289,7 +289,7 @@ filterByWeightsLight :: Ord a
                      -> SimpleFiltration
 filterByWeightsLight scales metric dataSet (numVerts, simplices) =
   let edgeInSimplex edge simplex =
-        (existsVec (\x -> V.head edge == x) simplex) && (existsVec (\x -> V.last edge == x) simplex)
+        (V.any (\x -> V.head edge == x) simplex) && (V.any (\x -> V.last edge == x) simplex)
       vector                     = case dataSet of Left v -> v; Right l -> V.fromList l
       edgeTooLong scale edge     = scale <= (metric (vector ! (edge ! 0)) (vector ! (edge ! 1)))
       maxIndex                   = (L.length scales) - 1
@@ -302,7 +302,7 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
           --if the simplex has not yet been assigned a fitration index
           if j == 0 then
             --if a long edge is in the simplex, assign it the current index
-            if existsVec (\edge -> edgeInSimplex edge v) longEdges then (i, v, f)
+            if V.any (\edge -> edgeInSimplex edge v) longEdges then (i, v, f)
             --otherwise wait until next iteration
             else (0, v, f)
           --otherwise leave it alone
@@ -633,20 +633,20 @@ calcLandscape brcds =
                 let new = [(Finite 0.0, b')]
                 in
                   if d' == Infinity then
-                    outerLoop (rmElement i barcodes) (((V.fromList ((Infinity, Infinity):new))
+                    outerLoop (rmIndex i barcodes) (((V.fromList ((Infinity, Infinity):new))
                       V.++ (V.head result)) `cons` (V.tail result))
                   else
-                    innerLoop (b', d') (rmElement i barcodes)
+                    innerLoop (b', d') (rmIndex i barcodes)
                       ((V.fromList ((half*(b' + d'), half*(d' - b')):new)
                         V.++ (V.head result)) `cons` (V.tail result))
               else
                 let new = [(Finite 0.0, d), (Finite 0.0, b')]
                 in
                   if d' == Infinity then
-                    outerLoop (rmElement i barcodes) (((V.fromList ((Infinity, Infinity):new))
+                    outerLoop (rmIndex i barcodes) (((V.fromList ((Infinity, Infinity):new))
                       V.++ (V.head result)) `cons` (V.tail result))
                   else
-                    innerLoop (b', d') (rmElement i barcodes)
+                    innerLoop (b', d') (rmIndex i barcodes)
                       (((V.fromList ((half*(b' + d'), half*(d' - b')):new))
                         V.++ (V.head result)) `cons` (V.tail result))
             else

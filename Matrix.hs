@@ -206,7 +206,7 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
               next  = i + 1
           in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
             if pivot == 0 then
-              if forallVec (\a -> a == 0) row then mat
+              if V.all (\a -> a == 0) row then mat
               else error "Pivot was found to be zero, Matrix.hs line 210"
             else
               if x == 0 || (x `mod` pivot == 0) then
@@ -260,7 +260,7 @@ rankInt matrix =
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ V.map (\i -> if existsVec (\j -> mat ! j ! i /= 0) $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
+        V.sum $ V.map (\i -> if V.any (\j -> mat ! j ! i /= 0) $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
 
@@ -320,7 +320,7 @@ rankIntPar matrix =
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ parMapVec (\i -> if existsVec (\j -> mat ! j ! i /= 0) $
+        V.sum $ parMapVec (\i -> if V.any (\j -> mat ! j ! i /= 0) $
           0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
@@ -395,7 +395,7 @@ finish diagLen matrix =
                 improve   = colOperation i i1 (thr gcdTriple, two gcdTriple, -(nextE `div` gcd), entry `div` gcd)
                 cleanup   = \m -> elimColInt (i, i) $ elimRowInt (i, i) m
             in calc i1 $ cleanup $ improve mat'
-      filtered = biFilter (\row -> existsVec (\x -> x /= 0) row) matrix
+      filtered = V.partition (\row -> V.any (\x -> x /= 0) row) matrix
   in calc 0 $ (fst filtered) V.++ (snd filtered)
 
 -- | Get the Smith normal form of an integer matrix.
@@ -542,7 +542,7 @@ kernelInt matrix =
       result   = doColOps (0, 0) (matrix, identity)
       elems    = fst result
       ide      = snd result
-  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
+  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> V.all (\row -> row ! i == 0) elems) $ 0 `range` cols1
 
 --improves row in parallel and does the same thing to the identity matrix in parallel
 improveRowIntWithIdPar :: (Int, Int) -> Int -> IMatrix -> IMatrix -> (IMatrix, Int, IMatrix)
@@ -599,7 +599,7 @@ kernelIntPar matrix =
       result   = doColOps (0, 0) (matrix, identity)
       elems    = fst result
       ide      = snd result
-  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
+  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> V.all (\row -> row ! i == 0) elems) $ 0 `range` cols1
 
 --FIND IMAGE IN BASIS OF KERNEL-------------------------------------------
 
@@ -663,7 +663,7 @@ imgInKerInt toColEsch toImage =
       result  = doColOps (0, 0) (toColEsch, toImage)
       colEsch = fst result
       image   = snd result
-  in V.map (\i -> image ! i) $ V.filter (\i -> forallVec (\row -> row ! i == 0) colEsch) $ 0 `range` (cols - 1)
+  in V.map (\i -> image ! i) $ V.filter (\i -> V.all (\row -> row ! i == 0) colEsch) $ 0 `range` (cols - 1)
 
 --improves row and does inverse operations in parallel
 improveRowIntWithInvPar :: (Int, Int) -> Int -> IMatrix -> IMatrix -> (IMatrix, Int, IMatrix)
@@ -727,7 +727,7 @@ imgInKerIntPar toColEsch toImage =
       result = doColOps (0, 0) (toColEsch, toImage)
       ker    = fst result
       img    = snd result
-  in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> row ! i == 0) ker) $ 0 `range` (cols - 1)
+  in V.map (\i -> img ! i) $ V.filter (\i -> V.all (\row -> row ! i == 0) ker) $ 0 `range` (cols - 1)
 
 --BOOLEAN MATRICES--------------------------------------------------------
 
@@ -775,7 +775,7 @@ rankBool matrix =
 
       countNonZeroCols mat =
         V.sum $ V.map (\i ->
-           if existsVec (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
+           if V.any (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
   in countNonZeroCols $ doColOps (0, 0) matrix
 
 --KERNEL------------------------------------------------------------------
@@ -818,7 +818,7 @@ kernelBool matrix =
       result = doColOps (0, 0) (matrix, identity)
       ker    = fst result
       img    = snd result
-  in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> not $ row ! i) ker) $ 0 `range` cols1
+  in V.map (\i -> img ! i) $ V.filter (\i -> V.all (\row -> not $ row ! i) ker) $ 0 `range` cols1
 
 --IMAGE IN BASIS OF KERNEL------------------------------------------------
 
@@ -858,4 +858,4 @@ imgInKerBool toColEch toImage =
       result = doColOps (0, 0) (toColEch, toImage)
       ker    = fst result
       img    = snd result
-  in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> not $ row ! i) ker) $ 0 `range` cols1
+  in V.map (\i -> img ! i) $ V.filter (\i -> V.all (\row -> not $ row ! i) ker) $ 0 `range` cols1

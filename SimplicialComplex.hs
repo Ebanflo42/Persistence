@@ -136,7 +136,7 @@ makeCliqueComplex graph =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = biFilter (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
         in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
 
       makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
@@ -181,7 +181,7 @@ makeCliqueComplexPar graph =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = biFilter (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
         in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
 
       makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
@@ -248,7 +248,7 @@ makeRipsComplexLight scale metric dataSet =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = biFilter (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
         in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
 
       makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
@@ -295,7 +295,7 @@ makeRipsComplexLightPar scale metric dataSet =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = biFilter (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
         in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
 
       makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique

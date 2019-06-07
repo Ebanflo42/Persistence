@@ -15,7 +15,10 @@ import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies
 
--- | Simple instance of Num where True is 1 and False is 0, all operations work like arithmetic modulo 2.
+{- |
+  Simple instance of Num where True is 1 and False is 0, 
+  all operations work like arithmetic modulo 2.
+-}
 instance Num Bool where
   p + q  = p `xor` q
   p * q  = p && q
@@ -70,7 +73,7 @@ add = V.zipWith (+)
 subtr :: Num a => Vector a -> Vector a -> Vector a
 subtr = V.zipWith (\x y -> x - y)
 
--- | Dot product.
+-- | Dot product. WARNING: vectors must be the same length.
 dotProduct :: Num a => Vector a -> Vector a -> a
 dotProduct vec1 vec2
   | a && b = fromIntegral 0
@@ -79,7 +82,11 @@ dotProduct vec1 vec2
   | otherwise   = (V.head vec1)*(V.head vec2) + (dotProduct (V.tail vec1) (V.tail vec2))
     where a = V.null vec1; b = V.null vec2
 
--- | Extended Euclidean algorithm. Finds the gcd of the two inputs plus the coefficients that multiply each input and sum to give the gcd.
+{- |
+  Extended Euclidean algorithm.
+  Finds the gcd of the two inputs
+  plus the coefficients that multiply each input and sum to give the gcd.
+-}
 extEucAlg :: Integral a => a -> a -> (a, a, a)
 extEucAlg a b =
   let eeaHelper r s t =
@@ -97,7 +104,10 @@ extEucAlg a b =
             in eeaHelper (r2, nextr) (s2, nexts) (t2, nextt)
   in (\(x, y, z) -> if x < 0 then (-x, -y, -z) else (x, y, z)) $ eeaHelper (a, b) (0, 1) (1, 0)
 
--- | Returns whether or not the first number divides the second number.
+{- |
+  Returns whether or not the first number divides the second number.
+  Instead of throwing an error, returns False if the first argument is 0.
+-}
 divides :: Int -> Int -> Bool
 0 `divides` b = False
 a `divides` b
@@ -120,28 +130,23 @@ switchElems i j vector
         third  = V.drop (j + 1) vector
     in first V.++ (cons (vector ! j) second) V.++ (cons (vector ! i) third)
 
--- | Remove the element at the given index. Unsafe.
-rmElement :: Int -> Vector a -> Vector a
-rmElement i v = (V.take i v) V.++ (V.drop i v)
+-- | Remove the element at the given index. Unsafe use of take and drop.
+rmIndex :: Int -> Vector a -> Vector a
+rmIndex i v = (V.take i v) V.++ (V.drop i v)
 
--- | Insert an element into a sorted list.
+-- | Generate a range of integers in vector form.
+range :: Int -> Int -> Vector Int
+range x y
+  | x == y = x `cons` empty
+  | x < y  = x `cons` (range (x + 1) y)
+  | x > y  = (range x (y + 1)) `snoc` y
 
--- | Return all vectors missing exactly one element from the original vector.
+{- |
+  Return all vectors missing exactly one element from the original vector.
+  Assumes the vector is non-empty.
+-}
 getCombos :: Vector a -> Vector (Vector a)
-getCombos vector =
-  let len    = V.length vector
-      calc i =
-        if i == len then empty
-        else
-          let i1 = i + 1
-          in ((V.take i vector) V.++ (V.drop i1 vector)) `cons` (calc i1)
-  in calc 0
-
--- | Returns whether or not every element satisfies the predicate.
-forallVec :: (a -> Bool) -> Vector a -> Bool
-forallVec p vector =
-  if V.null vector then True
-  else (p $ V.head vector) && (forallVec p $ V.tail vector)
+getCombos vector = V.map (\i -> rmIndex i vector) $ 0 `range` (V.length vector - 1)
 
 -- | Map a function that takes into account the index of each element.
 mapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
@@ -151,17 +156,25 @@ mapWithIndex f vector =
         else cons (f i $ V.head vec) $ helper (i + 1) (V.tail vec)
   in helper 0 vector
 
+-- | Filter a vector with a predicate that takes into account the index of the element.
+filterWithIndex :: (Int -> a -> Bool) -> Vector a -> Vector a
+filterWithIndex p vector =
+  let maxIndex = V.length vector - 1
+      calc i
+        | i == maxIndex    = V.empty
+        | p i (vector ! i) = (vector ! i) `cons` calc (i + 1)
+        | otherwise        = calc (i + 1)
+  in calc 0
+
+-- | Parallel map a function over a vector.
+parMapVec :: (a -> b) -> Vector a -> Vector b
+parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
+
 -- | Map a function that takes into account the index of each element in parallel.
 parMapWithIndex :: (Int -> a -> b) -> Vector a -> Vector b
-parMapWithIndex f vector =
-  let helper i vec = runEval $
-        if V.null vec then return empty
-        else
-          let current = f i $ V.head vec; rest = helper (i + 1) $ V.tail vec
-          in rpar current >> rseq rest >> (return $ current `cons` rest)
-  in helper 0 vector
+parMapWithIndex f = runEval . (evalTraversable rpar) . mapWithIndex f
 
--- | Return the element satisfying the predicate and its index if it exists.
+-- | Return the first element satisfying the predicate and its index if it exists.
 elemAndIndex :: (a -> Bool) -> Vector a -> Maybe (a, Int)
 elemAndIndex p vector =
   let helper i vec
@@ -182,66 +195,22 @@ elemAndIndices p vector =
 -- | Given a relation and two vectors, find all pairs of elements satisfying the relation.
 findBothElems :: (a -> b -> Bool) -> Vector a -> Vector b -> Vector (a, b)
 findBothElems rel vector1 vector2 =
-  let len = V.length vector1
- 
-      calc i result =
-        let a = vector1 ! i
-        in
-          if i == len then result
-          else case V.find (\b -> rel a b) vector2 of
-            Just b  -> calc (i + 1) $ result `snoc` (a, b)
-            Nothing -> calc (i + 1) result
-
-  in calc 0 V.empty
-
-{- |
-  Return the vector of elements that satisfy the predicate in the first component and
-  the vector of elements that don't satisfy the predicate in the second component.
--}
-biFilter :: (a -> Bool) -> Vector a -> (Vector a, Vector a)
-biFilter p vector =
-  let calc true false v
-        | V.null v  = (true, false)
-        | p x       = calc (true `snoc` x) false $ V.tail v
-        | otherwise = calc true (false `snoc` x) $ V.tail v
-        where x = V.head v
-  in calc V.empty V.empty vector
+  flatten $ V.map (\a -> V.map (\b -> (a, b)) $ V.filter (rel a) vector2) vector1
 
 -- | Orders a list of vectors from greatest to least length.
 sortVecs :: [Vector a] -> [Vector a]
-sortVecs []     = []
-sortVecs (v:vs) =
-  let len  = V.length v
-      less = sortVecs $ L.filter (\u -> V.length u < len) vs
-      more = sortVecs $ L.filter (\u -> V.length u >= len) vs
-  in more L.++ [v] L.++ less
+sortVecs =
+  let ordering v1 v2
+        | (V.length v1) > (V.length v2) = GT
+        | (V.length v1) < (V.length v2) = LT
+        | otherwise                     = EQ
+  in L.sortBy ordering
 
--- | Parallel map a function over a vector.
-parMapVec :: (a -> b) -> Vector a -> Vector b
-parMapVec f v = runEval $ evalTraversable rpar $ V.map f v
-
--- | Filter a vector with a predicate that takes into account the index of the element.
-filterWithIndex :: (Int -> a -> Bool) -> Vector a -> Vector a
-filterWithIndex p vector =
-  let maxIndex = V.length vector - 1
-      calc i
-        | i == maxIndex    = V.empty
-        | p i (vector ! i) = (vector ! i) `cons` calc (i + 1)
-        | otherwise        = calc (i + 1)
-  in calc 0
-
--- | Generate a range of integers in vector form.
-range :: Int -> Int -> Vector Int
-range x y
-  | x == y = x `cons` empty
-  | x < y  = x `cons` (range (x + 1) y)
-  | x > y  = (range x (y + 1)) `snoc` y
-
--- | Replace the element at the given index with the given element.
+-- | Replace the element at the given index with the given element. Unsafe use of take and drop.
 replaceElem :: Int -> a -> Vector a -> Vector a
 replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 
--- | Replace the element at the given index with the given element.
+-- | Replace the element at the given index with the given element. Unsafe use of take and drop.
 replaceElemList :: Int -> a -> [a] -> [a]
 replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 
@@ -261,13 +230,9 @@ quickSort rel vector = --rel is the <= operator
   this inserts the value in the correct position.
 -}
 orderedInsert :: (a -> a -> Bool) -> a -> Vector a -> Vector a
-orderedInsert rel x vector = --rel is the <= operator
-  case V.findIndex (\y -> y `rel` x) vector of
-    Just i  ->
-      case V.findIndex (\y -> x `rel` y) $ V.drop i vector of
-        Just j  -> (V.take (i + j) vector) V.++ (x `cons` (V.drop (i + j) vector))
-        Nothing -> (V.take i vector) V.++ (x `cons` (V.drop i vector))
-    Nothing -> vector `snoc` x
+orderedInsert rel x vector =
+  let (less, greater) = V.partition (rel x) vector
+  in less V.++ (x `cons` greater)
 
 -- | Takes the union of all of the vectors.
 bigU :: Eq a => Vector (Vector a) -> Vector a
@@ -285,7 +250,11 @@ bigU =
             else union (V.tail v1) (x `cons` v2)
   in V.foldl1 union
 
--- | The element being searched for, the vector being searched, and the lower and upper bounds on the indices.
+{- |
+  The element being searched for,
+  the vector being searched,
+  and the lower and upper bounds on the indices.
+-}
 binarySearch :: Ord a => a -> Vector a -> Int -> Int -> Maybe Int
 binarySearch value xs low high
   | high < low        = Nothing
@@ -314,14 +283,10 @@ smartSnoc v e =
     Just _  -> v
     Nothing -> v `snoc` e
 
--- | Returns whether or not there is an element that satisfies the predicate.
-existsVec :: (a -> Bool) -> Vector a -> Bool
-existsVec p v
-  | V.null v     = False
-  | p $ V.head v = True
-  | otherwise    = existsVec p $ V.tail v
-
--- | If the relation were the "greater than" operator, this would find the minimum element of the vector.
+{- |
+  If the relation were the "greater than" operator,
+  this would find the minimum element of the vector.
+-}
 foldRelation :: (a -> a -> Bool) -> Vector a -> a
 foldRelation rel vec =
   let calc w v
