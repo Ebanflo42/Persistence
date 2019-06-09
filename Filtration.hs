@@ -69,9 +69,9 @@ import Control.Parallel.Strategies
   Each simplex in a filtration is represented as a triple: its filtration index,
   the indices of its vertices in the original data, and the indices of its faces in the next lowest dimension.
   Edges do not have reference to their faces, as it would be redundant with their vertices.
-  All simplices are sorted according to filtration index upon construction of the filtration. 
-  In each dimension, all simplices are sorted in increasing order of filtration index, 
-  and every simplices face indices are sorted in decreasing order; 
+  All simplices are sorted according to filtration index upon construction of the filtration.
+  In each dimension, all simplices are sorted in increasing order of filtration index,
+  and every simplices face indices are sorted in decreasing order;
   both of these facts are critical to the computation of persistent homology.
 -}
 type FilterSimplex = (Int, Vector Int, Vector Int)
@@ -93,12 +93,7 @@ type Filtration = Vector (Vector FilterSimplex)
 data Extended a = Finite a
                 | Infinity
                 | MinusInfty
-                deriving Eq
-
--- | Convert the extended value to a string in the generic way.
-instance Show a => Show (Extended a) where
-  show (Finite a) = "Finite " L.++ (show a)
-  show Infinity   = "infinity"
+                deriving (Eq, Show)
 
 {- |
   The ordering is inherited from the type a,
@@ -503,7 +498,7 @@ indexBarCodesSimple (numVerts, allSimplices) =
       makeInfiniteBarCodes :: (Vector (Vector (BarCode Int)), Vector (Vector Int), Vector (Vector Int))
                            -> Vector (Vector (BarCode Int))
       makeInfiniteBarCodes (barcodes, marked, unusedSlots) =
-        let 
+        let
             makeCodes :: Int -> Vector (BarCode Int) -> Vector (BarCode Int)
             makeCodes i codes =
               let slots = unusedSlots ! i; marks = marked ! i
@@ -615,7 +610,7 @@ bottleNeckDistances metric diagrams1 diagrams2 =
 calcLandscape :: Vector (BarCode Int) -> Landscape
 calcLandscape brcds =
   let half = Finite 0.5
-    
+
       (i,j) `leq` (k,l) = i > k || j <= l
 
       innerLoop :: (Extended Double, Extended Double)
