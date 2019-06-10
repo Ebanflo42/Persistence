@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.Matrix
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental

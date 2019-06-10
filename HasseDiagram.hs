@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.HasseDiagram
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
@@ -25,6 +25,7 @@ module HasseDiagram
   ( Node
   , HasseDiagram
   , hsd2String
+  , dGraph2sc
   , encodeDirectedGraph
   , directedFlagComplex
   , toSimplicialComplex
@@ -50,7 +51,13 @@ type HasseDiagram = Vector (Vector Node)
 
 -- | Simple printing function for Hasse diagrams.
 hsd2String :: HasseDiagram -> String
-hsd2String = (L.intercalate "\n\n") . V.toList . (V.map (L.intercalate "\n" . V.toList . V.map show))
+hsd2String =
+  (L.intercalate "\n\n") . V.toList . (V.map (L.intercalate "\n" . V.toList . V.map show))
+
+-- | Given the number of vertices in a directed graph, and pairs representing the direction of each edge, construct a 1-dimensional simplicial complex in the canonical way. Betti numbers of this simplicial complex can be used to count cycles and connected components.
+dGraph2sc :: Int -> [(Int, Int)] -> SimplicialComplex
+dGraph2sc v edges =
+  (v, V.fromList [V.fromList $ L.map (\(i, j) -> (i `cons` (j `cons` V.empty), V.empty)) edges])
 
 -- | Given the number of vertices in a directed graph, and pairs representing the direction of each edge (initial, terminal), construct a Hasse diagram representing the graph.
 encodeDirectedGraph :: Int -> [(Int, Int)] -> HasseDiagram
@@ -62,7 +69,7 @@ encodeDirectedGraph numVerts cxns =
         let v1 = vertices ! i; v2 = vertices ! j; edge = V.empty `snoc` j `snoc` i
         in encodeEdges (n + 1)
           (replaceElem i (one v1, two v1, (thr v1) `snoc` n) $
-            replaceElem j (one v2, two v2, (thr v2) `snoc` n) vertices) 
+            replaceElem j (one v2, two v2, (thr v2) `snoc` n) vertices)
               (edges `snoc` (edge, edge, V.empty)) xs
 
   in encodeEdges 0 verts V.empty cxns

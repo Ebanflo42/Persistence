@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.Util
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
@@ -183,7 +183,7 @@ elemAndIndices p vector =
 findBothElems :: (a -> b -> Bool) -> Vector a -> Vector b -> Vector (a, b)
 findBothElems rel vector1 vector2 =
   let len = V.length vector1
- 
+
       calc i result =
         let a = vector1 ! i
         in
@@ -343,7 +343,7 @@ elemIndexUnsafe elem vector =
 {- |
   Spark the first argument for parallel evaluation and force evaluation of the second argument,
   then return the first argument concatenated to the second. This is useful especially if the second
-  argument is a recursive call that calls evalPar again, so that every elemment of the list will be 
+  argument is a recursive call that calls evalPar again, so that every elemment of the list will be
   sparked for parallelism.
 -}
 evalPar :: a -> [a] -> [a]

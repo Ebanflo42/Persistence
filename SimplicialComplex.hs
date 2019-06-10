@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.SimplicialComplex
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
@@ -26,6 +26,7 @@ module SimplicialComplex (
   , sc2String
   , getDim
   , encodeWeightedGraph
+  , wGraph2sc
   -- * Construction
   , makeNbrhdGraph
   , makeNbrhdGraphPar
@@ -106,6 +107,18 @@ getDim = L.length . snd
 encodeWeightedGraph :: Int -> (Int -> Int -> (a, Bool)) -> Graph a
 encodeWeightedGraph numVerts edge =
   mapWithIndex (\i r -> mapWithIndex (\j _ -> edge i j) r) $ V.replicate numVerts (V.replicate numVerts ())
+
+-- | Given a weighted graph, construct a 1-dimensional simplicial complex in the canonical way. Betti numbers of this simplicial complex can be used to count cycles and connected components.
+wGraph2sc :: Graph a -> SimplicialComplex
+wGraph2sc graph =
+  let numVerts = V.length graph
+      getEdges index result =
+        if index == numVerts then result
+        else
+          V.map (\(i, b) ->
+            (V.fromList [index, i], V.empty)) $ V.filter snd
+              $ mapWithIndex (\i (_, b) -> (i, b)) $ V.take (numVerts - index) $ graph ! index
+  in (numVerts, (getEdges 0 V.empty) `cons` V.empty)
 
 {- |
   The first argument is a scale, the second is a metric, and the third is the data.

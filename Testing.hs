@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 import Util
 import Matrix
 import SimplicialComplex
@@ -7,93 +9,133 @@ import Filtration
 import Data.Vector as V
 import Data.List as L
 
+class ToString a where
+  toString :: a -> String
+
+instance ToString IMatrix where
+  toString mat =
+    let printVec vec =
+          if V.null vec then ""
+          else
+            let x = V.head vec
+            in (show x) L.++ ((if x < 0 then " " else "  ") L.++ (printVec $ V.tail vec))
+        print m =
+          if V.null m then ""
+          else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
+    in print mat
+
+instance ToString BMatrix where
+  toString mat =
+    let printVec vec =
+          if V.null vec then ""
+          else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
+        print m =
+          if V.null m then ""
+          else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
+    in print mat
+
+instance Show a => ToString (Vector (Vector (BarCode a))) where
+  toString = unlines . V.toList . (V.map show)
+
+data TestResult = Success | Failure String deriving Eq
+
+checkPass :: (Eq a, ToString a) => String -> a -> a -> TestResult
+checkPass msg actual expect =
+  if actual == expect then Success
+  else
+    Failure $ msg
+      L.++ ":\nActual:\n" L.++ (toString actual)
+        L.++ "\nExpected:\n" L.++ (toString expect)
+
+formatTestResults :: [TestResult] -> String
+formatTestResults results =
+  let numTests  = L.length results
+      numPassed = L.length $ L.filter (\r -> r == Success) results
+      summary   = (show numPassed) L.++ "/" L.++ (show numTests) L.++ " Tests Passed.\n"
+      accum a r =
+        case r of
+          Success   -> a
+          Failure m -> a L.++ [m L.++ "\n"]
+      details   = L.foldl accum [] results
+  in unlines $ summary:details
+
 matrix1 :: IMatrix
-matrix1 =
-  cons (cons 2 $ cons 3 $ cons 5 empty)
-    (cons (cons (-4) $ cons 2 $ cons 3 empty) empty)
+matrix1 = V.fromList $ L.map V.fromList
+  [ [ 2, 3, 5]
+  , [-4, 2, 3]
+  ]
 
 kernel1 :: IMatrix
-kernel1 = cons ( cons (-1) $ cons (-26) $ cons 16 empty) empty
+kernel1 = V.fromList $ L.map V.fromList [[-1, -26, 16]]
 
 matrix2 :: IMatrix
-matrix2 =
-  cons (cons 1 $ cons (-1) $ cons 3 empty) $
-    cons (cons 5 $ cons 6 $ cons (-4) empty) $
-      cons (cons 7 $ cons 4 $ cons 2 empty) empty
+matrix2 = V.fromList $ L.map V.fromList
+  [ [1, -1,  3]
+  , [5,  6, -4]
+  , [7,  4,  2]
+  ]
 
 kernel2 :: IMatrix
-kernel2 = cons (cons (-14) $ cons 19 $ cons 11 empty) empty
+kernel2 = V.fromList $ L.map V.fromList [[14, -19, -11]]
 
 matrix3 :: IMatrix
-matrix3 =
-  V.fromList $ L.map V.fromList $
-    [ [1, 0, (-3), 0, 2, (-8)]
-    , [0, 1, 5, 0, (-1), 4]
-    , [0, 0, 0, 1, 7, (-9)]
-    , [0, 0, 0, 0, 0, 0] ]
+matrix3 = V.fromList $ L.map V.fromList $
+  [ [1, 0, -3, 0,  2, -8]
+  , [0, 1,  5, 0, -1,  4]
+  , [0, 0,  0, 1,  7, -9]
+  , [0, 0,  0, 0,  0,  0]
+  ]
 
 kernel3 :: IMatrix
-kernel3 =
-  V.fromList $ L.map V.fromList $
-    [ [3,(-5),1,0,0,0]
-    , [(-2),1,0,(-7),1,0]
-    , [8,(-4),0,9,0,1] ]
+kernel3 = V.fromList $ L.map V.fromList $
+  [ [ 3, -5, 1,  0, 0, 0]
+  , [-2,  1, 0, -7, 1, 0]
+  , [ 8, -4, 0,  9, 0, 1]
+  ]
 
 matrix4 :: IMatrix
-matrix4 =
-  cons (cons 2 $ cons 4 $ cons 4 empty) $
-    cons (cons (-6) $ cons 6 $ cons 12 empty) $
-      cons (cons 10 $ cons (-4) $ cons (-16) empty) empty
+matrix4 = V.fromList $ L.map V.fromList
+  [ [ 2,  4,   4]
+  , [-6,  6,  12]
+  , [10, -4, -16]
+  ]
 
 snf4 :: IMatrix
-snf4 =
-  cons (cons 2 $ cons 0 $ cons 0 empty) $
-    cons (cons 0 $ cons 6 $ cons 0 empty) $
-      cons (cons 0 $ cons 0 $ cons 12 empty) empty
+snf4 = V.fromList $ L.map V.fromList
+  [ [2, 0,  0]
+  , [0, 6,  0]
+  , [0, 0, 12]
+  ]
 
 matrix5 :: IMatrix
-matrix5 =
-  V.fromList $ L.map V.fromList $
-    [ [9, -36, 30]
-    , [-36, 192, -180]
-    , [30, -180, 180] ]
+matrix5 = V.fromList $ L.map V.fromList $
+  [ [  9,  -36,   30]
+  , [-36,  192, -180]
+  , [ 30, -180,  180]
+  ]
 
 snf5 :: IMatrix
-snf5 =
-  V.fromList $ L.map V.fromList $
-    [ [3, 0, 0]
-    , [0, 12, 0]
-    , [0, 0, 60] ]
+snf5 = V.fromList $ L.map V.fromList $
+  [ [3, 0, 0]
+  , [0, 12, 0]
+  , [0, 0, 60]
+  ]
 
 matrix6 :: IMatrix
-matrix6 =
-  V.fromList $ L.map V.fromList $
-    [ [9,   0, -36,  30]
-    , [0,   0,   0,   0]
-    , [-36, 0,  19, -18]
-    , [30,  0, -18, 18] ]
+matrix6 = V.fromList $ L.map V.fromList $
+  [ [  9, 0, -36,  30]
+  , [  0, 0,   0,   0]
+  , [-36, 0,  19, -18]
+  , [ 30, 0, -18,  18]
+  ]
 
-printMat :: IMatrix -> String
-printMat mat =
-  let printVec vec =
-        if V.null vec then ""
-        else
-          let x = V.head vec
-          in (show x) L.++ ((if x < 0 then " " else "  ") L.++ (printVec $ V.tail vec))
-      print m =
-        if V.null m then ""
-        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-  in print mat
-
-printMatBool :: BMatrix -> String
-printMatBool mat =
-  let printVec vec =
-        if V.null vec then ""
-        else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
-      print m =
-        if V.null m then ""
-        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-  in print mat
+snf6 :: IMatrix
+snf6 = V.fromList $ L.map V.fromList $
+  [ [ 1, 0,   0, 0]
+  , [ 0, 3,   0, 0]
+  , [ 0, 0, 462, 0]
+  , [ 0, 0,   0, 0]
+  ]
 
 pointCloud1 = Right
   [ ( -7, -19)
@@ -115,6 +157,15 @@ pointCloud1 = Right
   , ( 10,  19)
   , ( 17,  20)
   ]
+
+metric2 :: Floating a => (a, a) -> (a, a) -> a
+metric2 (a, b) (c, d) =
+  let x = a - c; y = b - d
+  in sqrt $ x*x + y*y
+
+scales1 = [10.0, 8.0, 6.0]
+testFiltration1 = makeRipsFiltrationFast scales1 metric2 pointCloud1
+nsTestFiltration1 = simple2Filtr testFiltration1
 
 pointCloud2 = Right
   [ (  1, -22)
@@ -166,6 +217,12 @@ pointCloud2 = Right
   , (  1,  16)
   ]
 
+--8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
+--1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
+scales2 = [10.0, 8.0, 6.0]
+testFiltration2 = makeRipsFiltrationFast scales2 metric2 pointCloud2
+nsTestFiltration2 = simple2Filtr testFiltration2
+
 octahedralCloud = Right
   [ ( 1, 0, 0)
   , (-1, 0, 0)
@@ -175,20 +232,39 @@ octahedralCloud = Right
   , ( 0, 0,-1)
   ]
 
+metric3 :: Floating a => (a, a, a) -> (a, a, a) -> a
+metric3 (x0, y0, z0) (x1, y1, z1) =
+  let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
+  sqrt (dx*dx + dy*dy + dz*dz)
+
+octaScales :: [Double]
+octaScales = [2.1, 1.6, 1.1, 0.5]
+
+--5 connected components from 0 to 2, 1 void from 2 to 3
+octahedron = makeRipsFiltrationFast octaScales metric3 octahedralCloud
+nsoctahedron = simple2Filtr octahedron
+
 sqrCloud = Right
-  [ (0,0)
-  , (1,0)
-  , (2,0)
-  , (3,0)
-  , (3,1)
-  , (3,2)
-  , (3,3)
-  , (2,3)
-  , (1,3)
-  , (0,3)
-  , (0,2)
-  , (0,1)
+  [ (0, 0)
+  , (1, 0)
+  , (2, 0)
+  , (3, 0)
+  , (3, 1)
+  , (3, 2)
+  , (3, 3)
+  , (2, 3)
+  , (1, 3)
+  , (0, 3)
+  , (0, 2)
+  , (0, 1)
   ]
+
+sqrScales :: [Double]
+sqrScales = [2.0, 1.5, 1.1, 0.5]
+
+--11 connected components from 0 to 1, 1 loop starting at 1
+square = makeRipsFiltrationFast sqrScales metric2 sqrCloud
+nssquare = simple2Filtr square
 
 dGraph1 =
   [ ( 0,  1)
@@ -235,329 +311,198 @@ dGraph1 =
   , (17, 15)
   ]
 
+directedGraph = encodeDirectedGraph 18 dGraph1
+dCliqueComplex = toSimplicialComplex $ directedFlagComplex directedGraph
+
+--Mobius strip created in blender
 mobius = Right
   [ ( 1.250000,  0.000000,  0.000000)
   , ( 0.750000,  0.000000,  0.000000)
-  --, (-0.750000,  0.000000, -0.000000)
   , (-1.250000, -0.000000, -0.000000)
-  --, (-0.732673, -0.064705,  0.196319)
   , (-1.199179,  0.064705,  0.321319)
-  --, (-0.678526, -0.125000,  0.391747)
   , (-1.053526,  0.125000,  0.608253)
-  --, (-0.582107, -0.176777,  0.582107)
   , (-0.832107,  0.176777,  0.832107)
-  --, (-0.437500, -0.216506,  0.757772)
   , (-0.562500,  0.216506,  0.974279)
-  --, (-0.242072, -0.241481,  0.903426)
   , (-0.275566,  0.241481,  1.028426)
-  --, ( 0.000000, -0.250000,  1.000000)
   , ( 0.000000,  0.250000,  1.000000)
-  --, ( 0.275565, -0.241481,  1.028426)
   , ( 0.242072,  0.241481,  0.903426)
-  --, ( 0.562500, -0.216506,  0.974279)
   , ( 0.437500,  0.216506,  0.757772)
-  --, ( 0.832106, -0.176777,  0.832107)
   , ( 0.582106,  0.176777,  0.582107)
-  --, ( 1.053525, -0.125000,  0.608253)
   , ( 0.678525,  0.125000,  0.391747)
-  --, ( 1.199179, -0.064705,  0.321319)
   , ( 0.732673,  0.064705,  0.196319)
-  --, (-0.724444,  0.000000, -0.194114)
   , (-1.207407, -0.000000, -0.323524)
-  --, (-0.649519,  0.000000, -0.375000)
   , (-1.082532, -0.000000, -0.625000)
-  --, (-0.530330,  0.000000, -0.530330)
   , (-0.883884, -0.000000, -0.883884)
-  --, (-0.375000,  0.000000, -0.649519)
   , (-0.625000, -0.000000, -1.082532)
-  --, (-0.194114,  0.000000, -0.724445)
   , (-0.323524, -0.000000, -1.207408)
-  --, ( 0.000000,  0.000000, -0.750000)
   , ( 0.000000, -0.000000, -1.250001)
-  --, ( 0.194114,  0.000000, -0.724445)
   , ( 0.323524, -0.000000, -1.207408)
-  --, ( 0.375000,  0.000000, -0.649519)
   , ( 0.625001, -0.000000, -1.082533)
-  --, ( 0.530331,  0.000000, -0.530330)
   , ( 0.883884, -0.000000, -0.883884)
-  --, ( 0.649520,  0.000000, -0.375000)
   , ( 1.082533, -0.000000, -0.625000)
-  --, ( 0.724445,  0.000000, -0.194114)
   , ( 1.207409, -0.000000, -0.323524)
-  --, ( 0.258819, -0.000000,  0.965926)
   , (-0.258819,  0.000000,  0.965926)
-  --, (-0.500000,  0.000000,  0.866026)
   , (-0.562438, -0.099169,  0.732983)
-  --, (-0.655086,  0.099169,  0.853723)
   , ( 0.562437,  0.099169,  0.732983)
-  --, ( 0.655085, -0.099169,  0.853724)
   , (-0.707107,  0.000000,  0.707107)
-  --, (-0.866026,  0.000000,  0.500000)
   , ( 0.000000,  0.000000,  1.000000)
-  --, ( 0.866025,  0.000000,  0.500000)
   , (-1.030574,  0.047835,  0.426877)
-  --, (-0.817186, -0.047835,  0.338489)
   , ( 1.000000,  0.000000,  0.000000)
-  --, (-1.000000, -0.000000, -0.000000)
   , ( 0.868575,  0.016316,  0.114350)
-  --, ( 1.114315, -0.016316,  0.146702)
   , (-1.114315,  0.016316,  0.146703)
-  --, (-0.868575, -0.016316,  0.114350)
   , ( 0.965926,  0.000000,  0.258819)
-  --, (-0.965926,  0.000000,  0.258819)
   , ( 1.030574, -0.047835,  0.426878)
-  --, ( 0.817185,  0.047835,  0.338490)
   , (-0.872030,  0.076095,  0.669132)
-  --, (-0.714677, -0.076095,  0.548391)
   , ( 0.872030, -0.076095,  0.669132)
-  --, ( 0.714677,  0.076095,  0.548391)
   , ( 0.707106,  0.000000,  0.707107)
-  --, (-0.364378, -0.115485,  0.879685)
   , (-0.400989,  0.115485,  0.968074)
-  --, ( 0.500000,  0.000000,  0.866025)
   , ( 0.128396,  0.123931,  0.975269)
-  --, ( 0.132656, -0.123931,  1.007621)
   , ( 0.364378,  0.115485,  0.879685)
-  --, ( 0.400989, -0.115485,  0.968074)
   , (-0.128397, -0.123931,  0.975268)
-  --, (-0.132656,  0.123931,  1.007621)
   , (-1.115376, -0.000000, -0.146842)
---  , (-0.867514,  0.000000, -0.114211)
-  --, (-0.965926, -0.000000, -0.258819)
   , (-1.039365, -0.000000, -0.430519)
-  --, (-0.808395,  0.000000, -0.334848)
   , (-0.866026, -0.000000, -0.500000)
-  --, (-0.892523, -0.000000, -0.684857)
   , (-0.694184,  0.000000, -0.532666)
-  --, (-0.707107, -0.000000, -0.707107)
   , (-0.684857, -0.000000, -0.892523)
-  --, (-0.532666,  0.000000, -0.694184)
   , (-0.500000, -0.000000, -0.866026)
-  --, (-0.430519, -0.000000, -1.039365)
   , (-0.334848,  0.000000, -0.808395)
-  --, (-0.258819, -0.000000, -0.965926)
   , (-0.146842, -0.000000, -1.115376)
-  --, (-0.114210,  0.000000, -0.867515)
   , ( 0.000000, -0.000000, -1.000000)
-  --, ( 0.146842, -0.000000, -1.115376)
   , ( 0.114211,  0.000000, -0.867515)
-  --, ( 0.258819, -0.000000, -0.965926)
   , ( 0.430519, -0.000000, -1.039365)
-  --, ( 0.334848,  0.000000, -0.808395)
   , ( 0.500000, -0.000000, -0.866026)
-  --, ( 0.684857, -0.000000, -0.892523)
   , ( 0.532667,  0.000000, -0.694185)
-  --, ( 0.707107, -0.000000, -0.707107)
   , ( 0.892523, -0.000000, -0.684857)
-  --, ( 0.694185,  0.000000, -0.532667)
   , ( 0.866026, -0.000000, -0.500000)
-  --, ( 1.039366, -0.000000, -0.430519)
   , ( 0.808395,  0.000000, -0.334848)
-  --, ( 0.965927, -0.000000, -0.258819)
   , ( 1.115377, -0.000000, -0.146842)
-  --, ( 0.867515, 0.000000 , -0.114210)
   ]
 
-metric2 :: (Float, Float) -> (Float, Float) -> Float
-metric2 (a, b) (c, d) =
-  let x = a - c; y = b - d in
-  sqrt (x*x + y*y)
+mobScales = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15]
+mobiusStrip = makeRipsFiltrationFast mobScales metric3 mobius
+nsmobius = simple2Filtr mobiusStrip
 
-metric3 :: (Float, Float, Float) -> (Float, Float, Float) -> Float
-metric3 (x0, y0, z0) (x1, y1, z1) =
-  let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
-  sqrt (dx*dx + dy*dy + dz*dz)
+tests =
+  [ let actual = kernelInt matrix1
+        expect = kernel1
+    in checkPass "kernelInt matrix1" actual expect
 
-testFiltration1 = makeRipsFiltrationFast [10.0, 8.0, 6.0] metric2 pointCloud1
-nstestFiltration1 = simple2Filtr testFiltration1
+  , let actual = kernelIntPar matrix1
+        expect = kernel1
+    in checkPass "kernelIntPar matrix1" actual expect
 
---8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
---1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
-testFiltration2 = makeRipsFiltrationFast [6.0, 5.0, 4.0] metric2 pointCloud2
-nsTestFiltration2 = simple2Filtr testFiltration2
+  , let actual = kernelInt matrix2
+        expect = kernel2
+    in checkPass "kernelInt matrix2" actual expect
 
---5 connected components from 0 to 2, 1 void from 2 to 3
-octahedron = makeRipsFiltrationFast [2.1, 1.6, 1.1, 0.5] metric3 octahedralCloud
+  , let actual = kernelIntPar matrix2
+        expect = kernel2
+    in checkPass "kernelIntPar matrix2" actual expect
 
---11 connected components from 0 to 1, 1 loop starting at 1
-square = makeRipsFiltrationFast [1.5, 1.0, 0.5] metric2 sqrCloud
+  , let actual = kernelInt matrix3
+        expect = kernel3
+    in checkPass "kernelInt matrix3" actual expect
 
-mobiusStrip = makeRipsFiltrationFast [0.3, 0.25, 0.2, 0.15] metric3 mobius
+  , let actual = kernelIntPar matrix3
+        expect = kernel3
+    in checkPass "kernelIntPar matrix3" actual expect
 
-directedGraph = encodeDirectedGraph 18 dGraph1
+  , let actual = normalFormInt matrix4
+        expect = snf4
+    in checkPass "normalFormInt matrix4" actual expect
 
-dCliqueComplex = toSimplicialComplex $ directedFlagComplex directedGraph
+  , let actual = normalFormIntPar matrix4
+        expect = snf4
+    in checkPass "normalFormIntPar matrix4" actual expect
 
-main = do
-{--
-  putStrLn "The first matrix is:"
-  putStrLn $ iMat2String matrix1
-  putStrLn "It's kernel is:"
-  putStrLn $ iMat2String $ kernelInt matrix1
-  putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ iMat2String $ kernelIntPar matrix1
-  putStrLn "The kernel should be:"
-  putStrLn $ iMat2String kernel1
+  , let actual = normalFormInt matrix5
+        expect = snf5
+    in checkPass "normalFormInt matrix5" actual expect
 
-  putStrLn "The second matrix is:"
-  putStrLn $ iMat2String matrix2
-  putStrLn "It's kernel is:"
-  putStrLn $ iMat2String $ kernelInt matrix2
-  putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ iMat2String $ kernelIntPar matrix2
-  putStrLn "The kernel should be:"
-  putStrLn $ iMat2String kernel2
+  , let actual = normalFormIntPar matrix5
+        expect = snf5
+    in checkPass "normalFormIntPar matrix5" actual expect
 
-  putStrLn "The third matrix is:"
-  putStrLn $ iMat2String matrix3
-  putStrLn "It's kernel is:"
-  putStrLn $ iMat2String $ kernelInt matrix3
-  putStrLn "It's kernel computed in parallel is:"
-  putStrLn $ iMat2String $ kernelIntPar matrix3
-  putStrLn "The kernel should be:"
-  putStrLn $ iMat2String kernel3
+  , let actual = normalFormInt matrix6
+        expect = snf6
+    in checkPass "normalFormInt matrix6" actual expect
 
-  putStrLn "The fourth matrix is:"
-  putStrLn $ iMat2String matrix4
-  putStrLn "It's Smith normal form is:"
-  putStrLn $ iMat2String $ normalFormInt matrix4
-  putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ iMat2String $ normalFormIntPar matrix4
-  putStrLn "The Smith Normal form should be:"
-  putStrLn $ iMat2String $ snf4
+  , let actual = normalFormIntPar matrix6
+        expect = snf6
+    in checkPass "normalFormIntPar matrix6" actual expect
 
-  putStrLn "The fifth matrix is:"
-  putStrLn $ iMat2String matrix5
-  putStrLn "It's Smith normal form is:"
-  putStrLn $ iMat2String $ normalFormInt matrix5
-  putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ iMat2String $ normalFormIntPar matrix5
-  putStrLn "The Smith Normal form should be:"
-  putStrLn $ iMat2String $ snf5
+  --test filtration 1
 
-  putStrLn "The sixth matrix is:"
-  putStrLn $ iMat2String matrix6
-  putStrLn "It's Smith normal form is:"
-  putStrLn $ iMat2String $ normalFormInt matrix6
-  putStrLn "It's Smith normal form computed in parallel is:"
-  putStrLn $ iMat2String $ normalFormIntPar matrix6
-  --}
+  , let actual = indexBarCodesSimple testFiltration1
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity), (0, Infinity), (0, Infinity)], [(2,Infinity),(2,Infinity)], []]
+    in checkPass "indexBarCodesSimple testFiltration1" actual expect
 
-  {--
-  putStrLn "Index bar codes of point cloud 1:"
-  let ipcs1 = indexBarCodesSimple testFiltration1
-  putStrLn $ (intercalate "\n" $ V.map show $ V.map (V.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the point cloud 1:"
-  let spcs1 = scaleBarCodesSimple [10.0, 8.0, 6.0] testFiltration1
-  putStrLn $ (intercalate "\n" $ V.map show spcs1) L.++ "\n"
-  --}
-  {--}
-  putStrLn "Index bar codes of point cloud 1 (non-simple):"
-  let ipcs1 = indexBarCodes nstestFiltration1
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show $ V.map (V.filter (\(a, b) -> b /= Finite a)) ipcs1) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the point cloud 1 (non-simple):"
-  let spcns1 = scaleBarCodes [10.0, 8.0, 6.0] nstestFiltration1
-  putStrLn $ (intercalate "\n" $ V.map show spcns1) L.++ "\n"
-  --}
+  , let actual = scaleBarCodesSimple (Right scales1) testFiltration1
+        expect = V.fromList $ L.map V.fromList [[(6.0, Finite 10.0), (6.0, Finite 10.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Infinity), (6.0, Infinity), (6.0, Infinity)], [(10.0, Infinity), (10.0, Infinity)], []]
+    in checkPass "scaleBarCodesSimple testFiltration1" actual expect
 
-  {--}
-  putStrLn "Index bar codes of point cloud 2:"
-  let ipcs2 = indexBarCodesSimple testFiltration2
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show $ V.map (V.filter (\(a, b) -> b /= Finite a)) ipcs2) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the point cloud 2:"
-  let spcs2 = scaleBarCodesSimple [6.0, 5.0, 4.0] testFiltration2
-  putStrLn $ (intercalate "\n" $ V.map show spcs2) L.++ "\n"
-  --}
-  {--
-  putStrLn "Index bar codes of point cloud 2 as a non-simple filtration:"
-  let ipcns2 = indexBarCodes nsTestFiltration2
-  putStrLn $ (intercalate "\n" $ V.map show ipcns2) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of point cloud 2 as a non-simple filtration:"
-  let sbcns = scaleBarCodes [6.0, 5.0, 4.0] nsTestFiltration2
-  putStrLn $ (intercalate "\n" $ V.map show sbcns) L.++ "\n"
-  --}
+  , let actual = indexBarCodes nsTestFiltration1
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity), (0, Infinity), (0, Infinity)], [(2,Infinity),(2,Infinity)], [], []]
+    in checkPass "indexBarCodes testFiltration1" actual expect
 
-  {--}
-  putStrLn "Index bar codes of the octahedral cloud (simple):"
-  let iocts = indexBarCodesSimple octahedron
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show iocts) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the octahedral cloud (simple):"
-  let socts = scaleBarCodesSimple [2.1, 1.6, 1.1, 0.5] octahedron
-  putStrLn $ (intercalate "\n" $ V.map show socts) L.++ "\n"
-  --}
-  {--
-  putStrLn "Index bar codes of the octahedral cloud (non-simple):"
-  let ioctns = indexBarCodes $ simple2Filtr octahedron
-  putStrLn $ (intercalate "\n" $ V.map show ioctns) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the octahedral cloud (non-simple):"
-  let soctns = scaleBarCodes [2.1, 1.6, 1.1, 0.5] $ simple2Filtr octahedron
-  putStrLn $ (intercalate "\n" $ V.map show soctns) L.++ "\n"
-  --}
+  , let actual = scaleBarCodes (Right scales1) nsTestFiltration1
+        expect = V.fromList $ L.map V.fromList [[(6.0, Finite 10.0), (6.0, Finite 10.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Infinity), (6.0, Infinity), (6.0, Infinity)], [(10.0, Infinity), (10.0, Infinity)], [], []]
+    in checkPass "scaleBarCodes testFiltration1" actual expect
 
-  {--}
-  putStrLn "Index bar codes of the square cloud (simple):"
-  let isqrs = indexBarCodesSimple square
-  putStrLn $ (intercalate "\n" $V.toList $  V.map show isqrs) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the square cloud (simple):"
-  let ssqrs = scaleBarCodesSimple [1.5, 1.0, 0.5] square
-  putStrLn $ (intercalate "\n" $ V.map show ssqrs) L.++ "\n"
-  --}
-  {--
-  putStrLn "Index bar codes of the square cloud (non-simple):"
-  let isqrns = indexBarCodes $ simple2Filtr square
-  putStrLn $ (intercalate "\n" $ V.map show isqrns) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of the square cloud (non-simple):"
-  let ssqrns = scaleBarCodes [1.5, 1.0, 0.5] $ simple2Filtr square
-  putStrLn $ (intercalate "\n" $ V.map show ssqrns) L.++ "\n"
-  --}
+  --octahedral filtration
 
-  {--
-  putStrLn "Index bar codes of Mobius strip (simple):"
-  let imobs = indexBarCodesSimple mobiusStrip
-  putStrLn $ (intercalate "\n" $ V.map show imobs) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of Mobius strip (simple):"
-  let smobs = scaleBarCodesSimple [0.3, 0.25, 0.2, 0.15] mobiusStrip
-  putStrLn $ (intercalate "\n" $ V.map show smobs) L.++ "\n"
-  --}
-  {--}
-  putStrLn "Index bar codes of Mobius strip (non-simple):"
-  let imobns = indexBarCodes $ simple2Filtr mobiusStrip
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show imobns) L.++ "\n"
-  --}
-  {--
-  putStrLn "Scale bar codes of Mobius strip (non-simple):"
-  let smobns = scaleBarCodes [0.3, 0.25, 0.2, 0.15] $ simple2Filtr mobiusStrip
-  putStrLn $ (intercalate "\n" $ V.map show smobns) L.++ "\n"
-  --}
+  , let actual = indexBarCodesSimple octahedron
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 2),(0,Infinity)], [], [(2,Finite 3)], [], []]
+    in checkPass "indexBarCodesSimple octahedron" actual expect
 
-  {--}
-  putStrLn "Bottleneck distances between point cloud 1 & 2:"
-  let pc12 = bottleNeckDistances indexMetric ipcs1 ipcs2
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show pc12) L.++ "\n"
-  --}
-  {--}
-  putStrLn "Bottleneck distances between octahedron barcodes and square barcodes:"
-  let sqroct = bottleNeckDistances indexMetric iocts isqrs
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show sqroct) L.++ "\n"
-  --}
-  putStrLn "Bottleneck distance between square and mobius barcodes:"
-  let sqmob = bottleNeckDistances indexMetric isqrs imobns
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show sqmob) L.++ "\n"
+  , let actual = scaleBarCodesSimple (Right octaScales) octahedron
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6), (0.5, Infinity)], [], [(1.6,Finite 2.1)], [], []]
+    in checkPass "scaleBarCodesSimple octahedron" actual expect
+
+  , let actual = indexBarCodes nsoctahedron
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 2),(0,Infinity)], [], [(2,Finite 3)], [], [], []]
+    in checkPass "indexBarCodes octahedron" actual expect
+
+  , let actual = scaleBarCodes (Right octaScales) nsoctahedron
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6), (0.5, Infinity)], [], [(1.6,Finite 2.1)], [], [], []]
+    in checkPass "scaleBarCodes octahedron" actual expect
+
+  --square filtration
+
+  , let actual = indexBarCodesSimple square
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(1,Infinity)]]
+    in checkPass "indexBarCodesSimple square" actual expect
+
+  , let actual = scaleBarCodesSimple (Right sqrScales) square
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Infinity)], [(1.1,Infinity)]]
+    in checkPass "scaleBarCodesSimple square" actual expect
+
+  , let actual = indexBarCodes nssquare
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(1,Infinity)], []]
+    in checkPass "indexBarCodes square" actual expect
+
+  , let actual = scaleBarCodes (Right sqrScales) nssquare
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Infinity)], [(1.1,Infinity)], []]
+    in checkPass "scaleBarCodes square" actual expect
+
+  --mobius strip filtration
+
+  , let actual = indexBarCodesSimple mobiusStrip
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1),(0,Finite 1),(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(4, Finite 5), (3, Finite 5), (3, Finite 5), (4, Infinity)], [], [], []]
+    in checkPass "indexBarCodesSimple mobius" actual expect
+
+  , let actual = scaleBarCodesSimple (Right mobScales) mobiusStrip
+        expect = V.fromList $ L.map V.fromList $ [[(0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Infinity)], [(0.35, Finite 0.4), (0.3, Finite 0.4), (0.3, Finite 0.4), (0.35, Infinity)], [], [], []]
+    in checkPass "scaleBarCodesSimple mobius" actual expect
+
+  , let actual = indexBarCodes nsmobius
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1),(0,Finite 1),(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(4, Finite 5), (3, Finite 5), (3, Finite 5), (4, Infinity)], [], [], [], []]
+    in checkPass "indexBarCodes mobius" actual expect
+
+  , let actual = scaleBarCodes (Right mobScales) nsmobius
+        expect = V.fromList $ L.map V.fromList $ [[(0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Infinity)], [(0.35, Finite 0.4), (0.3, Finite 0.4), (0.3, Finite 0.4), (0.35, Infinity)], [], [], [], []]
+    in checkPass "scaleBarCodes mobius" actual expect
+
+  ]
+
+main = putStrLn $ formatTestResults tests
