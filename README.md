@@ -7,7 +7,7 @@ Visit https://hackage.haskell.org/package/Persistence to see the documentation f
 
 GitHub: https://github.com/Ebanflo42/Persistence
 
-Relevant files for development: Util.hs, Matrix.hs, SimplicialComplex.hs, HasseDiagram.hs, Persistence.hs, Testing.hs
+Relevant files for development: `Util.hs`, `Matrix.hs`, `SimplicialComplex.hs`, `HasseDiagram.hs`, `Persistence.hs`, `Testing.hs`
 
 Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with 
 
