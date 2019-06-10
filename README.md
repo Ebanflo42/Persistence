@@ -9,7 +9,7 @@ GitHub: https://github.com/Ebanflo42/Persistence
 
 Relevant files for development: `Util.hs`, `Matrix.hs`, `SimplicialComplex.hs`, `HasseDiagram.hs`, `Persistence.hs`, `Testing.hs`
 
-Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with 
+Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with
 
     ./Testing +RTS -s -N<number of threads>
 
@@ -43,7 +43,7 @@ https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 `Matrix.hs`:
 
-1) Fix Gauss-Jordan elimnation over the integers.
+1) Fix Smith normal form over the integers.
 
 `SimplicialComplex.hs`:
 
@@ -51,21 +51,21 @@ https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 2) Implement construction of the alpha-complex (sub-complex of the Delaunay triangulation where the vertices of every simplex are within a certain distance).
 
-3) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
+3) Fix simplicial homology over the integers (first Smith normal form must be finished in `Matrix.hs`)
 
 `Filtration.hs`:
 
 Many of these are breaking API changes and so will be included in Persistence-2.0.
 
-1) Implement persistence landscape functions.
+1) Debug persistent homology (it was likely a recent commit that broke it).
 
-2) Investigate the possibility of making persistent homology functions which identify the vertices where features occur.
+2) Finish implementing persistence landscape functions.
 
 `Testing.hs`:
 
 1) Test the bottleneck distance.
 
-2) Test the persistent homology function that returns barcodes in terms of scales.
+2) Test persistence landscapes.
 
 3) Make some filtrations whose vertices don't all have index 0 and test persistent homology on them.
 

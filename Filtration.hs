@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.Filtration
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
@@ -203,7 +203,8 @@ getDimension (Right f) = V.length f - 1
 simple2Filtr :: SimpleFiltration -> Filtration
 simple2Filtr (n, x) =
   let x' = (V.map (\(i, v, _) -> (i, v, V.reverse v)) $ V.head x) `cons` (V.tail x)
-  in (mapWithIndex (\i (a,b,c) -> (a,i `cons` V.empty,c)) $ V.replicate n (0, V.empty, V.empty)) `cons` x'
+  in (mapWithIndex (\i (a,b,c) ->
+      (a,i `cons` V.empty,c)) $ V.replicate n (0, V.empty, V.empty)) `cons` x'
 
 -- * Filtration construction
 
@@ -239,7 +240,8 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quickSort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in reverse order
+              --sorted in reverse order
+              V.map (quickSort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (i, v, f) =
               let findNew j =
@@ -305,13 +307,14 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
 
       sortFiltration simplices =
         let sortedSimplices =
-              V.map (quickSort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $ --sorted in increasing order
+              --sorted in increasing order
+              V.map (quickSort (\((i, _, _), _) ((j, _, _), _) -> i > j)) $
                 V.map (mapWithIndex (\i s -> (s, i))) simplices
             newFaces dim (i, v, f) =
               let findNew j =
                     case V.findIndex (\x -> snd x == j) $ sortedSimplices ! (dim - 1) of
                       Just k  -> k
-                      Nothing -> error "Persistence.filterByWeightsLight.sortFiltration.newFaces.findNew"
+                      Nothing -> error  "Persistence.Filtration.filterByWeightsLight.sortFiltration.newFaces.findNew"
               in (i, v, (V.map findNew f))
         in
           if V.null simplices then simplices
@@ -381,7 +384,8 @@ indexBarCodes filtration =
           in
             --mark the simplex if its boundary chain is reduced to null
             if V.null reduced then
-              makeFiniteBarCodes dim (newMarked `snoc` (fst boundary)) slots (V.tail boundaries) barcodes
+              makeFiniteBarCodes dim (newMarked
+                `snoc` (fst boundary)) slots (V.tail boundaries) barcodes
             else
               let pivot = V.head reduced
               --put the pivot chain in the pivot's slot, add the new barcode to the list
@@ -402,7 +406,8 @@ indexBarCodes filtration =
         else
           let numSlots = if dim == 0 then 0 else V.length $ filtration ! (dim - 1) --see above
               boundaries =
-                removeUnmarked (V.last marked) $ mapWithIndex (\i (_, _, f) -> (i, f)) $ filtration ! dim
+                removeUnmarked (V.last marked)
+                  $ mapWithIndex (\i (_, _, f) -> (i, f)) $ filtration ! dim
               (newMarked, newSlots, newCodes) =
                 makeFiniteBarCodes dim V.empty (V.replicate numSlots Nothing) boundaries V.empty
           in loopFiniteBarCodes (dim + 1) (marked `snoc` newMarked)
@@ -427,7 +432,7 @@ indexBarCodes filtration =
             V.++ (makeInfiniteBarCodes dim (marked ! dim) (slots ! dim))) barcodes)
 
   in V.map (V.filter (\(a, b) -> b /= Finite a))
-    $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty V.empty
+       $ loopInfiniteBarCodes 0 $ loopFiniteBarCodes 0 V.empty V.empty V.empty
 
 {- |
   Same as above except this function acts on filtrations whose vertices all have filtration index zero
@@ -485,7 +490,10 @@ indexBarCodesSimple (numVerts, allSimplices) =
                          -> Vector (Vector (BarCode Int))
                          -> Vector (Vector Int)
                          -> Vector (Vector Int)
-                         -> (Vector (Vector (BarCode Int)), Vector (Vector Int), Vector (Vector Int))
+                         -> ( Vector (Vector (BarCode Int))
+                            , Vector (Vector Int)
+                            , Vector (Vector Int)
+                            )
       makeFiniteBarCodes dim maxdim barcodes marked slots =
         if dim == maxdim then (barcodes, marked, slots)
         else
@@ -493,16 +501,22 @@ indexBarCodesSimple (numVerts, allSimplices) =
                 makeBarCodesAndMark dim 0 (V.last marked) (V.replicate (V.length
                   $ allSimplices ! (dim - 1)) Nothing) (allSimplices ! dim) (V.empty, V.empty)
           in makeFiniteBarCodes (dim + 1) maxdim
-            (barcodes V.++ (newCodes `cons` V.empty)) (marked `snoc` newMarked) (slots `snoc` unusedSlots)
+               (barcodes V.++ (newCodes `cons` V.empty))
+                 (marked `snoc` newMarked) (slots `snoc` unusedSlots)
 
-      makeInfiniteBarCodes :: (Vector (Vector (BarCode Int)), Vector (Vector Int), Vector (Vector Int))
+      makeInfiniteBarCodes :: ( Vector (Vector (BarCode Int))
+                              , Vector (Vector Int)
+                              , Vector (Vector Int)
+                              )
                            -> Vector (Vector (BarCode Int))
       makeInfiniteBarCodes (barcodes, marked, unusedSlots) =
         let
             makeCodes :: Int -> Vector (BarCode Int) -> Vector (BarCode Int)
             makeCodes i codes =
               let slots = unusedSlots ! i; marks = marked ! i
-              in codes V.++ (V.map (\j -> (one $ allSimplices ! (i - 1) ! j, Infinity)) $ slots |^| marks)
+              in codes V.++ (V.map (\j ->
+                   (one $ allSimplices ! (i - 1) ! j, Infinity)) $ slots |^| marks)
+
             loop :: Int -> Vector (Vector (BarCode Int)) -> Vector (Vector (BarCode Int))
             loop i v
               | V.null v  = V.empty

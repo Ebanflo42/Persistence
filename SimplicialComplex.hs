@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.SimplicialComplex
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
@@ -65,7 +65,7 @@ type Simplex = (Vector Int, Vector Int)
 {- |
   The first component of the pair is the number of vertices.
   The second component is a vector whose entries are vectors of simplices of the same dimension.
-  Index 0 of the vecor corresponds to dimension 1 because there is no need to store individual vertices.
+  Index 0 of the vector corresponds to dimension 1 because there is no need to store individual vertices.
 -}
 type SimplicialComplex = (Int, Vector (Vector Simplex))
 
@@ -105,7 +105,20 @@ getDim = L.length . snd
 -}
 encodeWeightedGraph :: Int -> (Int -> Int -> (a, Bool)) -> Graph a
 encodeWeightedGraph numVerts edge =
-  mapWithIndex (\i r -> mapWithIndex (\j _ -> edge i j) r) $ V.replicate numVerts (V.replicate numVerts ())
+  mapWithIndex (\i r -> mapWithIndex (\j _
+    -> edge i j) r) $ V.replicate numVerts (V.replicate numVerts ())
+
+-- | Given a weighted graph, construct a 1-dimensional simplicial complex in the canonical way.
+wGraph2sc :: Graph a -> SimplicialComplex
+wGraph2sc graph =
+  let numVerts = V.length graph
+      getEdges index result =
+        if index == numVerts then result
+        else
+          V.map (\(i, b) ->
+            (V.fromList [index, i], V.empty)) $ V.filter snd
+              $ mapWithIndex (\i (_, b) -> (i, b)) $ V.take (numVerts - index) $ graph ! index
+  in (numVerts, (getEdges 0 V.empty) `cons` V.empty)
 
 {- |
   The first argument is a scale, the second is a metric, and the third is the data.
@@ -136,40 +149,60 @@ makeCliqueComplex graph =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
-        in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
+        --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques
+         --append them to the next iteration of the function
+        in (fst helper):(organizeCliques (i - 1) $ snd helper)
 
-      makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
+      --pair the organized maximal cliques with the dimension of the largest clique
+      makePair simplices =
         case simplices of
           (x:_) ->
             let dim = V.length x
             in (dim, organizeCliques dim $ V.fromList simplices)
-          []    -> (1, []) --if there are no maximal cliques this acts as a flag so that the algorithm doesn't try to generate all the other simplices
+          --if there are no maximal cliques
+          --this acts as a flag so that
+          --the algorithm doesn't try to generate all the other simplices
+          []    -> (1, [])
 
+      --find all maximal cliques
+      --and sort them from largest to smallest (excludes maximal cliques which are single points)
       maxCliques :: (Int, Vector (Vector (Vector Int)))
-      maxCliques = --find all maximal cliques and sort them from largest to smallest (excludes maximal cliques which are single points)
-        (\(x, y) -> (x, V.fromList y)) $ makePair $ sortVecs $ L.map V.fromList $
-          L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> snd $ graph ! i ! j) [0..numVerts - 1]
+      maxCliques =
+        (\(x, y) -> (x, V.fromList y)) $ makePair $ sortVecs
+          $ L.map V.fromList $ L.filter (\c -> L.length c > 1)
+            $ getMaximalCliques (\i j -> snd $ graph ! i ! j) [0..numVerts - 1]
 
       --generates faces of simplices and records the boundary indices
-      combos :: Int -> Int -> Vector (Vector (Vector Int)) -> Vector (Vector (Vector Int, Vector Int)) -> Vector (Vector (Vector Int, Vector Int))
+      combos :: Int
+             -> Int
+             -> Vector (Vector (Vector Int))
+             -> Vector (Vector (Vector Int, Vector Int))
+             -> Vector (Vector (Vector Int, Vector Int))
       combos i max sc result =
         if i == max then
-          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result --don't record boundary indices for edges
+          --don't record boundary indices for edges
+          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result
         else
-          let i1        = i + 1 --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
+          let i1        = i + 1
+              --sc is in reverse order
+              --so sc !! i1 is the array of simplices one dimension lower
               current   = sc ! i
               next      = sc ! i1
               len       = V.length next
               allCombos = V.map getCombos current --get all the faces of every simplex
               uCombos   = bigU allCombos --union of faces
-              --the index of the faces of each simplex can be found by adding the number of (n-1)-simplices to the index of each face in the union of faces
+              --the index of the faces of each simplex can be found
+              --by adding the number of (n-1)-simplices to the index of
+              --each face in the union of faces
               indices   = V.map (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
-          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices) `cons` result
+          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc)
+               $ (V.zip current indices) `cons` result
 
       fstmc2 = fst maxCliques - 2
   in
-    if fstmc2 == (-1) then (numVerts, V.empty) --if there are no maximal cliques, the complex is just a bunch of points
+    --if there are no maximal cliques, the complex is just a bunch of points
+    if fstmc2 == (-1) then (numVerts, V.empty)
     else
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
       in (numVerts, sc)
@@ -181,18 +214,25 @@ makeCliqueComplexPar graph =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
-        in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
+        --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques
+        --append them to the next iteration of the function
+        in (fst helper):(organizeCliques (i - 1) $ snd helper)
 
-      makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
+      --pair the organized maximal cliques with the dimension of the largest clique
+      makePair simplices =
         case simplices of
           (x:_) ->
             let dim = V.length x
             in (dim, organizeCliques dim $ V.fromList simplices)
-          []    -> (1, []) --if there are no maximal cliques this acts as a flag so that the algorithm doesn't try to generate all the other simplices
+          --if there are no maximal cliques this acts as a flag
+          --so that the algorithm doesn't try to generate all the other simplices
+          []    -> (1, [])
 
+      --find all maximal cliques
+      --and sort them from largest to smallest (excludes maximal cliques which are single points)
       maxCliques :: (Int, Vector (Vector (Vector Int)))
-      maxCliques = --find all maximal cliques and sort them from largest to smallest (excludes maximal cliques which are single points)
+      maxCliques =
         (\(x, y) -> (x, V.fromList y)) $ makePair $ sortVecs $ L.map V.fromList $
           L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> snd $ graph ! i ! j) [0..numVerts - 1]
 
@@ -200,21 +240,27 @@ makeCliqueComplexPar graph =
       combos :: Int -> Int -> Vector (Vector (Vector Int)) -> Vector (Vector (Vector Int, Vector Int)) -> Vector (Vector (Vector Int, Vector Int))
       combos i max sc result =
         if i == max then
-          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result --don't record boundary indices for edges
+          --don't record boundary indices for edges
+          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result
         else
-          let i1        = i + 1 --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
+          let i1        = i + 1
+              --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
               current   = sc ! i
               next      = sc ! i1
               len       = V.length next
               allCombos = V.map getCombos current --get all the faces of every simplex
               uCombos   = bigU allCombos --union of faces
-              --the index of the faces of each simplex can be found by adding the number of (n-1)-simplices to the index of each face in the union of faces
-              indices   = parMapVec (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
-          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices) `cons` result
+              --the index of the faces of each simplex can be found by
+              --adding the number of (n-1)-simplices to the index of each face in the union of faces
+              indices   =
+                parMapVec (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
+          in combos i1 max
+               (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices) `cons` result
 
       fstmc2 = fst maxCliques - 2
   in
-    if fstmc2 == (-1) then (numVerts, V.empty) --if there are no maximal cliques, the complex is just a bunch of points
+    --if there are no maximal cliques, the complex is just a bunch of points
+    if fstmc2 == (-1) then (numVerts, V.empty)
     else
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
       in (numVerts, sc)
@@ -224,7 +270,11 @@ makeCliqueComplexPar graph =
   Also uses O(n^2) memory (where n is the number of data points)
   for a graph storing all the distances between data points.
 -}
-makeRipsComplexFast :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> (SimplicialComplex, Graph a)
+makeRipsComplexFast :: (Ord a, Eq b)
+                    => a
+                    -> (b -> b -> a)
+                    -> Either (Vector b) [b]
+                    -> (SimplicialComplex, Graph a)
 makeRipsComplexFast scale metric dataSet =
   let graph = makeNbrhdGraph scale metric dataSet
       sc    = makeCliqueComplex graph
@@ -233,14 +283,22 @@ makeRipsComplexFast scale metric dataSet =
 {- |
   Parallel version of the above
 -}
-makeRipsComplexFastPar :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> (SimplicialComplex, Graph a)
+makeRipsComplexFastPar :: (Ord a, Eq b)
+                       => a
+                       -> (b -> b -> a)
+                       -> Either (Vector b) [b]
+                       -> (SimplicialComplex, Graph a)
 makeRipsComplexFastPar scale metric dataSet =
   let graph = makeNbrhdGraphPar scale metric dataSet
       sc    = makeCliqueComplexPar graph
   in (sc, graph)
 
 -- | Constructs the Vietoris-Rips complex given a scale, metric, and data set.
-makeRipsComplexLight :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> SimplicialComplex
+makeRipsComplexLight :: (Ord a, Eq b)
+                     => a
+                     -> (b -> b -> a)
+                     -> Either (Vector b) [b]
+                     -> SimplicialComplex
 makeRipsComplexLight scale metric dataSet =
   let numVerts = L.length dataSet
       vector   = case dataSet of Left v -> v; Right l -> V.fromList l
@@ -248,46 +306,67 @@ makeRipsComplexLight scale metric dataSet =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
-        in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
+        --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques
+        --append them to the next iteration of the function
+        in (fst helper):(organizeCliques (i - 1) $ snd helper)
 
-      makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
+      --pair the organized maximal cliques with the dimension of the largest clique
+      makePair simplices =
         case simplices of
           (x:_) ->
             let dim = V.length x
             in (dim, organizeCliques dim $ V.fromList simplices)
-          []    -> (1, []) --if there are no maximal cliques this acts as a flag so that the algorithm doesn't try to generate all the other simplices
+          --if there are no maximal cliques this acts as a flag
+          --so that the algorithm doesn't try to generate all the other simplices
+          []    -> (1, [])
 
+      --find all maximal cliques and
+      --sort them from largest to smallest (excludes maximal cliques which are single points)
       maxCliques :: (Int, Vector (Vector (Vector Int)))
-      maxCliques = --find all maximal cliques and sort them from largest to smallest (excludes maximal cliques which are single points)
+      maxCliques =
         (\(x, y) -> (x, V.fromList y)) $ makePair $ sortVecs $ L.map V.fromList $
           L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (vector ! i) (vector ! j) <= scale) [0..numVerts - 1]
 
       --generates faces of simplices and records the boundary indices
-      combos :: Int -> Int -> Vector (Vector (Vector Int)) -> Vector (Vector (Vector Int, Vector Int)) -> Vector (Vector (Vector Int, Vector Int))
+      combos :: Int
+             -> Int
+             -> Vector (Vector (Vector Int))
+             -> Vector (Vector (Vector Int, Vector Int))
+             -> Vector (Vector (Vector Int, Vector Int))
       combos i max sc result =
         if i == max then
-          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result --don't record boundary indices for edges
+          --don't record boundary indices for edges
+          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result
         else
-          let i1        = i + 1 --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
+          let i1        = i + 1
+              --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
               current   = sc ! i
               next      = sc ! i1
               len       = V.length next
               allCombos = V.map getCombos current --get all the faces of every simplex
               uCombos   = bigU allCombos --union of faces
-              --the index of the faces of each simplex can be found by adding the number of (n-1)-simplices to the index of each face in the union of faces
+              --the index of the faces of each simplex can be found
+              --by adding the number of (n-1)-simplices to
+              --the index of each face in the union of faces
               indices   = V.map (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
-          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices) `cons` result
+          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc)
+               $ (V.zip current indices) `cons` result
 
       fstmc2 = fst maxCliques - 2
   in
-    if fstmc2 == (-1) then (numVerts, V.empty) --if there are no maximal cliques, the complex is just a bunch of points
+    --if there are no maximal cliques, the complex is just a bunch of points
+    if fstmc2 == (-1) then (numVerts, V.empty)
     else
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
       in (numVerts, sc)
 
 -- | Parallel version of the above.
-makeRipsComplexLightPar :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> SimplicialComplex
+makeRipsComplexLightPar :: (Ord a, Eq b)
+                        => a
+                        -> (b -> b -> a)
+                        -> Either (Vector b) [b]
+                        -> SimplicialComplex
 makeRipsComplexLightPar scale metric dataSet =
   let numVerts = L.length dataSet
       vector   = case dataSet of Left v -> v; Right l -> V.fromList l
@@ -295,40 +374,59 @@ makeRipsComplexLightPar scale metric dataSet =
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
       organizeCliques i cliques =
-        let helper = V.partition (\simplex -> i == V.length simplex) cliques --find the simplices with the given number of vertices
-        in (fst helper):(organizeCliques (i - 1) $ snd helper) --append them to the next iteration of the function
+        --find the simplices with the given number of vertices
+        let helper = V.partition (\simplex -> i == V.length simplex) cliques
+        --append them to the next iteration of the function
+        in (fst helper):(organizeCliques (i - 1) $ snd helper)
 
-      makePair simplices = --pair the organized maximal cliques with the dimension of the largest clique
+      --pair the organized maximal cliques with the dimension of the largest clique
+      makePair simplices =
         case simplices of
           (x:_) ->
             let dim = V.length x
             in (dim, organizeCliques dim $ V.fromList simplices)
-          []    -> (1, []) --if there are no maximal cliques this acts as a flag so that the algorithm doesn't try to generate all the other simplices
+          --if there are no maximal cliques this acts as a flag
+          --so that the algorithm doesn't try to generate all the other simplices
+          []    -> (1, [])
 
+      --find all maximal cliques
+      --and sort them from largest to smallest (excludes maximal cliques which are single points)
       maxCliques :: (Int, Vector (Vector (Vector Int)))
-      maxCliques = --find all maximal cliques and sort them from largest to smallest (excludes maximal cliques which are single points)
-        (\(x, y) -> (x, V.fromList y)) $ makePair $ sortVecs $ L.map V.fromList $
-          L.filter (\c -> L.length c > 1) $ getMaximalCliques (\i j -> metric (vector ! i) (vector ! j) <= scale) [0..numVerts - 1]
+      maxCliques =
+        (\(x, y) -> (x, V.fromList y)) $ makePair $ sortVecs
+          $ L.map V.fromList $ L.filter (\c -> L.length c > 1)
+            $ getMaximalCliques (\i j -> metric (vector ! i) (vector ! j) <= scale) [0..numVerts-1]
 
       --generates faces of simplices and records the boundary indices
-      combos :: Int -> Int -> Vector (Vector (Vector Int)) -> Vector (Vector (Vector Int, Vector Int)) -> Vector (Vector (Vector Int, Vector Int))
+      combos :: Int
+             -> Int
+             -> Vector (Vector (Vector Int))
+             -> Vector (Vector (Vector Int, Vector Int))
+             -> Vector (Vector (Vector Int, Vector Int))
       combos i max sc result =
         if i == max then
-          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result --don't record boundary indices for edges
+          --don't record boundary indices for edges
+          (V.map (\s -> (s, V.empty)) $ V.last sc) `cons` result
         else
-          let i1        = i + 1 --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
+          let i1        = i + 1
+              --sc is in reverse order, so sc !! i1 is the array of simplices one dimension lower
               current   = sc ! i
               next      = sc ! i1
               len       = V.length next
               allCombos = V.map getCombos current --get all the faces of every simplex
               uCombos   = bigU allCombos --union of faces
-              --the index of the faces of each simplex can be found by adding the number of (n-1)-simplices to the index of each face in the union of faces
-              indices   = parMapVec (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
-          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc) $ (V.zip current indices) `cons` result
+              --the index of the faces of each simplex can be found
+              --by adding the number of (n-1)-simplices to
+              --the index of each face in the union of faces
+              indices   =
+                parMapVec (V.map (\face -> len + (elemIndexUnsafe face uCombos))) allCombos
+          in combos i1 max (replaceElem i1 (next V.++ uCombos) sc)
+               $ (V.zip current indices) `cons` result
 
       fstmc2 = fst maxCliques - 2
   in
-    if fstmc2 == (-1) then (numVerts, V.empty) --if there are no maximal cliques, the complex is just a bunch of points
+    --if there are no maximal cliques, the complex is just a bunch of points
+    if fstmc2 == (-1) then (numVerts, V.empty)
     else
       let sc = combos 0 fstmc2 (snd maxCliques) V.empty
       in (numVerts, sc)
@@ -362,7 +460,8 @@ makeSimplexBoundaryInt simplices (_, indices) =
 --makes boundary operator for all simplices of dimension 2 or greater
 --first argument is the dimension of the boundary operator, second is the simplicial complex
 makeBoundaryOperatorInt :: Int -> SimplicialComplex -> IMatrix
-makeBoundaryOperatorInt dim sc = transposeMat $ V.map (makeSimplexBoundaryInt ((snd sc) ! (dim - 2))) $ (snd sc) ! (dim - 1)
+makeBoundaryOperatorInt dim sc =
+  transposeMat $ V.map (makeSimplexBoundaryInt ((snd sc) ! (dim - 2))) $ (snd sc) ! (dim - 1)
 
 --makes all the boundary operators
 makeBoundaryOperatorsInt :: SimplicialComplex -> Vector IMatrix
@@ -391,7 +490,8 @@ simplicialHomology sc =
           in (L.replicate ((V.length $ V.head op) - (rankInt op)) 0):(calc $ i - 1)
         else
           let i1 = i - 1
-          in (getUnsignedDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
+          in (getUnsignedDiagonal $ normalFormInt
+               $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim
@@ -434,7 +534,8 @@ makeSimplexBoundaryBool dim simplices (simplex, indices) =
 --makes boundary operator for all simplices of dimension 2 or greater
 --first argument is the dimension of the boundary operator, second is the simplicial complex
 makeBoundaryOperatorBool :: Int -> SimplicialComplex -> BMatrix
-makeBoundaryOperatorBool dim sc = transposeMat $ V.map (makeSimplexBoundaryBool dim sc) $ (snd sc) ! (dim - 1)
+makeBoundaryOperatorBool dim sc =
+  transposeMat $ V.map (makeSimplexBoundaryBool dim sc) $ (snd sc) ! (dim - 1)
 
 --makes all the boundary operators
 makeBoundaryOperatorsBool :: SimplicialComplex -> Vector BMatrix
@@ -474,8 +575,8 @@ bettiNumbersPar sc =
   let dim      = (getDim sc) + 1
       boundOps = makeBoundaryOperatorsBool sc
       ranks    = --dimension of image paired with dimension of kernel
-        (0, V.length $ V.head boundOps) `cons`
-          (parMapVec (\op -> let rank = rankBool op in (rank, (V.length $ V.head op) - rank)) boundOps)
+        (0, V.length $ V.head boundOps) `cons` (parMapVec (\op ->
+          let rank = rankBool op in (rank, (V.length $ V.head op) - rank)) boundOps)
       calc 1   = [(snd $ ranks ! 0) - (fst $ ranks ! 1)]
       calc i   =
         let i1 = i - 1

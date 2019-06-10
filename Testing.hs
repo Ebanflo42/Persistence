@@ -129,37 +129,15 @@ matrix6 = V.fromList $ L.map V.fromList $
   , [ 30, 0, -18,  18]
   ]
 
-pointCloud1 = Right
-  [ ( -7, -19)
-  , ( -6, -16)
-  , (  2, -16)
-  , ( 11, -16)
-  , ( 11, -11)
-  , ( -6,  -9)
-  , (  2,  -9)
-  , ( 11,  -6)
-  , (-11,  -5)
-  , (  6,  -3)
-  , (  0,   0)
-  , ( -2,   3)
-  , ( 11,   3)
-  , (-14,   8)
-  , (  1,   8)
-  , ( -8,  14)
-  , ( 10,  19)
-  , ( 17,  20)
+snf6 :: IMatrix
+snf6 = V.fromList $ L.map V.fromList $
+  [ [ 1, 0,   0, 0]
+  , [ 0, 3,   0, 0]
+  , [ 0, 0, 462, 0]
+  , [ 0, 0,   0, 0]
   ]
 
-metric2 :: (Float, Float) -> (Float, Float) -> Float
-metric2 (a, b) (c, d) =
-  let x = a - c; y = b - d in
-  sqrt (x*x + y*y)
-
-scales1 = [10.0, 8.0, 6.0]
-testFiltration1 = makeRipsFiltrationFast scales1 metric2 pointCloud1
-nsTestFiltration1 = simple2Filtr testFiltration1
-
-pointCloud2 = Right
+pointCloud1 = Right
   [ (  1, -22)
   , (  4, -21)
   , ( -3, -20)
@@ -209,11 +187,18 @@ pointCloud2 = Right
   , (  1,  16)
   ]
 
+metric2 :: Floating a => (a, a) -> (a, a) -> a
+metric2 (a, b) (c, d) =
+  let x = a - c; y = b - d
+  in sqrt $ x*x + y*y
+
 --8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
 --1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
-scales2 = [6.0, 5.0, 4.0]
-testFiltration2 = makeRipsFiltrationFast scales2 metric2 pointCloud2
-nsTestFiltration2 = simple2Filtr testFiltration2
+--will be tested once current bug is found in persistent homology
+--scales1 = [6.0, 5.0, 4.0]
+scales1 = [10.0, 8.0, 6.0]
+testFiltration1 = makeRipsFiltrationFast scales1 metric2 pointCloud1
+nsTestFiltration1 = simple2Filtr testFiltration1
 
 octahedralCloud = Right
   [ ( 1, 0, 0)
@@ -224,11 +209,12 @@ octahedralCloud = Right
   , ( 0, 0,-1)
   ]
 
-metric3 :: (Float, Float, Float) -> (Float, Float, Float) -> Float
+metric3 :: Floating a => (a, a, a) -> (a, a, a) -> a
 metric3 (x0, y0, z0) (x1, y1, z1) =
   let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
   sqrt (dx*dx + dy*dy + dz*dz)
 
+octaScales :: [Double]
 octaScales = [2.1, 1.6, 1.1, 0.5]
 
 --5 connected components from 0 to 2, 1 void from 2 to 3
@@ -250,7 +236,8 @@ sqrCloud = Right
   , (0, 1)
   ]
 
-sqrScales = [1.5, 1.1, 0.5]
+sqrScales :: [Double]
+sqrScales = [2.0, 1.5, 1.1, 0.5]
 
 --11 connected components from 0 to 1, 1 loop starting at 1
 square = makeRipsFiltrationFast sqrScales metric2 sqrCloud
@@ -368,7 +355,7 @@ mobius = Right
   , ( 1.115377, -0.000000, -0.146842)
   ]
 
-mobScales = [0.3, 0.25, 0.2, 0.15]
+mobScales = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15]
 mobiusStrip = makeRipsFiltrationFast mobScales metric3 mobius
 nsmobius = simple2Filtr mobiusStrip
 
@@ -414,86 +401,52 @@ tests =
     in checkPass "normalFormIntPar matrix5" actual expect
 
   , let actual = normalFormInt matrix6
-        expect = V.empty
+        expect = snf6
     in checkPass "normalFormInt matrix6" actual expect
 
   , let actual = normalFormIntPar matrix6
-        expect = V.empty
+        expect = snf6
     in checkPass "normalFormIntPar matrix6" actual expect
-
-   --test filtration 1
-
-  , let actual = indexBarCodesSimple testFiltration1
-        expect = V.empty
-    in checkPass "indexBarCodesSimple testFiltration1" actual expect
-
-  , let actual = scaleBarCodesSimple (Right scales1) testFiltration1
-        expect = V.empty
-    in checkPass "scaleBarCodesSimple testFiltration1" actual expect
-
-  , let actual = indexBarCodes nsTestFiltration1
-        expect = V.empty
-    in checkPass "indexBarCodes nsTestFiltration1" actual expect
-
-  , let actual = scaleBarCodes (Right scales1) nsTestFiltration1
-        expect = V.empty
-    in checkPass "scaleBarCodes nsTestFiltration1" actual expect
-
-  --test filtration 2
-
-  , let actual = indexBarCodesSimple testFiltration2
-        expect = V.empty
-    in checkPass "indexBarCodesSimple testFiltration2" actual expect
-
-  , let actual = scaleBarCodesSimple (Right scales2) testFiltration2
-        expect = V.empty
-    in checkPass "scaleBarCodesSimple testFiltration2" actual expect
-
-  , let actual = indexBarCodes nsTestFiltration2
-        expect = V.empty
-    in checkPass "indexBarCodes nsTestFiltration2" actual expect
-
-  , let actual = scaleBarCodes (Right scales2) nsTestFiltration2
-        expect = V.empty
-    in checkPass "scaleBarCodes nsTestFiltration2" actual expect
 
   --octahedral filtration
 
   , let actual = indexBarCodesSimple octahedron
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 2),(0,Infinity)], [], [(2,Finite 3)], [], []]
     in checkPass "indexBarCodesSimple octahedron" actual expect
 
   , let actual = scaleBarCodesSimple (Right octaScales) octahedron
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6), (0.5, Infinity)], [], [(1.6,Finite 2.1)], [], []]
     in checkPass "scaleBarCodesSimple octahedron" actual expect
 
   , let actual = indexBarCodes nsoctahedron
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 2),(0,Infinity)], [], [(2,Finite 3)], [], [], []]
     in checkPass "indexBarCodes octahedron" actual expect
 
   , let actual = scaleBarCodes (Right octaScales) nsoctahedron
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6), (0.5, Infinity)], [], [(1.6,Finite 2.1)], [], [], []]
     in checkPass "scaleBarCodes octahedron" actual expect
 
   --square filtration
 
   , let actual = indexBarCodesSimple square
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(1,Infinity)]]
     in checkPass "indexBarCodesSimple square" actual expect
 
   , let actual = scaleBarCodesSimple (Right sqrScales) square
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Infinity)], [(1.1,Infinity)]]
     in checkPass "scaleBarCodesSimple square" actual expect
 
   , let actual = indexBarCodes nssquare
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(1,Infinity)], []]
     in checkPass "indexBarCodes square" actual expect
 
   , let actual = scaleBarCodes (Right sqrScales) nssquare
-        expect = V.empty
+        expect = V.fromList $ L.map V.fromList [[(0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Infinity)], [(1.1,Infinity)], []]
     in checkPass "scaleBarCodes square" actual expect
 
   --mobius strip filtration
+  --the mobius strip has a 1-cycle which isn't being picked up by the algorithm
+  --so we print all the test results every time
 
   , let actual = indexBarCodesSimple mobiusStrip
         expect = V.empty
@@ -514,17 +467,3 @@ tests =
   ]
 
 main = putStrLn $ formatTestResults tests
-
-  {--
-  putStrLn "Bottleneck distances between point cloud 1 & 2:"
-  let pc12 = bottleNeckDistances indexMetric ipcs1 ipcs2
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show pc12) L.++ "\n"
-
-  putStrLn "Bottleneck distances between octahedron barcodes and square barcodes:"
-  let sqroct = bottleNeckDistances indexMetric iocts isqrs
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show sqroct) L.++ "\n"
-
-  putStrLn "Bottleneck distance between square and mobius barcodes:"
-  let sqmob = bottleNeckDistances indexMetric isqrs imobns
-  putStrLn $ (intercalate "\n" $ V.toList $ V.map show sqmob) L.++ "\n"
-  --}

@@ -1,6 +1,6 @@
 {- |
 Module     : Persistence.Util
-Copyright  : (c) Eben Cowley, 2018
+Copyright  : (c) Eben Kadile, 2018
 License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
@@ -16,7 +16,7 @@ import Data.Vector as V
 import Control.Parallel.Strategies
 
 {- |
-  Simple instance of Num where True is 1 and False is 0, 
+  Simple instance of Num where True is 1 and False is 0,
   all operations work like arithmetic modulo 2.
 -}
 instance Num Bool where
@@ -130,9 +130,9 @@ switchElems i j vector
         third  = V.drop (j + 1) vector
     in first V.++ (cons (vector ! j) second) V.++ (cons (vector ! i) third)
 
--- | Remove the element at the given index. Unsafe use of take and drop.
+-- | Remove the element at the given index.
 rmIndex :: Int -> Vector a -> Vector a
-rmIndex i v = (V.take i v) V.++ (V.drop i v)
+rmIndex i v = (V.take i v) V.++ (V.drop (i + 1) v)
 
 -- | Generate a range of integers in vector form.
 range :: Int -> Int -> Vector Int
@@ -206,11 +206,11 @@ sortVecs =
         | otherwise                     = EQ
   in L.sortBy ordering
 
--- | Replace the element at the given index with the given element. Unsafe use of take and drop.
+-- | Replace the element at the given index with the given element.
 replaceElem :: Int -> a -> Vector a -> Vector a
 replaceElem i e v = (V.take i v) V.++ (e `cons` (V.drop (i + 1) v))
 
--- | Replace the element at the given index with the given element. Unsafe use of take and drop.
+-- | Replace the element at the given index with the given element.
 replaceElemList :: Int -> a -> [a] -> [a]
 replaceElemList i e l = (L.take i l) L.++ (e:(L.drop (i + 1) l))
 
@@ -308,7 +308,7 @@ elemIndexUnsafe elem vector =
 {- |
   Spark the first argument for parallel evaluation and force evaluation of the second argument,
   then return the first argument concatenated to the second. This is useful especially if the second
-  argument is a recursive call that calls evalPar again, so that every elemment of the list will be 
+  argument is a recursive call that calls evalPar again, so that every elemment of the list will be
   sparked for parallelism.
 -}
 evalPar :: a -> [a] -> [a]
