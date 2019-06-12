@@ -85,23 +85,44 @@ directedFlagComplex directedGraph =
         V.map (\e ->
           V.map (\(e0, _) -> (two e0) ! 0) $
             findBothElems (\e1 e2 -> (two e1) ! 0 == (two e2) ! 0)
-              (V.filter (\e0 -> (two e0) ! 1 == (two e) ! 1) edges) (V.filter (\e0 -> (two e0) ! 1 == (two e) ! 0) edges)) edges
+              (V.filter (\e0 -> (two e0) ! 1 == (two e) ! 1) edges)
+                (V.filter (\e0 -> (two e0) ! 1 == (two e) ! 0) edges)) edges
 
-      --take last level of nodes and their sinks. return modified last level, new level, and new sinks
-      makeLevel :: Bool -> HasseDiagram -> Vector Node -> Vector (Vector Int) -> (Vector Node, Vector Node, Vector (Vector Int))
+      --take last level of nodes and their sinks
+      --return modified last level, new level, and new sinks
+      makeLevel :: Bool
+                -> HasseDiagram
+                -> Vector Node
+                -> Vector (Vector Int)
+                -> (Vector Node, Vector Node, Vector (Vector Int))
       makeLevel fstIter result oldNodes oldSinks =
         let maxindex = V.length oldNodes
 
-            --given a node and a specific sink, construct a new node with new sinks that has the given index. Fst output is the modified input nodes, snd output is the new node, thrd output is the sinks of the new node
-            makeNode :: Int -> Int -> Int -> Vector Node -> Vector Int -> (Vector Node, Node, Vector Int)
+            --given a node and a specific sink
+            --construct a new node with new sinks that has the given index
+            --Fst output is the modified input nodes
+            --snd output is the new node, thrd output is the sinks of the new node
+            makeNode :: Int
+                     -> Int
+                     -> Int
+                     -> Vector Node
+                     -> Vector Int
+                     -> (Vector Node, Node, Vector Int)
             makeNode newIndex oldIndex sinkIndex nodes sinks =
               let sink     = sinks ! sinkIndex
                   oldNode  = nodes ! oldIndex
-                  verts    = sink `cons` (one oldNode) --the vertices of the new simplex are the vertices of the old simplex plus the sink
+                  --the vertices of the new simplex are
+                  --the vertices of the old simplex plus the sink
+                  verts    = sink `cons` (one oldNode)
                   numFaces = V.length $ two oldNode
 
                   --find all the faces of the new node by looking at the faces of the old node
-                  testTargets :: Int -> Node -> Vector Node -> Node -> Vector Int -> (Vector Node, Node, Vector Int)
+                  testTargets :: Int
+                              -> Node
+                              -> Vector Node
+                              -> Node
+                              -> Vector Int
+                              -> (Vector Node, Node, Vector Int)
                   testTargets i onode onodes newNode newSinks =
                     let faceVerts =
                           if fstIter then one $ (V.last $ V.init $ result) ! ((two onode) ! i)
@@ -109,16 +130,22 @@ directedFlagComplex directedGraph =
                     in
                       if i == numFaces then (onodes, newNode, newSinks)
                       else
-                        case V.find (\(_, (v, _, _)) -> V.head v == sink && V.tail v == faceVerts) $ mapWithIndex (\j n -> (j, n)) onodes of
+                        case V.find (\(_, (v, _, _)) ->
+                               V.head v == sink && V.tail v == faceVerts)
+                                 $ mapWithIndex (\j n -> (j, n)) onodes of
                           Just (j, n) ->
                             testTargets (i + 1) onode
                               (replaceElem j (one n, two n, (thr n) `smartSnoc` newIndex) onodes)
-                                (one newNode, (two newNode) `snoc` j, thr newNode) (newSinks |^| (oldSinks ! j))
-                          Nothing     -> error "Face not found, HasseDiagram.directedFlagComplex.makeDiagram.makeNode.testTargets"
+                                (one newNode, (two newNode) `snoc` j, thr newNode)
+                                  (newSinks |^| (oldSinks ! j))
+                          Nothing     -> error "HasseDiagram.directedFlagComplex.makeDiagram.makeNode.testTargets. This is a bug. Please email the Persistence maintainers."
 
               in testTargets 0 oldNode nodes (verts, oldIndex `cons` V.empty, V.empty) sinks
 
-            loopSinks :: Int -> Int -> Vector Node -> (Vector Node, Vector Node, Vector (Vector Int), Int)
+            loopSinks :: Int
+                      -> Int
+                      -> Vector Node
+                      -> (Vector Node, Vector Node, Vector (Vector Int), Int)
             loopSinks nodeIndex lastIndex nodes =
               let node     = oldNodes ! nodeIndex
                   sinks    = oldSinks ! nodeIndex
@@ -127,17 +154,24 @@ directedFlagComplex directedGraph =
                   loop i (modifiedNodes, newNodes, newSinks) =
                     if i == numSinks then (modifiedNodes, newNodes, newSinks, i + lastIndex)
                     else
-                      let (modNodes, newNode, ns) = makeNode (i + lastIndex) nodeIndex i modifiedNodes sinks
+                      let (modNodes, newNode, ns) =
+                            makeNode (i + lastIndex) nodeIndex i modifiedNodes sinks
                       in loop (i + 1) (modNodes, newNodes `snoc` newNode, newSinks `snoc` ns)
 
               in loop 0 (nodes, V.empty, V.empty)
 
-            loopNodes :: Int -> Int -> Vector Node -> Vector Node -> Vector (Vector Int) -> (Vector Node, Vector Node, Vector (Vector Int))
+            loopNodes :: Int
+                      -> Int
+                      -> Vector Node
+                      -> Vector Node
+                      -> Vector (Vector Int)
+                      -> (Vector Node, Vector Node, Vector (Vector Int))
             loopNodes i lastIndex nodes newNodes newSinks =
               if i == maxindex then (nodes, newNodes, newSinks)
               else
                 let (modifiedNodes, nnodes, nsinks, index) = loopSinks i lastIndex nodes
-                in loopNodes (i + 1) lastIndex modifiedNodes (newNodes V.++ nnodes) (newSinks V.++ nsinks)
+                in loopNodes (i + 1) lastIndex modifiedNodes
+                     (newNodes V.++ nnodes) (newSinks V.++ nsinks)
 
         in loopNodes 0 0 oldNodes V.empty V.empty
 

@@ -13,17 +13,20 @@ Bool is an instance of Num here (instance given in Util) so that functions can b
 
 -}
 
-module Matrix
-  ( IMatrix
-  , BMatrix
+module Matrix (
+  -- * Types
+    IMatrix
   , iMat2String
+  , BMatrix
   , bMat2String
+  -- * Utilities
   , getDiagonal
   , getUnsignedDiagonal
   , transposeMat
   , transposePar
   , multiply
   , multiplyPar
+  -- Int matrices
   , rankInt
   , rankIntPar
   , normalFormInt
@@ -32,6 +35,7 @@ module Matrix
   , kernelIntPar
   , imgInKerInt
   , imgInKerIntPar
+  -- Bool matrices
   , rankBool
   , kernelBool
   , imgInKerBool
@@ -59,13 +63,10 @@ import Data.List as L
 import Data.Vector as V
 import Control.Parallel.Strategies
 
---BASIC STUFF-------------------------------------------------------------
+-- * Types
 
 -- | Matrix of integers.
 type IMatrix = Vector (Vector Int)
-
--- | Matrix of integers modulo 2. Alternatively, matrix over the field with 2 elements.
-type BMatrix = Vector (Vector Bool)
 
 -- | Display an integer matrix.
 iMat2String :: IMatrix -> String
@@ -80,6 +81,9 @@ iMat2String mat =
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
   in print mat
 
+-- | Matrix of integers modulo 2. Alternatively, matrix over the field with 2 elements.
+type BMatrix = Vector (Vector Bool)
+
 -- | Display a boolean matrix (as 1's and 0's).
 bMat2String :: BMatrix -> String
 bMat2String mat =
@@ -90,6 +94,9 @@ bMat2String mat =
         if V.null m then ""
         else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
   in print mat
+
+
+-- * Utilities
 
 -- | Take the transpose a matrix (no fancy optimizations, yet).
 transposeMat :: Vector (Vector a) -> Vector (Vector a)
@@ -146,7 +153,8 @@ colOperationPar index1 index2 (c11, c12, c21, c22) matrix =
             first  = V.take index1 row
             second = V.drop (index1 + 1) (V.take index2 row)
             third  = V.drop (index2 + 1) row
-        in first V.++ (cons (c11*elem1 + c12*elem2) second) V.++ (cons (c22*elem2 + c21*elem1) third)
+        in first V.++ (cons (c11*elem1 + c12*elem2) second)
+             V.++ (cons (c22*elem2 + c21*elem1) third)
   in parMapVec calc matrix
 
 --assumes index1 < index2
@@ -173,7 +181,7 @@ rowOperationPar index1 index2 (c11, c12, c21, c22) matrix =
      rseq (a,b)
      return $ first V.++ (a `cons` second) V.++ (b `cons` third)
 
---INTEGER MATRICES--------------------------------------------------------
+-- * Int matrices
 
 --RANK--------------------------------------------------------------------
 
@@ -190,7 +198,7 @@ chooseGaussPivotInt (rowIndex, colIndex) mat =
       else
         let j = V.head indices
         in
-          if row ! j == 0 then error "The pivot was found to be zero, Matrix.hs line 193"
+          if row ! j == 0 then error "Persistence.Matrix.chooseGaussPivotInt. This is a bug. Please email the persistence maintainers."
           else Just (V.length indices > 1, V.map (switchElems colIndex j) mat, Just (colIndex, j))
     else Just (V.length indices > 0, mat, Nothing)
 
@@ -204,10 +212,12 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
               pivot = row ! colIndex
               x     = row ! i
               next  = i + 1
-          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
+          in
+            --boundary operators have lots of zeroes
+            --better to catch that instead of doing unnecessary %
             if pivot == 0 then
-              if forallVec (\a -> a == 0) row then mat
-              else error "Pivot was found to be zero, Matrix.hs line 210"
+              if V.all (\a -> a == 0) row then mat
+              else error "Persistence.Matrix.improveRowInt. This is a bug. Please email the Persistence maintainers."
             else
               if x == 0 || (x `mod` pivot == 0) then
                 improve next mat
@@ -218,7 +228,8 @@ improveRowInt (rowIndex, colIndex) numCols matrix =
 
   in improve (colIndex + 1) matrix
 
---given pivot index and pivot paired with matrix whose pivot row has been improved, eliminates the entries in the pivot row
+--given pivot index and pivot paired with matrix whose pivot row has been improved
+--eliminates the entries in the pivot row
 --the kinds of matrices that the functions work on will have lots of zeroes
 --better to catch that with a condition than perform an unnecessary division
 elimRowInt :: (Int, Int) -> IMatrix -> IMatrix
@@ -238,10 +249,11 @@ elimRowInt (rowIndex, colIndex) elems =
         if V.null ops then mat
         else
           let (i, coeff) = V.head ops
-          in calc (mapWithIndex (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
+          in calc (mapWithIndex (\j row ->
+               replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
 
   in
-    if pivot == 0 then error "Pivot was found to be zero, Matrix.hs line 218"
+    if pivot == 0 then error "Persistence.Matrix.elimRowInt. This is a bug. Please email the Persistence maintainers."
     else calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Finds the rank of integer matrix (number of linearly independent columns).
@@ -255,12 +267,14 @@ rankInt matrix =
         if rowIndex == rows || colIndex == cols then mat else
           case chooseGaussPivotInt (rowIndex, colIndex) mat of
             Just (True, mx, _)  ->
-              doColOps (rowIndex + 1, colIndex + 1) $ elimRowInt (rowIndex, colIndex) $ improveRowInt (rowIndex, colIndex) cols mx
+              doColOps (rowIndex + 1, colIndex + 1)
+                $ elimRowInt (rowIndex, colIndex) $ improveRowInt (rowIndex, colIndex) cols mx
             Just (False, mx, _) -> doColOps (rowIndex + 1, colIndex + 1) mx
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ V.map (\i -> if existsVec (\j -> mat ! j ! i /= 0) $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
+        V.sum $ V.map (\i -> if V.any (\j -> mat ! j ! i /= 0)
+          $ 0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
 
@@ -273,13 +287,17 @@ improveRowIntPar (rowIndex, colIndex) numCols matrix =
               pivot = row ! colIndex
               x     = row ! i
               next  = i + 1
-          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
+          in
+            --boundary operators have lots of zeroes
+            --better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-              in improve next $ colOperationPar colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
+              in improve next
+                   $ colOperationPar colIndex i
+                     (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (colIndex + 1) matrix
 
 --eliminates a row in parallel
@@ -298,8 +316,11 @@ elimRowIntPar (rowIndex, colIndex) elems =
       calc :: IMatrix -> Vector (Int, Int) -> IMatrix
       calc mat ops =
         if V.null ops then mat
-        else let (i, coeff) = V.head ops in
-          calc (parMapWithIndex (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
+        else
+          let (i, coeff) = V.head ops
+          in
+            calc (parMapWithIndex
+              (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
 
   in calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
@@ -320,14 +341,15 @@ rankIntPar matrix =
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
-        V.sum $ parMapVec (\i -> if existsVec (\j -> mat ! j ! i /= 0) $
+        V.sum $ parMapVec (\i -> if V.any (\j -> mat ! j ! i /= 0) $
           0 `range` (rows - 1) then 1 else 0) $ 0 `range` cols1
 
   in countNonZeroCols $ doColOps (0, 0) matrix
 
 --NORMAL FORM-------------------------------------------------------------
 
---rearranges matrix so that the pivot entry is in the correct position, returns true if more elimination is necessary
+--rearranges matrix so that the pivot entry is in the correct position
+--returns true if more elimination is necessary
 --returns Nothing if there is nothing but zeroes after the current pivot position
 chooseRowPivotInt :: (Int, Int) -> Int -> Int -> IMatrix -> Maybe (Bool, IMatrix)
 chooseRowPivotInt (rowIndex, colIndex) numRows numCols mat =
@@ -351,13 +373,17 @@ improveColInt pIndex maxIndex matrix =
           let pivot = matrix ! pIndex ! pIndex
               x     = matrix ! i ! pIndex
               next  = i + 1
-          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
+          in
+            --boundary operators have lots of zeroes
+            --better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-              in improve next $ rowOperation pIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
+              in improve next
+                   $ rowOperation pIndex i
+                     (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (pIndex + 1) matrix
 
 --eliminates the pivot column of a matrix to obtain normal form
@@ -392,10 +418,12 @@ finish diagLen matrix =
           else
             let mat'      = replaceElem i (replaceElem i1 nextE row) mat
                 gcdTriple = extEucAlg entry nextE; gcd = one gcdTriple
-                improve   = colOperation i i1 (thr gcdTriple, two gcdTriple, -(nextE `div` gcd), entry `div` gcd)
+                improve   =
+                  colOperation i i1
+                    (thr gcdTriple, two gcdTriple, -(nextE `div` gcd), entry `div` gcd)
                 cleanup   = \m -> elimColInt (i, i) $ elimRowInt (i, i) m
             in calc i1 $ cleanup $ improve mat'
-      filtered = biFilter (\row -> existsVec (\x -> x /= 0) row) matrix
+      filtered = V.partition (\row -> V.any (\x -> x /= 0) row) matrix
   in calc 0 $ (fst filtered) V.++ (snd filtered)
 
 -- | Get the Smith normal form of an integer matrix.
@@ -429,13 +457,17 @@ improveColIntPar pIndex maxIndex matrix =
               pivot = col ! pIndex
               x     = col ! i
               next  = i + 1
-          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
+          in
+            --boundary operators have lots of zeroes
+            --better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat
             else
               let gcdTriple = extEucAlg pivot x
                   gcd       = one gcdTriple
-              in improve next $ rowOperationPar pIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
+              in improve next
+                   $ rowOperationPar pIndex i
+                     (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd)) mat
   in improve (pIndex + 1) matrix
 
 --NEEDS TO BE PARALLELIZED
@@ -500,13 +532,17 @@ improveRowIntWithId (rowIndex, colIndex) numCols elems identity =
             else
             let gcdTriple = extEucAlg pivot x
                 gcd       = one gcdTriple
-                transform = colOperation colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
+                transform =
+                  colOperation colIndex i
+                    (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
             in improve next (transform mat) (transform ide)
 
   in improve (colIndex + 1) elems identity
 
---eliminates all the entries in the pivot row that come after the pivot, after the matrix has been improved
---returns the new matrix (fst) paired with the identity with whatever column operations were performed (snd)
+--eliminates all the entries in the pivot row that come after the pivot
+--after the matrix has been improved
+--returns the new matrix (fst) and
+--the identity with whatever column operations were performed (snd)
 elimRowIntWithId :: (Int, Int) -> Int -> (IMatrix, Int, IMatrix) -> (IMatrix, IMatrix)
 elimRowIntWithId (rowIndex, colIndex) numCols (elems, pivot, identity) =
   let row            = elems ! rowIndex
@@ -514,7 +550,9 @@ elimRowIntWithId (rowIndex, colIndex) numCols (elems, pivot, identity) =
         if i == numCols then (mat, ide)
         else
           let coeff     = (row ! i) `div` pivot
-              transform = V.map (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
+              transform =
+                V.map (\r -> (V.take i r)
+                  V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
 
@@ -524,7 +562,8 @@ kernelInt matrix =
   let rows     = V.length matrix
       cols     = V.length $ V.head matrix
       cols1    = cols - 1
-      identity = V.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
+      identity = V.map (\i -> (V.replicate i 0)
+                   V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
 
       doColOps (rowIndex, colIndex) (elems, ide) =
         if rowIndex == rows || colIndex == cols then (elems, ide) else
@@ -535,14 +574,16 @@ kernelInt matrix =
             Just (True, _, Nothing)       ->
               doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithId (rowIndex, colIndex) cols $
                 improveRowIntWithId (rowIndex, colIndex) cols elems ide
-            Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, V.map (switchElems i j) ide)
+            Just (False, mx, Just (i, j)) ->
+              doColOps (rowIndex + 1, colIndex + 1) (mx, V.map (switchElems i j) ide)
             Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (elems, ide)
             Nothing                       -> doColOps (rowIndex + 1, colIndex) (elems, ide)
 
       result   = doColOps (0, 0) (matrix, identity)
       elems    = fst result
       ide      = snd result
-  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
+  in V.map (\i -> V.map (\row -> row ! i) ide)
+       $ V.filter (\i -> V.all (\row -> row ! i == 0) elems) $ 0 `range` cols1
 
 --improves row in parallel and does the same thing to the identity matrix in parallel
 improveRowIntWithIdPar :: (Int, Int) -> Int -> IMatrix -> IMatrix -> (IMatrix, Int, IMatrix)
@@ -553,13 +594,16 @@ improveRowIntWithIdPar (rowIndex, colIndex) numCols elems identity =
               pivot = row ! colIndex
               x     = row ! i
               next  = i + 1
-          in --boundary operators have lots of zeroes, better to catch that instead of doing unnecessary %
+          in
+            --boundary operators have lots of zeroes
+            --better to catch that instead of doing unnecessary %
             if x == 0 || (x `mod` pivot == 0) then
               improve next mat ide
             else
             let gcdTriple = extEucAlg pivot x
                 gcd       = one gcdTriple
-                transform = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
+                transform = colOperationPar colIndex i
+                              (thr gcdTriple, two gcdTriple, x `div` gcd, -(pivot `div` gcd))
             in improve next (transform mat) (transform ide)
   in improve (colIndex + 1) elems identity
 
@@ -571,7 +615,8 @@ elimRowIntWithIdPar (rowIndex, colIndex) numCols (elems, pivot, identity) =
         if i == numCols then (mat, ide)
         else
           let coeff     = (row ! i) `div` pivot
-              transform = parMapVec (\r -> (V.take i r) V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
+              transform = parMapVec (\r -> (V.take i r)
+                            V.++ (cons ((r ! i) - coeff*(r ! colIndex)) (V.drop (i + 1) r)))
           in elim (i + 1) (transform mat) (transform ide)
   in elim (colIndex + 1) elems identity
 
@@ -581,25 +626,31 @@ kernelIntPar matrix =
   let rows     = V.length matrix
       cols     = V.length $ V.head matrix
       cols1    = cols - 1
-      identity = V.map (\i -> (V.replicate i 0) V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
+      identity = V.map (\i -> (V.replicate i 0)
+                   V.++ (cons 1 (V.replicate (cols1 - i) 0))) $ 0 `range` cols1
 
       doColOps (rowIndex, colIndex) (elems, ide) =
         if rowIndex == rows || colIndex == cols then (elems, ide) else
           case chooseGaussPivotInt (rowIndex, colIndex) elems of
             Just (True, mx, Just (i, j))  ->
-              doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithIdPar (rowIndex, colIndex) cols $
-                improveRowIntWithIdPar (rowIndex, colIndex) cols mx $ V.map (switchElems i j) ide
+              doColOps (rowIndex + 1, colIndex + 1)
+                $ elimRowIntWithIdPar (rowIndex, colIndex) cols
+                  $ improveRowIntWithIdPar (rowIndex, colIndex) cols mx
+                    $ V.map (switchElems i j) ide
             Just (True, _, Nothing)       ->
-              doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithIdPar (rowIndex, colIndex) cols $
-                improveRowIntWithIdPar (rowIndex, colIndex) cols elems ide
-            Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, V.map (switchElems i j) ide)
+              doColOps (rowIndex + 1, colIndex + 1)
+                $ elimRowIntWithIdPar (rowIndex, colIndex) cols
+                  $ improveRowIntWithIdPar (rowIndex, colIndex) cols elems ide
+            Just (False, mx, Just (i, j)) ->
+              doColOps (rowIndex + 1, colIndex + 1) (mx, V.map (switchElems i j) ide)
             Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (elems, ide)
             Nothing                       -> doColOps (rowIndex + 1, colIndex) (elems, ide)
 
       result   = doColOps (0, 0) (matrix, identity)
       elems    = fst result
       ide      = snd result
-  in V.map (\i -> V.map (\row -> row ! i) ide) $ V.filter (\i -> forallVec (\row -> row ! i == 0) elems) $ 0 `range` cols1
+  in V.map (\i -> V.map (\row -> row ! i) ide)
+       $ V.filter (\i -> V.all (\row -> row ! i == 0) elems) $ 0 `range` cols1
 
 --FIND IMAGE IN BASIS OF KERNEL-------------------------------------------
 
@@ -621,8 +672,10 @@ improveRowIntWithInv (rowIndex, colIndex) numCols kernel image =
                   gcd        = one gcdTriple
                   q1         = pivot `div` gcd
                   q2         = x `div` gcd
-                  transform1 = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, q2, -q1)
-                  transform2 = rowOperationPar colIndex i (-q1, -(two gcdTriple), -q2, thr gcdTriple)
+                  transform1 =
+                    colOperationPar colIndex i (thr gcdTriple, two gcdTriple, q2, -q1)
+                  transform2 =
+                    rowOperationPar colIndex i (-q1, -(two gcdTriple), -q2, thr gcdTriple)
               in improve next (transform1 ker) (transform2 img)
   in improve (colIndex + 1) kernel image
 
@@ -636,7 +689,8 @@ elimRowIntWithInv (rowIndex, colIndex) numCols (kernel, pivot, image) =
         | otherwise               =
           let coeff      = (row ! i) `div` pivot
               transform1 = V.map (\r -> replaceElem i ((r ! i) - coeff*(r ! colIndex)) r)
-              transform2 = \mat -> replaceElem colIndex ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
+              transform2 = \mat -> replaceElem colIndex
+                             ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
           in elim (i + 1) (transform1 ker) (transform2 img)
         where row = ker ! rowIndex
   in elim (colIndex + 1) kernel image
@@ -656,14 +710,16 @@ imgInKerInt toColEsch toImage =
           Just (True, mx, Just (i, j))  ->
             doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithInv (rowIndex, colIndex) cols $
               improveRowIntWithInv (rowIndex, colIndex) cols mx $ switchElems i j img
-          Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
+          Just (False, mx, Just (i, j)) ->
+            doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
           Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (ker, img)
           Nothing                       -> doColOps (rowIndex + 1, colIndex) (ker, img)
 
       result  = doColOps (0, 0) (toColEsch, toImage)
       colEsch = fst result
       image   = snd result
-  in V.map (\i -> image ! i) $ V.filter (\i -> forallVec (\row -> row ! i == 0) colEsch) $ 0 `range` (cols - 1)
+  in V.map (\i -> image ! i)
+       $ V.filter (\i -> V.all (\row -> row ! i == 0) colEsch) $ 0 `range` (cols - 1)
 
 --improves row and does inverse operations in parallel
 improveRowIntWithInvPar :: (Int, Int) -> Int -> IMatrix -> IMatrix -> (IMatrix, Int, IMatrix)
@@ -682,8 +738,10 @@ improveRowIntWithInvPar (rowIndex, colIndex) numCols kernel image =
                   gcd        = one gcdTriple
                   q1         = pivot `div` gcd
                   q2         = x `div` gcd
-                  transform1 = colOperationPar colIndex i (thr gcdTriple, two gcdTriple, q2, -q1)
-                  transform2 = rowOperationPar colIndex i (-q1, -(two gcdTriple), -q2, thr gcdTriple)
+                  transform1 =
+                    colOperationPar colIndex i (thr gcdTriple, two gcdTriple, q2, -q1)
+                  transform2 =
+                    rowOperationPar colIndex i (-q1, -(two gcdTriple), -q2, thr gcdTriple)
               in improve next (transform1 ker) (transform2 img)
   in improve (colIndex + 1) kernel image
 
@@ -697,15 +755,13 @@ elimRowIntWithInvPar (rowIndex, colIndex) numCols (kernel, pivot, image) =
         | otherwise               =
           let coeff      = (row ! i) `div` pivot
               transform1 = parMapVec (\r -> replaceElem i ((r ! i) - coeff*(r ! colIndex)) r)
-              transform2 = \mat -> replaceElem colIndex ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
+              transform2 = \mat -> replaceElem colIndex
+                             ((coeff `mul` (mat ! i)) `add` (mat ! colIndex)) mat
           in elim (i + 1) (transform1 ker) (transform2 img)
         where row = ker ! rowIndex
   in elim (colIndex + 1) kernel image
 
-{- |
-  Calculates the image of the second matrix represented in the basis of the kernel of the first matrix.
-  Uses lots of parallelism if processors are available.
--}
+-- | Calculates the image of the second matrix represented in the basis of the kernel of the first matrix. Uses lots of parallelism if processors are available.
 imgInKerIntPar :: IMatrix -> IMatrix -> IMatrix
 imgInKerIntPar toColEsch toImage =
   let rows     = V.length toColEsch
@@ -720,16 +776,18 @@ imgInKerIntPar toColEsch toImage =
           Just (True, mx, Just (i, j))  ->
             doColOps (rowIndex + 1, colIndex + 1) $ elimRowIntWithInvPar (rowIndex, colIndex) cols $
               improveRowIntWithInvPar (rowIndex, colIndex) cols mx $ switchElems i j img
-          Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
+          Just (False, mx, Just (i, j)) ->
+            doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
           Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (ker, img)
           Nothing                       -> doColOps (rowIndex + 1, colIndex) (ker, img)
 
       result = doColOps (0, 0) (toColEsch, toImage)
       ker    = fst result
       img    = snd result
-  in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> row ! i == 0) ker) $ 0 `range` (cols - 1)
+  in V.map (\i -> img ! i)
+       $ V.filter (\i -> V.all (\row -> row ! i == 0) ker) $ 0 `range` (cols - 1)
 
---BOOLEAN MATRICES--------------------------------------------------------
+-- * Bool matrices
 
 --RANK--------------------------------------------------------------------
 
@@ -756,7 +814,8 @@ elimRowBool (rowIndex, colIndex) numCols elems =
       elim i mat
         | i == numCols  = mat
         | not $ row ! i = elim (i + 1) mat
-        | otherwise     = elim (i + 1) $ V.map (\row -> replaceElem i ((row ! i) + (row ! colIndex)) row) mat
+        | otherwise     = elim (i + 1)
+                            $ V.map (\row -> replaceElem i ((row ! i) + (row ! colIndex)) row) mat
   in elim (colIndex + 1) elems
 
 -- | Find the rank of a mod 2 matrix (number of linearly independent columns).
@@ -769,19 +828,22 @@ rankBool matrix =
       doColOps (rowIndex, colIndex) mat =
         if rowIndex == rows || colIndex == cols then mat else
           case chooseGaussPivotBool (rowIndex, colIndex) mat of
-            Just (True, mx, _)  -> doColOps (rowIndex + 1, colIndex + 1) $ elimRowBool (rowIndex, colIndex) cols mx
+            Just (True, mx, _)  ->
+              doColOps (rowIndex + 1, colIndex + 1) $ elimRowBool (rowIndex, colIndex) cols mx
             Just (False, mx, _) -> doColOps (rowIndex + 1, colIndex + 1) mat
             Nothing             -> doColOps (rowIndex + 1, colIndex) mat
 
       countNonZeroCols mat =
         V.sum $ V.map (\i ->
-           if existsVec (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
+           if V.any (\j -> mat ! j ! i /= 0) (0 `range` (rows - 1)) then 1 else 0) $ 0 `range` cols1
   in countNonZeroCols $ doColOps (0, 0) matrix
 
 --KERNEL------------------------------------------------------------------
 
---eliminates all the entries in the pivot row that come after the pivot, after the matrix has been improved
---returns the new matrix (fst) paired with the identity with whatever column operations were performed (snd)
+--eliminates all the entries in the pivot row that come after the pivot
+--after the matrix has been improved
+--returns the new matrix (fst) paired
+--and the identity with whatever column operations were performed (snd)
 elimRowBoolWithId :: (Int, Int) -> Int -> BMatrix -> BMatrix -> (BMatrix, BMatrix)
 elimRowBoolWithId (rowIndex, colIndex) numCols elems identity =
   let row = elems ! rowIndex
@@ -799,7 +861,8 @@ kernelBool matrix =
   let rows     = V.length matrix
       cols     = V.length $ V.head matrix
       cols1    = cols - 1
-      identity = V.map (\i -> (V.replicate i False) V.++ (cons True (V.replicate (cols1 - i) False))) $ 0 `range` cols1
+      identity = V.map (\i -> (V.replicate i False)
+                   V.++ (cons True (V.replicate (cols1 - i) False))) $ 0 `range` cols1
 
       doColOps (rowIndex, colIndex) (ker, ide) =
         if rowIndex == rows || colIndex == cols then (ker, ide)
@@ -811,14 +874,15 @@ kernelBool matrix =
             Just (True, mx, Just (i, j)) ->
               doColOps (rowIndex + 1, colIndex + 1) $
                 elimRowBoolWithId (rowIndex, colIndex) cols mx $ V.map (switchElems i j) ide
-            Just (False, _, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (ker, V.map (switchElems i j) ide)
+            Just (False, _, Just (i, j)) ->
+              doColOps (rowIndex + 1, colIndex + 1) (ker, V.map (switchElems i j) ide)
             Just (False, _, _)           -> doColOps (rowIndex + 1, colIndex + 1) (ker, ide)
             Nothing                      -> doColOps (rowIndex + 1, colIndex) (ker, ide)
 
       result = doColOps (0, 0) (matrix, identity)
       ker    = fst result
       img    = snd result
-  in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> not $ row ! i) ker) $ 0 `range` cols1
+  in V.map (\i -> img ! i) $ V.filter (\i -> V.all (\row -> not $ row ! i) ker) $ 0 `range` cols1
 
 --IMAGE IN BASIS OF KERNEL------------------------------------------------
 
@@ -851,11 +915,12 @@ imgInKerBool toColEch toImage =
             Just (True, mx, Just (i, j))  ->
               doColOps (rowIndex + 1, colIndex + 1) $
                 elimRowBoolWithInv (rowIndex, colIndex) cols mx $ switchElems i j img
-            Just (False, mx, Just (i, j)) -> doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
+            Just (False, mx, Just (i, j)) ->
+              doColOps (rowIndex + 1, colIndex + 1) (mx, switchElems i j img)
             Just (False, _, _)            -> doColOps (rowIndex + 1, colIndex + 1) (ech, img)
             Nothing                       -> doColOps (rowIndex + 1, colIndex) (ech, img)
 
       result = doColOps (0, 0) (toColEch, toImage)
       ker    = fst result
       img    = snd result
-  in V.map (\i -> img ! i) $ V.filter (\i -> forallVec (\row -> not $ row ! i) ker) $ 0 `range` cols1
+  in V.map (\i -> img ! i) $ V.filter (\i -> V.all (\row -> not $ row ! i) ker) $ 0 `range` cols1
