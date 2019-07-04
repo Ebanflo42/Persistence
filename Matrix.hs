@@ -181,6 +181,9 @@ rowOperationPar index1 index2 (c11, c12, c21, c22) matrix =
      rseq (a,b)
      return $ first V.++ (a `cons` second) V.++ (b `cons` third)
 
+absAtIndex :: (Int, Int) -> IMatrix -> IMatrix
+absAtIndex (i, j) mat = replaceElem i (replaceElem j (abs $ mat!i!j) $ mat!i) mat
+
 -- * Int matrices
 
 --RANK--------------------------------------------------------------------
@@ -254,7 +257,7 @@ elimRowInt (rowIndex, colIndex) elems =
 
   in
     if pivot == 0 then error "Persistence.Matrix.elimRowInt. This is a bug. Please email the Persistence maintainers."
-    else calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
+    else absAtIndex (rowIndex, colIndex) $ calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Finds the rank of integer matrix (number of linearly independent columns).
 rankInt :: IMatrix -> Int
@@ -322,7 +325,10 @@ elimRowIntPar (rowIndex, colIndex) elems =
             calc (parMapWithIndex
               (\j row -> replaceElem i ((row ! i) - coeff*(pCol ! j)) row) mat) (V.tail ops)
 
-  in calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
+  in
+    if pivot == 0
+    then error "Persistence.Matrix.elimRowIntPar. This is a bug. Please email the Persistence maintainers."
+    else absAtIndex (rowIndex, colIndex) $ calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Calculates the rank of a matrix by operating on multiple rows in parallel.
 rankIntPar :: IMatrix -> Int
@@ -402,7 +408,11 @@ elimColInt (rowIndex, colIndex) elems =
         if V.null ops then mat
         else let (i, coeff) = V.head ops in
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
-  in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
+  in
+    if pivot == 0
+    then error "Persistence.Matrix.elimColInt. This is a bug. Please email the Persistence maintainters."
+    else absAtIndex (rowIndex, colIndex) $ calc elems
+           $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
 finish :: Int -> IMatrix -> IMatrix
 finish diagLen matrix =
@@ -446,7 +456,10 @@ normalFormInt matrix =
                 elimColInt (rowIndex, colIndex) $ improveColInt rowIndex rows mx
             Nothing          -> calc (rowIndex + 1, colIndex) mat
 
-  in if V.null matrix then empty else finish diag $ calc (0, 0) matrix
+  in
+    if V.null matrix
+    then empty
+    else finish diag $ calc (0, 0) matrix
 
 --improves the pivot column of a matrix in parallel
 improveColIntPar :: Int -> Int -> IMatrix -> IMatrix
@@ -490,7 +503,8 @@ elimColIntPar (rowIndex, colIndex) elems =
         else let (i, coeff) = V.head ops in
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
 
-  in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
+  in absAtIndex (rowIndex, colIndex) $ calc elems
+       $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
 -- | Gets the Smith normal form of a matrix, uses lots of parallelism if processors are available.
 normalFormIntPar :: IMatrix -> IMatrix
@@ -512,7 +526,10 @@ normalFormIntPar matrix =
                 elimColIntPar (rowIndex, colIndex) $ improveColIntPar rowIndex rows mx
             Nothing          -> calc (rowIndex + 1, colIndex) mat
 
-  in if V.null matrix then empty else finish diag $ calc (0, 0) matrix
+  in
+    if V.null matrix
+    then empty
+    else finish diag $ calc (0, 0) matrix
 
 --KERNEL------------------------------------------------------------------
 
