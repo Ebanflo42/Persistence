@@ -98,10 +98,17 @@ bMat2String mat =
 
 -- * Utilities
 
+isMatrix :: Vector (Vector a) -> Bool
+isMatrix mat =
+  let rowLen = V.length $ V.head mat
+  in V.all (\r -> V.length r == rowLen) mat
+
 -- | Take the transpose a matrix (no fancy optimizations, yet).
-transposeMat :: Vector (Vector a) -> Vector (Vector a)
+transposeMat :: Vector (Vector a) -> Maybe (Vector (Vector a))
 transposeMat mat =
-  V.map (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
+  if isMatrix mat
+  then Just $ V.map (\i -> V.map (\row -> row ! i) mat) $ 0 `range` ((V.length $ V.head mat) - 1)
+  else Nothing
 
 -- | Take the transpose of a matrix using parallel evaluation of rows.
 transposePar :: Vector (Vector a) -> Vector (Vector a)
@@ -111,13 +118,19 @@ transposePar mat =
 -- | Multiply two matrices
 multiply :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
 multiply mat1 mat2 =
-  let t = transposeMat mat2
+  let t =
+        case transposeMat mat2 of
+          Just m  -> m
+          Nothing -> error "error in multiply"
   in V.map (\row -> V.map (dotProduct row) t) mat1
 
 -- | Multiply matrices, evaluate rows in parallel if processors are available
 multiplyPar :: Num a => Vector (Vector a) -> Vector (Vector a) -> Vector (Vector a)
 multiplyPar mat1 mat2 = runEval $ do
-  let t = transposeMat mat2
+  let t =
+        case transposeMat mat2 of
+          Just m  -> m
+          Nothing -> error "error in multiplyPar"
   rseq t
   return $ parMapVec (\row -> V.map (dotProduct row) t) mat1
 
@@ -180,9 +193,6 @@ rowOperationPar index1 index2 (c11, c12, c21, c22) matrix =
      b <- rpar $ (c21 `mul` row1) `add` (c22 `mul` row2)
      rseq (a,b)
      return $ first V.++ (a `cons` second) V.++ (b `cons` third)
-
-absAtIndex :: (Int, Int) -> IMatrix -> IMatrix
-absAtIndex (i, j) mat = replaceElem i (replaceElem j (abs $ mat!i!j) $ mat!i) mat
 
 -- * Int matrices
 
@@ -257,7 +267,7 @@ elimRowInt (rowIndex, colIndex) elems =
 
   in
     if pivot == 0 then error "Persistence.Matrix.elimRowInt. This is a bug. Please email the Persistence maintainers."
-    else absAtIndex (rowIndex, colIndex) $ calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
+    else calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Finds the rank of integer matrix (number of linearly independent columns).
 rankInt :: IMatrix -> Int
@@ -328,7 +338,7 @@ elimRowIntPar (rowIndex, colIndex) elems =
   in
     if pivot == 0
     then error "Persistence.Matrix.elimRowIntPar. This is a bug. Please email the Persistence maintainers."
-    else absAtIndex (rowIndex, colIndex) $ calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
+    else calc elems $ makeCoeffs c1 $ V.drop c1 $ elems ! rowIndex
 
 -- | Calculates the rank of a matrix by operating on multiple rows in parallel.
 rankIntPar :: IMatrix -> Int
@@ -411,8 +421,7 @@ elimColInt (rowIndex, colIndex) elems =
   in
     if pivot == 0
     then error "Persistence.Matrix.elimColInt. This is a bug. Please email the Persistence maintainters."
-    else absAtIndex (rowIndex, colIndex) $ calc elems
-           $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
+    else calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
 finish :: Int -> IMatrix -> IMatrix
 finish diagLen matrix =
@@ -430,11 +439,18 @@ finish diagLen matrix =
                 gcdTriple = extEucAlg entry nextE; gcd = one gcdTriple
                 improve   =
                   colOperation i i1
-                    (thr gcdTriple, two gcdTriple, -(nextE `div` gcd), entry `div` gcd)
+                    (thr gcdTriple, two gcdTriple, nextE `div` gcd, entry `div` gcd)
                 cleanup   = \m -> elimColInt (i, i) $ elimRowInt (i, i) m
             in calc i1 $ cleanup $ improve mat'
+
+      absDiag i mat =
+        if i == V.length mat
+        then mat
+        else absDiag (i + 1)
+               $ replaceElem i (replaceElem i (abs $ mat!i!i) $ mat!i) mat
+
       filtered = V.partition (\row -> V.any (\x -> x /= 0) row) matrix
-  in calc 0 $ (fst filtered) V.++ (snd filtered)
+  in absDiag 0 $ calc 0 $ (fst filtered) V.++ (snd filtered)
 
 -- | Get the Smith normal form of an integer matrix.
 normalFormInt :: IMatrix -> IMatrix
@@ -503,8 +519,7 @@ elimColIntPar (rowIndex, colIndex) elems =
         else let (i, coeff) = V.head ops in
           calc (replaceElem i ((mat ! i) `subtr` (coeff `mul` pRow)) mat) (V.tail ops)
 
-  in absAtIndex (rowIndex, colIndex) $ calc elems
-       $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
+  in calc elems $ makeCoeffs ri1 $ V.drop ri1 $ V.map (\row -> row ! colIndex) elems
 
 -- | Gets the Smith normal form of a matrix, uses lots of parallelism if processors are available.
 normalFormIntPar :: IMatrix -> IMatrix

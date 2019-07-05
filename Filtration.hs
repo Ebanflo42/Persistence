@@ -56,6 +56,7 @@ import Util
 import Matrix
 import SimplicialComplex
 
+import Data.Maybe
 import Data.List as L
 import Data.Vector as V
 import Data.Algorithm.MaximalCliques
@@ -194,10 +195,10 @@ filtr2String (Right f) =
 -- | Gets the simplicial complex specified by the filtration index. This is O(n) with respect to the number of simplices.
 getComplex :: Int -> Either SimpleFiltration Filtration -> SimplicialComplex
 getComplex index (Left (n, simplices)) =
-  (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) simplices)
+  (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i <= index)) simplices)
 getComplex index (Right simplices)     =
   (V.length $ V.filter (\v -> one v <= index) (V.head simplices),
-    V.map (V.map not1 . V.filter (\(i, _, _) -> i == index)) (V.tail simplices))
+    V.map (V.map not1 . V.filter (\(i, _, _) -> i <= index)) (V.tail simplices))
 
 -- | Return the dimension of the highest dimensional simplex in the filtration (constant time).
 getDimension :: Either SimpleFiltration Filtration -> Int
@@ -689,3 +690,83 @@ calcLandscape brcds =
         else result
 
   in outerLoop (quickSort leq $ V.map (\(i, j) -> (fi $ Finite i, fi j)) brcds) V.empty
+
+-- | Evaluate the nth function in the landscape for the given point.
+evalLandscape :: Landscape -> Int -> Extended Double -> Extended Double
+evalLandscape landscape i arg =
+  let fcn = landscape ! i
+
+      findPointNeighbors :: Ord a => Int -> a -> Vector a -> (Int, Int)
+      findPointNeighbors helper x vector =
+        let len = V.length vector
+            i   = len `div` 2
+            y   = vector ! i
+        in
+          if x == y
+          then (helper + i, helper + i)
+          else if x > y
+          then
+            case vector !? (i + 1) of
+              Nothing -> (helper + i, helper + i)
+              Just z  ->
+                if x < z
+                then (helper + i, helper + i + 1)
+                else findPointNeighbors (helper + i) x $ V.drop i vector
+          else
+            case vector !? (i - 1) of
+              Nothing -> (helper + i, helper + i)
+              Just z  ->
+                if x > z
+                then (helper + i - 1, helper + i)
+                else findPointNeighbors helper x $ V.take i vector
+
+      (i1, i2) = findPointNeighbors 0 arg $ V.map fst fcn
+      (x1, x2) = (fst $ fcn ! i1, fst $ fcn ! i2)
+      (y1, y2) = (snd $ fromMaybe (error "Persistence.Filtration.evalLandscape. This is a bug. Please email the Persistence mainstainers.") $ V.find (\a -> x1 == fst a) fcn, snd $ fromMaybe (error "Persistence.Filtration.evalLandscape. This is a bug. Please email the Persistence mainstainers.") $ V.find (\a -> x2 == fst a) fcn)
+      t        =
+        if x1 == x2
+        then Finite 0.0
+        else
+          case (x1, x2) of
+            (MinusInfty, Infinity) -> arg
+            (Finite a, Finite b)   ->
+              case arg of
+                Infinity   -> Infinity
+                MinusInfty -> MinusInfty
+                Finite c   -> Finite $ (c - a)/(b - a)
+
+  in t*y2 + ((Finite 1.0) - t)*y1
+
+{- |
+  Compute a linear combination of the landscapes.
+  If the coefficient list is too short, the rest of the coefficients are assumed to be zero.
+  If it is too long, the extra coefficients are discarded.
+-}
+linearComboLandscapes :: [Double] -> [Landscape] -> Landscape
+linearComboLandscapes coeffs landscapes =
+  let myconcat v1 v2
+        | V.null v1 = v2
+        | V.null v2 = v1
+        | otherwise = ((V.head v1) V.++ (V.head v2)) `cons` (myconcat (V.tail v1) (V.tail v2))
+      xs = L.map (V.map (V.map fst)) landscapes
+      concatted = L.foldl myconcat V.empty xs
+      unionXs :: Vector (Vector (Extended Double))
+      unionXs   = V.map (V.fromList . L.nub . V.toList) concatted
+      yVals     = L.map (\landscape -> mapWithIndex (\i v ->
+                    V.map (\x -> evalLandscape landscape i x) v) unionXs) landscapes
+      yVals' :: [Vector (Vector (Extended Double))]
+      yVals'    = L.zipWith (\coeff yvals -> V.map (V.map ((Finite coeff)*)) yvals) coeffs yVals
+      finalY :: Vector (Vector (Extended Double))
+      finalY    = L.foldl1 (\acc new -> V.zipWith (V.zipWith (+)) acc new) yVals'
+  in V.zipWith V.zip unionXs finalY
+
+-- | Average the persistence landscapes.
+avgLandscapes :: [Landscape] -> Landscape
+avgLandscapes landscapes =
+  let numscapes = L.length landscapes
+      coeffs    = L.replicate numscapes (1.0/(fromIntegral numscapes))
+  in linearComboLandscapes coeffs landscapes
+
+-- | Take the differene between two persistence landscapes.
+diffLandscapes :: Landscape -> Landscape -> Landscape
+diffLandscapes scape1 scape2 = linearComboLandscapes [1, -1] [scape1, scape2]

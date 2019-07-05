@@ -41,35 +41,31 @@ https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 # Major TODOs:
 
-`Matrix.hs`:
-
-1) Fix Gauss-Jordan elimnation over the integers.
-
-`SimplicialComplex.hs`:
-
-1) Implement construction of the Cech complex (n points form an (n-1)-simplex if balls of a certain radius centered at each of the points intersect).
-
-2) Implement construction of the alpha-complex (sub-complex of the Delaunay triangulation where the vertices of every simplex are within a certain distance).
-
-3) Fix simplicial homology over the integers (this is almost certainly being caused by a malfunction of Gauss-Jordan elimnation in `Matrix.hs`
-
-`Filtration.hs`:
-
-Many of these are breaking API changes and so will be included in Persistence-2.0.
-
-1) Implement persistence landscape functions.
-
 `Testing.hs`:
 
 1) Test the bottleneck distance.
 
-2) Test simplicial homology functions.
+2) Test Betti number functions functions.
 
 3) Test Persistence landscape functions.
 
 4) Test construction of the directed flag complex.
 
 5) Make some filtrations whose vertices don't all have index 0 and test persistent homology on them.
+
+`SimplicialComplex.hs`:
+
+1) Fix simplicial homology over the integers (This might be due to an error in `getComplex` or `makeCliqueComplex`; the 2D boundary operator is not a matrix).
+
+2) Implement construction of the Cech complex (n points form an (n-1)-simplex if balls of a certain radius centered at each of the points intersect).
+
+3) Implement construction of the alpha-complex (sub-complex of the Delaunay triangulation where the vertices of every simplex are within a certain distance).
+
+`Filtration.hs`:
+
+Many of these are breaking API changes and so will be included in Persistence-2.0.
+
+1) Implement persistence landscape functions.
 
 General:
 

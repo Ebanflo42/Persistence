@@ -438,9 +438,14 @@ makeRipsComplexLightPar scale metric dataSet =
 --gets the first boundary operator (because edges don't need to point to their subsimplices)
 makeEdgeBoundariesBool :: SimplicialComplex -> BMatrix
 makeEdgeBoundariesBool sc =
-  transposeMat $ V.map (\edge ->
-    V.map (\vert -> vert == V.head edge || vert == V.last edge) $ 0 `range` (fst sc - 1))
-      $ V.map fst $ V.head $ snd sc
+  let mat =
+        V.map (\edge ->
+          V.map (\vert -> vert == V.head edge || vert == V.last edge) $ 0 `range` (fst sc - 1))
+            $ V.map fst $ V.head $ snd sc
+  in
+    case transposeMat mat of
+      Just m  -> m
+      Nothing -> error "error in makeEdgeBoundariesBool"
 
 --gets the boundary coefficients for a simplex of dimension 2 or greater
 --first argument is dimension of the simplex
@@ -454,7 +459,11 @@ makeSimplexBoundaryBool dim simplices (simplex, indices) =
 --first argument is the dimension of the boundary operator, second is the simplicial complex
 makeBoundaryOperatorBool :: Int -> SimplicialComplex -> BMatrix
 makeBoundaryOperatorBool dim sc =
-  transposeMat $ V.map (makeSimplexBoundaryBool dim sc) $ (snd sc) ! (dim - 1)
+  let mat = V.map (makeSimplexBoundaryBool dim sc) $ (snd sc) ! (dim - 1)
+  in
+    case transposeMat mat of
+      Just m  -> m
+      Nothing -> error "error in makeBoundaryOperatorBool"
 
 --makes all the boundary operators
 makeBoundaryOperatorsBool :: SimplicialComplex -> Vector BMatrix
@@ -512,17 +521,20 @@ bettiNumbersPar sc =
 --because edges don't need to point to their faces
 makeEdgeBoundariesInt :: SimplicialComplex -> IMatrix
 makeEdgeBoundariesInt sc =
-  transposeMat $
-  V.map (\e -> let edge = fst e in
-      replaceElem (V.head edge) (-1) $
-        replaceElem (V.last edge) 1 $
-          V.replicate (fst sc) 0) $
-            V.head $ snd sc
+  let mat =
+        V.map (\e -> let edge = fst e in
+            replaceElem (V.head edge) (-1) $
+              replaceElem (V.last edge) 1 $
+                V.replicate (fst sc) 0) $
+                  V.head $ snd sc
+  in
+    case transposeMat mat of
+      Just m  -> m
+      Nothing -> error "error in makeEdgeBoundariesInt"
 
 --gets the boundary coefficients for a simplex of dimension 2 or greater
---first argument is dimension of the simplex
---second argument is the simplicial complex
---third argument is the simplex paired with the indices of its faces
+--first argument is the simplices of one dimension lower
+--second argument is the simplex paired with the indices of its faces
 makeSimplexBoundaryInt :: Vector (Vector Int, Vector Int) -> (Vector Int, Vector Int) -> Vector Int
 makeSimplexBoundaryInt simplices (_, indices) =
   let calc1 ixs result =
@@ -537,7 +549,11 @@ makeSimplexBoundaryInt simplices (_, indices) =
 --first argument is the dimension of the boundary operator, second is the simplicial complex
 makeBoundaryOperatorInt :: Int -> SimplicialComplex -> IMatrix
 makeBoundaryOperatorInt dim sc =
-  transposeMat $ V.map (makeSimplexBoundaryInt ((snd sc) ! (dim - 2))) $ (snd sc) ! (dim - 1)
+  let mat = V.map (makeSimplexBoundaryInt ((snd sc) ! (dim - 2))) $ (snd sc) ! (dim - 1)
+  in
+    case transposeMat mat of
+      Just m  -> m
+      Nothing -> error $ show mat
 
 --makes all the boundary operators
 makeBoundaryOperatorsInt :: SimplicialComplex -> Vector IMatrix
