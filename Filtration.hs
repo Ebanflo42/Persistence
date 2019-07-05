@@ -49,7 +49,12 @@ module Filtration (
   , indexMetric
   , bottleNeckDistance
   , bottleNeckDistances
-  --, calcLandscape
+  , calcLandscape
+  , linearComboLandscapes
+  , avgLandscapes
+  , diffLandscapes
+  , normLp
+  , metricLp
   ) where
 
 import Util
@@ -165,6 +170,11 @@ fi :: (Integral a, Floating b) => Extended a -> Extended b
 fi (Finite i) = Finite $ fromIntegral i
 fi Infinity   = Infinity
 fi MinusInfty = MinusInfty
+
+unExtend :: Floating a => Extended a -> a
+unExtend Infinity   = 1.0/0.0
+unExtend (Finite x) = x
+unExtend MinusInfty = -1.0/0.0
 
 -- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
 type BarCode a = (a, Extended a)
@@ -770,3 +780,40 @@ avgLandscapes landscapes =
 -- | Take the differene between two persistence landscapes.
 diffLandscapes :: Landscape -> Landscape -> Landscape
 diffLandscapes scape1 scape2 = linearComboLandscapes [1, -1] [scape1, scape2]
+
+{- |
+  Take a power, p (could be infinity), an interval, a stepsize, and a persistence landscape.
+  If p>=1 then it will compute the L^p norm on the given interval.
+  Uses trapezoidal approximation.
+  You should ensure that the stepsize partitions the interval evenly.
+-}
+normLp :: Extended Double -> (Double, Double) -> Double -> Landscape -> Maybe Double
+normLp p interval step landscape =
+  let len = V.length landscape
+      a   = fst interval
+      b   = snd interval
+
+      fcn x =
+        let vals = V.map (\n ->
+                     abs $ unExtend $ evalLandscape landscape n (Finite x)) $ 0 `range` (len - 1)
+        in
+          case p of
+            Infinity    -> V.maximum vals
+            Finite 1.0  -> V.sum vals
+            Finite 2.0  -> sqrt $ V.sum $ V.map (\a -> a*a) vals
+            Finite p'   -> (**(1.0/p')) $ V.sum $ V.map (**p') vals
+
+      computeSum :: Double -> Double -> Double
+      computeSum currentX result =
+        let nextX = currentX + step
+        in
+          if nextX > b then result + (fcn nextX)
+          else computeSum nextX (result + 2.0*(fcn nextX))
+
+  in
+    if p < (Finite 1.0) then Nothing
+    else Just $ 0.5*step*(computeSum a $ fcn a)
+
+-- | Given the same information as above, computes the L^p distance between the two landscapes.
+metricLp :: Extended Double -> (Double, Double) -> Double -> Landscape -> Landscape -> Maybe Double
+metricLp p interval step scape1 scape2 = normLp p interval step $ diffLandscapes scape1 scape2
