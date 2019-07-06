@@ -35,14 +35,19 @@ xor True True   = False
 
 -- | First element of a triple.
 one (a, _, _) = a
+
 -- | Second element of a triple.
 two (_, b, _) = b
+
 -- | Third element of a triple.
 thr (_, _, c) = c
+
 -- | Last two elements of a triple.
 not1 (_, b, c) = (b, c)
+
 -- | First and last elements of a triple.
 not2 (a, _, c) = (a, c)
+
 -- | First two elements of a triple.
 not3 (a, b, _) = (a, b)
 
@@ -134,6 +139,10 @@ range x y
 -- | Return all vectors missing exactly one element from the original vector.
 getCombos :: Vector a -> Vector (Vector a)
 getCombos vector = V.map (\i -> rmIndex i vector) $ 0 `range` (V.length vector - 1)
+
+-- | Drop all elements from the right until the predicate is unsatisfied.
+dropRightWhile :: (a -> Bool) -> Vector a -> Vector a
+dropRightWhile p v = if p (V.last v) then dropRightWhile p (V.init v) else v
 
 -- | Filter a vector with a predicate that takes into account the index of the element.
 filterWithIndex :: (Int -> a -> Bool) -> Vector a -> Vector a

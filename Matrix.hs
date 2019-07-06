@@ -16,9 +16,7 @@ Bool is an instance of Num here (instance given in Util) so that functions can b
 module Matrix (
   -- * Types
     IMatrix
-  , iMat2String
   , BMatrix
-  , bMat2String
   -- * Utilities
   , getDiagonal
   , getUnsignedDiagonal
@@ -61,6 +59,7 @@ import Util
 
 import Data.List as L
 import Data.Vector as V
+
 import Control.Parallel.Strategies
 
 -- * Types
@@ -68,33 +67,8 @@ import Control.Parallel.Strategies
 -- | Matrix of integers.
 type IMatrix = Vector (Vector Int)
 
--- | Display an integer matrix.
-iMat2String :: IMatrix -> String
-iMat2String mat =
-  let printVec vec =
-        if V.null vec then ""
-        else
-          let x = V.head vec
-          in (show x) L.++ ((if x < 0 then " " else "  ") L.++ (printVec $ V.tail vec))
-      print m =
-        if V.null m then ""
-        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-  in print mat
-
 -- | Matrix of integers modulo 2. Alternatively, matrix over the field with 2 elements.
 type BMatrix = Vector (Vector Bool)
-
--- | Display a boolean matrix (as 1's and 0's).
-bMat2String :: BMatrix -> String
-bMat2String mat =
-  let printVec vec =
-        if V.null vec then ""
-        else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
-      print m =
-        if V.null m then ""
-        else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-  in print mat
-
 
 -- * Utilities
 

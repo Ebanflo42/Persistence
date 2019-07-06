@@ -99,12 +99,7 @@ type Filtration = Vector (Vector FilterSimplex)
 data Extended a = Finite a
                 | Infinity
                 | MinusInfty
-                deriving Eq
-
--- | Convert the extended value to a string in the generic way.
-instance Show a => Show (Extended a) where
-  show (Finite a) = "Finite " L.++ (show a)
-  show Infinity   = "infinity"
+                deriving (Eq, Show)
 
 {- |
   The ordering is inherited from the type a,
@@ -202,13 +197,19 @@ filtr2String (Left f)  =
 filtr2String (Right f) =
   (intercalate "\n") $ toList $ V.map (L.concat . toList . (V.map sim2String)) f
 
--- | Gets the simplicial complex specified by the filtration index. This is O(n) with respect to the number of simplices.
+{- |
+  Gets the simplicial complex specified by the filtration index.
+  This is O(n) with respect to the number of simplices.
+-}
 getComplex :: Int -> Either SimpleFiltration Filtration -> SimplicialComplex
 getComplex index (Left (n, simplices)) =
-  (n, V.map (V.map not1 . V.filter (\(i, _, _) -> i <= index)) simplices)
+  (n, dropRightWhile V.null
+    $ V.map (V.map not1 . V.filter (\(i, _, _) -> i <= index)) simplices)
 getComplex index (Right simplices)     =
-  (V.length $ V.filter (\v -> one v <= index) (V.head simplices),
-    V.map (V.map not1 . V.filter (\(i, _, _) -> i <= index)) (V.tail simplices))
+  (V.length $ V.filter (\v ->
+    one v <= index) (V.head simplices),
+      dropRightWhile V.null $ V.map (V.map not1
+        . V.filter (\(i, _, _) -> i <= index)) (V.tail simplices))
 
 -- | Return the dimension of the highest dimensional simplex in the filtration (constant time).
 getDimension :: Either SimpleFiltration Filtration -> Int
@@ -744,6 +745,9 @@ evalLandscape landscape i arg =
                 Infinity   -> Infinity
                 MinusInfty -> MinusInfty
                 Finite c   -> Finite $ (c - a)/(b - a)
+            (Infinity, Finite _)   -> Finite 0.0
+            (MinusInfty, Finite _) -> Finite 0.0
+            anything               -> error $ "Persistence.Filtration.evalLandscape: " L.++ (show anything) L.++ ". This is a bug. Please email the Persistence maintainers."
 
   in t*y2 + ((Finite 1.0) - t)*y1
 

@@ -39,7 +39,7 @@ import Data.Vector as V
 
 {- |
   Type representing a node in a Hasse diagram.
-  Hasse diagrams are being used to represent simplicial complexes so each node represents a simplex
+  Hasse diagrams are being used to represent simplicial complexes so each node represents a simplex.
   Contents of the tuple in order: Vector of references to vertices of the underlying directed graph,
   vector of references to the simplices faes in the next lowest level of the Hasse diagram,
   vector of references to "parent" simplices (simplices who have this simplex as a face) in the next highest level of the Hasse diagram.

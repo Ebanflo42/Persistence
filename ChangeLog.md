@@ -12,7 +12,7 @@
 - A function for encoding generic graphs as 2D vectors.
 
 ### Changed
-- Improved documentation for all exposed modules.     
+- Improved documentation for all exposed modules.
 
 ## 1.1.3 -- 2018-07-30
 
@@ -63,3 +63,5 @@
 - Data structures for filtrations both with and without all vertices having filtration index equal to zero, and persistent homology functions for processing each structure.
 
 - Persistent homology functions that return Bar codes in terms of scales.
+
+- Functions for constructing and manipulating persistence landscapes.

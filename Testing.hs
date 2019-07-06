@@ -12,6 +12,15 @@ import Data.List as L
 class ToString a where
   toString :: a -> String
 
+instance ToString Double where
+  toString = show
+
+instance ToString Int where
+  toString = show
+
+instance ToString Bool where
+  toString b = if b then "1" else "0"
+
 instance ToString IMatrix where
   toString mat =
     let printVec vec =
@@ -24,21 +33,21 @@ instance ToString IMatrix where
           else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
     in print mat
 
-instance ToString BMatrix where
-  toString mat =
-    let printVec vec =
-          if V.null vec then ""
-          else (if V.head vec then "1 " else "0 ") L.++ (printVec $ V.tail vec)
-        print m =
-          if V.null m then ""
-          else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-    in print mat
+instance ToString [Int] where
+  toString = show
 
 instance ToString [[Int]] where
   toString = show
 
 instance Show a => ToString (Vector (Vector (BarCode a))) where
   toString = unlines . V.toList . (V.map show)
+
+instance ToString Landscape where
+  toString = show
+
+instance ToString a => ToString (Maybe a) where
+  toString (Just a) = "Just " L.++ (toString a)
+  toString Nothing  = "Nothing"
 
 data TestResult = Success | Failure String deriving Eq
 
@@ -510,11 +519,63 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList $ [[(0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Infinity)], [(0.35, Finite 0.4), (0.3, Finite 0.4), (0.3, Finite 0.4), (0.35, Infinity)], [], [], [], []]
     in checkPass "scaleBarCodes mobius" actual expect
 
-  , let complex = getComplex 3 $ Left mobiusStrip
-        actual  = simplicialHomology complex
-        expect  = Nothing
-    in checkPass "simplicialHomology mobiusStrip" actual expect
+  , let complex = getComplex 1 $ Right nssquare
+        actual  = bettiNumbers complex
+        expect  = Just [1,1]
+    in checkPass "bettiNumbers nssquare 1" actual expect
 
+  , let complex = getComplex 1 $ Right nssquare
+        actual  = bettiNumbersPar complex
+        expect  = Just [1,1]
+    in checkPass "bettiNumbersPar nssquare 1" actual expect
+
+  , let complex = getComplex 2 $ Left octahedron
+        actual  = bettiNumbers complex
+        expect  = Just [1,0,1]
+    in checkPass "bettiNumbers octahedron 2" actual expect
+
+  , let complex = getComplex 2 $ Left octahedron
+        actual  = bettiNumbersPar complex
+        expect  = Just [1,0,1]
+    in checkPass "bettiNumbersPar octahedron 2" actual expect
+
+  , let complex = getComplex 2 $ Left testFiltration1
+        actual  = bettiNumbers complex
+        expect  = Just [3,2,0,0]
+    in checkPass "bettiNumbers testFiltration1 2" actual expect
+
+  , let complex = getComplex 2 $ Left testFiltration1
+        actual  = bettiNumbersPar complex
+        expect  = Just [3,2,0,0]
+    in checkPass "bettiNumbersPar testFiltration1 2" actual expect
+
+  --for now we only check if the landscape functions don't throw errors
+
+  , let ibarcodes = indexBarCodesSimple testFiltration1
+        actual    = calcLandscape $ ibarcodes ! 0
+        expect    = Nothing
+    in checkPass "calcLandscape testFiltration1 0-dimensional" actual expect
+
+  , let ibarcodes = indexBarCodesSimple mobiusStrip
+        actual    = calcLandscape $ ibarcodes ! 1
+        expect    = Nothing
+    in checkPass "calcLandscape mobiusStrip 1-dimensional" actual expect
+
+  , let ibarcodestest = indexBarCodesSimple testFiltration1
+        ibarcodesmob  = indexBarCodesSimple mobiusStrip
+        testscape     = calcLandscape $ ibarcodestest ! 0
+        mobscape      = calcLandscape $ ibarcodesmob ! 1
+        actual        = avgLandscapes [testscape, mobscape]
+        expect        = Nothing
+    in checkPass "avgLandscapes testFiltration1 mobiuStrip" actual expect
+
+  , let ibarcodestest = indexBarCodesSimple testFiltration1
+        ibarcodesmob  = indexBarCodesSimple mobiusStrip
+        testscape     = calcLandscape $ ibarcodestest ! 0
+        mobscape      = calcLandscape $ ibarcodesmob ! 1
+        actual        = metricLp (Finite 3.0) (0.0, 5.0) 0.5 testscape mobscape
+        expect        = Nothing
+    in checkPass "metricLp 3.0 (0.0, 5.0) testFiltration1 mobiuStrip" actual expect
   ]
 
 main = putStrLn $ formatTestResults tests
