@@ -734,22 +734,30 @@ evalLandscape landscape i arg =
       (i1, i2) = findPointNeighbors 0 arg $ V.map fst fcn
       (x1, x2) = (fst $ fcn ! i1, fst $ fcn ! i2)
       (y1, y2) = (snd $ fromMaybe (error "Persistence.Filtration.evalLandscape. This is a bug. Please email the Persistence mainstainers.") $ V.find (\a -> x1 == fst a) fcn, snd $ fromMaybe (error "Persistence.Filtration.evalLandscape. This is a bug. Please email the Persistence mainstainers.") $ V.find (\a -> x2 == fst a) fcn)
-      t        =
-        if x1 == x2
-        then Finite 0.0
-        else
-          case (x1, x2) of
-            (MinusInfty, Infinity) -> arg
-            (Finite a, Finite b)   ->
-              case arg of
-                Infinity   -> Infinity
-                MinusInfty -> MinusInfty
-                Finite c   -> Finite $ (c - a)/(b - a)
-            (Infinity, Finite _)   -> Finite 0.0
-            (MinusInfty, Finite _) -> Finite 0.0
-            anything               -> error $ "Persistence.Filtration.evalLandscape: " L.++ (show anything) L.++ ". This is a bug. Please email the Persistence maintainers."
 
-  in t*y2 + ((Finite 1.0) - t)*y1
+  in
+    if x1 == x2
+    then y1
+    else
+      case (x1, x2) of
+        (MinusInfty, Infinity)   -> arg
+        (MinusInfty, Finite _)   -> y1
+        (Finite a, Finite b)     ->
+          case arg of
+            Finite c   ->
+              let t = Finite $ (c - a)/(b - a)
+              in t*y2 + ((Finite 1.0) - t)*y1
+            _          -> error "Persistence.Filtration.evalLandscape.findPointNeighbors. This is a bug. Please email the Persistence maintainers."
+        (Finite a, Infinity)     ->
+          case arg of
+            Infinity   -> y2
+            Finite c   ->
+              case y2 of
+                Infinity   -> Finite $ c - a
+                Finite 0.0 -> Finite 0.0
+                _          -> error $ "Persistence.Filtration.evalLandscape: y2 = " L.++ (show y2) L.++ ". This is a bug. Please email the Persistence maintainers."
+            _          -> error "Persistence.Filtration.evalLandscape.findPointNeighbors: bad argument. This is a bug. Please email the Persistence maintainers."
+        anything                 -> error $ "Persistence.Filtration.evalLandscape.findPointNeighbors: " L.++ (show anything) L.++ ". This is a bug. Please email the Persistence maintainers."
 
 {- |
   Compute a linear combination of the landscapes.
@@ -764,13 +772,11 @@ linearComboLandscapes coeffs landscapes =
         | otherwise = ((V.head v1) V.++ (V.head v2)) `cons` (myconcat (V.tail v1) (V.tail v2))
       xs = L.map (V.map (V.map fst)) landscapes
       concatted = L.foldl myconcat V.empty xs
-      unionXs :: Vector (Vector (Extended Double))
-      unionXs   = V.map (V.fromList . L.nub . V.toList) concatted
-      yVals     = L.map (\landscape -> mapWithIndex (\i v ->
-                    V.map (\x -> evalLandscape landscape i x) v) unionXs) landscapes
-      yVals' :: [Vector (Vector (Extended Double))]
-      yVals'    = L.zipWith (\coeff yvals -> V.map (V.map ((Finite coeff)*)) yvals) coeffs yVals
-      finalY :: Vector (Vector (Extended Double))
+      unionXs   = V.map ((quickSort (>)) . V.fromList . L.nub . V.toList) concatted
+      yVals     = mapWithIndex (\i landscape -> V.map (\v ->
+                    V.map (\x -> evalLandscape landscape i x) v) unionXs) $ V.fromList landscapes
+      yVals'    = V.zipWith (\coeff yvals ->
+                    V.map (V.map ((Finite coeff)*)) yvals) (V.fromList coeffs) yVals
       finalY    = L.foldl1 (\acc new -> V.zipWith (V.zipWith (+)) acc new) yVals'
   in V.zipWith V.zip unionXs finalY
 

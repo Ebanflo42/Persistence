@@ -45,7 +45,6 @@ module SimplicialComplex (
 
 import Util
 import Matrix
-import SmithReduction
 
 import Data.List as L
 import Data.Vector as V
@@ -583,16 +582,10 @@ simplicialHomology sc =
           let op = V.last boundOps
           in (L.replicate ((V.length $ V.head op) - (rankInt op)) 0):(calc $ i - 1)
         else
-          let i1  = i - 1
-              mat = (boundOps ! i1) `multiply` (boundOps ! i)
-          in
-            if V.null mat
-            then calc i1
-            else (structure_constants_from_matrix
-                   $ matrix_from_list $ V.toList $ V.map V.toList mat):(calc i1)
+          let i1 = i - 1
+          in (getUnsignedDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in
-    if L.null $ snd sc
-    then [L.replicate (fst sc) 0]
+    if L.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim
 
 -- | Same as simplicialHomology except it computes each of the groups in parallel and uses parallel matrix computations.
@@ -607,9 +600,8 @@ simplicialHomologyPar sc =
           in evalPar (L.replicate ((V.length $ V.head op) - (rankInt op)) 0) $ calc $ i - 1
         else
           let i1 = i - 1
-          in evalPar (structure_constants_from_matrix
-               $ matrix_from_list $ V.toList $ V.map V.toList
-                 $ imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
+          in evalPar (getUnsignedDiagonal $ normalFormIntPar $ --see Util for evalPar
+            imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
   in
     if L.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim

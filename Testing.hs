@@ -573,9 +573,17 @@ tests =
         ibarcodesmob  = indexBarCodesSimple mobiusStrip
         testscape     = calcLandscape $ ibarcodestest ! 0
         mobscape      = calcLandscape $ ibarcodesmob ! 1
+        actual        = diffLandscapes testscape mobscape
+        expect        = Nothing
+    in checkPass "diffLandscapes testFiltration1 mobiusStrip" actual expect
+
+  , let ibarcodestest = indexBarCodesSimple testFiltration1
+        ibarcodesmob  = indexBarCodesSimple mobiusStrip
+        testscape     = calcLandscape $ ibarcodestest ! 0
+        mobscape      = calcLandscape $ ibarcodesmob ! 1
         actual        = metricLp (Finite 3.0) (0.0, 5.0) 0.5 testscape mobscape
         expect        = Nothing
-    in checkPass "metricLp 3.0 (0.0, 5.0) testFiltration1 mobiuStrip" actual expect
+    in checkPass "metricLp 3.0 (0.0, 5.0) testFiltration1 mobiusStrip" actual expect
   ]
 
 main = putStrLn $ formatTestResults tests
