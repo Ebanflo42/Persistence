@@ -50,6 +50,8 @@ module Filtration (
   , bottleNeckDistance
   , bottleNeckDistances
   , calcLandscape
+  , evalLandscape
+  , evalLandscapeAll
   , linearComboLandscapes
   , avgLandscapes
   , diffLandscapes
@@ -700,7 +702,8 @@ calcLandscape brcds =
               in innerLoop (b, d) (V.tail barcodes) ((V.fromList newCritPoints) `cons` result)
         else result
 
-  in outerLoop (quickSort leq $ V.map (\(i, j) -> (fi $ Finite i, fi j)) brcds) V.empty
+  in V.map (quickSort (\(x1, _) (x2, _) -> x1 > x2))
+       $ outerLoop (quickSort leq $ V.map (\(i, j) -> (fi $ Finite i, fi j)) brcds) V.empty
 
 -- | Evaluate the nth function in the landscape for the given point.
 evalLandscape :: Landscape -> Int -> Extended Double -> Extended Double
@@ -759,6 +762,11 @@ evalLandscape landscape i arg =
             _          -> error "Persistence.Filtration.evalLandscape.findPointNeighbors: bad argument. This is a bug. Please email the Persistence maintainers."
         anything                 -> error $ "Persistence.Filtration.evalLandscape.findPointNeighbors: " L.++ (show anything) L.++ ". This is a bug. Please email the Persistence maintainers."
 
+evalLandscapeAll :: Landscape -> Extended Double -> Vector (Extended Double)
+evalLandscapeAll landscape arg =
+  if V.null landscape then V.empty
+  else (evalLandscape landscape 0 arg) `cons` (evalLandscapeAll (V.tail landscape) arg)
+
 {- |
   Compute a linear combination of the landscapes.
   If the coefficient list is too short, the rest of the coefficients are assumed to be zero.
@@ -766,17 +774,22 @@ evalLandscape landscape i arg =
 -}
 linearComboLandscapes :: [Double] -> [Landscape] -> Landscape
 linearComboLandscapes coeffs landscapes =
-  let myconcat v1 v2
+  let maxlen      = L.maximum $ L.map V.length landscapes
+      emptylayer  = V.fromList [(MinusInfty, Finite 0.0), (Infinity, Finite 0.0)]
+      landscapes' = L.map (\l -> l V.++ (V.replicate (maxlen - V.length l) emptylayer)) landscapes
+
+      myconcat v1 v2
         | V.null v1 = v2
         | V.null v2 = v1
         | otherwise = ((V.head v1) V.++ (V.head v2)) `cons` (myconcat (V.tail v1) (V.tail v2))
-      xs = L.map (V.map (V.map fst)) landscapes
+
+      xs        = L.map (V.map (V.map fst)) landscapes'
       concatted = L.foldl myconcat V.empty xs
       unionXs   = V.map ((quickSort (>)) . V.fromList . L.nub . V.toList) concatted
-      yVals     = mapWithIndex (\i landscape -> V.map (\v ->
-                    V.map (\x -> evalLandscape landscape i x) v) unionXs) $ V.fromList landscapes
-      yVals'    = V.zipWith (\coeff yvals ->
-                    V.map (V.map ((Finite coeff)*)) yvals) (V.fromList coeffs) yVals
+      yVals     = L.map (\landscape ->
+                    mapWithIndex (\i v -> V.map (evalLandscape landscape i) v) unionXs) landscapes'
+      yVals'    = L.zipWith (\coeff yvals ->
+                    V.map (V.map ((Finite coeff)*)) yvals) coeffs yVals
       finalY    = L.foldl1 (\acc new -> V.zipWith (V.zipWith (+)) acc new) yVals'
   in V.zipWith V.zip unionXs finalY
 
@@ -787,7 +800,7 @@ avgLandscapes landscapes =
       coeffs    = L.replicate numscapes (1.0/(fromIntegral numscapes))
   in linearComboLandscapes coeffs landscapes
 
--- | Take the differene between two persistence landscapes.
+-- | Subtract the second landscape from the first.
 diffLandscapes :: Landscape -> Landscape -> Landscape
 diffLandscapes scape1 scape2 = linearComboLandscapes [1, -1] [scape1, scape2]
 
@@ -824,6 +837,9 @@ normLp p interval step landscape =
     if p < (Finite 1.0) then Nothing
     else Just $ 0.5*step*(computeSum a $ fcn a)
 
--- | Given the same information as above, computes the L^p distance between the two landscapes.
+{- |
+  Given the same information as above, computes the L^p distance between the two landscapes.
+  One way to compare the topologies of two filtrations.
+-}
 metricLp :: Extended Double -> (Double, Double) -> Double -> Landscape -> Landscape -> Maybe Double
 metricLp p interval step scape1 scape2 = normLp p interval step $ diffLandscapes scape1 scape2
