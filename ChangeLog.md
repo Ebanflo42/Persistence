@@ -54,7 +54,7 @@
 
 - Improved documentation for all exposed modules
 
-- `Extended` type now exports its constructors and its instance os `Show`.
+- `Extended` type now exports its constructors.
 
 ### Added
 

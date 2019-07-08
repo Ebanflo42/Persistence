@@ -1,0 +1,61 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 8b7fcc7836b916f046653da257033f5fbdeb90a49069ff85be71bca358f359c0
+
+name:           Persistence
+version:        2.0
+description:    Please see the README on GitHub at <https://github.com/Ebanflo42/Persistence>
+homepage:       https://github.com/Ebanflo42/Persistence#readme
+bug-reports:    https://github.com/Ebanflo42/Persistence/issues
+author:         Eben Kadile
+maintainer:     eben.cowley42@gmail.com
+copyright:      2019 Eben Kadile
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/Ebanflo42/Persistence
+
+library
+  exposed-modules:
+      Filtration
+      HasseDiagram
+      Matrix
+      SimplicialComplex
+      Util
+  other-modules:
+      Paths_Persistence
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.0 && <4.11.2
+    , containers ==0.5.*
+    , maximal-cliques >=0.1
+    , parallel ==3.2.*
+    , vector >=0.12
+  default-language: Haskell2010
+
+test-suite persistence-test
+  type: exitcode-stdio-1.0
+  main-is: Testing.hs
+  other-modules:
+      Paths_Persistence
+  hs-source-dirs:
+      testing
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Persistence
+    , base >=4.0 && <4.11.2
+    , containers ==0.5.*
+    , maximal-cliques >=0.1
+    , parallel ==3.2.*
+    , vector >=0.12
+  default-language: Haskell2010

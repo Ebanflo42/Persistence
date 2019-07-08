@@ -6,3 +6,5 @@
 *.gif
 dist
 Testing
+.stack-work
+Persistence-dev.cabal

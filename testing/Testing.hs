@@ -328,7 +328,7 @@ dGraph1 =
   ]
 
 directedGraph = encodeDirectedGraph 18 dGraph1
-dCliqueComplex = toSimplicialComplex $ directedFlagComplex directedGraph
+dCliqueComplex = hDiagram2sc $ directedFlagComplex directedGraph
 
 --Mobius strip created in blender
 mobius = Right
@@ -584,6 +584,17 @@ tests =
         actual        = metricLp (Finite 3.0) (0.0, 5.0) 0.5 testscape mobscape
         expect        = Nothing
     in checkPass "metricLp 3.0 (0.0, 5.0) testFiltration1 mobiusStrip" actual expect
+
+  --Hasse diagram tests
+
+  , let complex = dGraph2sc 18 dGraph1
+        actual  = bettiNumbers complex
+        expect  = Just [1,25]
+    in checkPass "bettiNumbers dGraph2sc dGraph1" actual expect
+
+  , let actual = bettiNumbers dCliqueComplex
+        expect = Just [1,8,2,0,0,0,0]
+    in checkPass "bettiNumbers dCliquecComplex" actual expect
   ]
 
 main = putStrLn $ formatTestResults tests

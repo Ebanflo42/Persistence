@@ -39,8 +39,8 @@ module SimplicialComplex (
   -- * Homology
   , bettiNumbers
   , bettiNumbersPar
-  , simplicialHomology
-  , simplicialHomologyPar
+  --, simplicialHomology
+  --, simplicialHomologyPar
   ) where
 
 import Util

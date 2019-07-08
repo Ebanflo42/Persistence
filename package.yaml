@@ -1,0 +1,77 @@
+name:                Persistence
+
+version:             2.0
+
+github:              "Ebanflo42/Persistence"
+
+license:             BSD3
+
+author:              "Eben Kadile"
+
+maintainer:          "eben.cowley42@gmail.com"
+
+copyright:           "2019 Eben Kadile"
+
+
+
+extra-source-files:
+
+- README.md
+
+
+
+# Metadata used when publishing your package
+
+# synopsis:            Persistence is a topological data analysis library motivated by flexibility when it comes to the type of data being analyzed. If you have data that comes with a meaningful function into something of the Ord typeclass, you can use Persistence to detect clusters and holes in the data. You can also use the library to analyze the topology of directed\/undirected weighted\/unweighted graphs, and compare topologies of different data sets.
+
+# category:            Data
+
+
+
+# To avoid duplicated efforts in documentation and dealing with the
+
+# complications of embedding Haddock markup inside cabal files, it is
+
+# common to point users to the README.md file.
+
+description:         Please see the README on GitHub at <https://github.com/Ebanflo42/Persistence>
+
+
+
+dependencies:
+
+- base >= 4.0 && < 4.11.2
+
+- containers ==0.5.*
+
+- vector >= 0.12
+
+- maximal-cliques >=0.1
+
+- parallel ==3.2.*
+
+
+library:
+
+  source-dirs: src
+
+
+tests:
+
+  persistence-test:
+
+    main:                Testing.hs
+
+    source-dirs:         testing
+
+    ghc-options:
+
+    - -threaded
+
+    - -rtsopts
+
+    - -with-rtsopts=-N
+
+    dependencies:
+
+    - Persistence

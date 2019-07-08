@@ -9,9 +9,7 @@ GitHub: https://github.com/Ebanflo42/Persistence
 
 Relevant files for development: Util.hs, Matrix.hs, SimplicialComplex.hs, HasseDiagram.hs, Persistence.hs, Testing.hs
 
-Compile Testing.hs with `ghc --make Testing.hs -threaded -rtsopts` and run with
-
-    ./Testing +RTS -s -N<number of threads>
+If you have the Haskell `stack` tool installed, compile and run tests with `stack test`.
 
 # Learning about Topological Data Analysis
 

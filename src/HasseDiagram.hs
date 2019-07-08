@@ -28,7 +28,7 @@ module HasseDiagram
   , dGraph2sc
   , encodeDirectedGraph
   , directedFlagComplex
-  , toSimplicialComplex
+  , hDiagram2sc
   ) where
 
 import Util
@@ -54,12 +54,21 @@ hsd2String :: HasseDiagram -> String
 hsd2String =
   (L.intercalate "\n\n") . V.toList . (V.map (L.intercalate "\n" . V.toList . V.map show))
 
--- | Given the number of vertices in a directed graph, and pairs representing the direction of each edge, construct a 1-dimensional simplicial complex in the canonical way. Betti numbers of this simplicial complex can be used to count cycles and connected components.
+{- |
+  Given the number of vertices in a directed graph,
+  and pairs representing the direction of each edge,
+  construct a 1-dimensional simplicial complex in the canonical way.
+  Betti numbers of this simplicial complex can be used to count cycles and connected components.
+-}
 dGraph2sc :: Int -> [(Int, Int)] -> SimplicialComplex
 dGraph2sc v edges =
   (v, V.fromList [V.fromList $ L.map (\(i, j) -> (i `cons` (j `cons` V.empty), V.empty)) edges])
 
--- | Given the number of vertices in a directed graph, and pairs representing the direction of each edge (initial, terminal), construct a Hasse diagram representing the graph.
+{- |
+  Given the number of vertices in a directed graph,
+  and pairs representing the direction of each edge (initial, terminal),
+  construct a Hasse diagram representing the graph.
+-}
 encodeDirectedGraph :: Int -> [(Int, Int)] -> HasseDiagram
 encodeDirectedGraph numVerts cxns =
   let verts       = V.map (\n -> (n `cons` V.empty, V.empty, V.empty)) $ 0 `range` (numVerts - 1)
@@ -186,7 +195,7 @@ directedFlagComplex directedGraph =
   in loopLevels 0 directedGraph edges fstSinks
 
 -- | Convert a Hasse diagram to a simplicial complex.
-toSimplicialComplex :: HasseDiagram -> SimplicialComplex
-toSimplicialComplex diagram =
+hDiagram2sc :: HasseDiagram -> SimplicialComplex
+hDiagram2sc diagram =
   let sc = V.map (V.map not3) $ V.tail diagram
   in (V.length $ V.head diagram, (V.map (\(v, _) -> (v, V.empty)) $ sc ! 0) `cons` V.tail sc)
