@@ -13,7 +13,7 @@ Bool is an instance of Num here (instance given in Util) so that functions can b
 
 -}
 
-module Matrix (
+module Persistence.Matrix (
   -- * Types
     IMatrix
   , BMatrix
@@ -55,7 +55,7 @@ Boolean matrices are much easier to work with, they are regular matrices with el
 
 --}
 
-import Util
+import Persistence.Util
 
 import Data.List as L
 import Data.Vector as V

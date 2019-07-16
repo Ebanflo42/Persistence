@@ -9,7 +9,7 @@ This module contains miscellaneous utility functions used throughout the Persist
 
 -}
 
-module Util where
+module Persistence.Util where
 
 import Data.List as L
 import Data.Vector as V

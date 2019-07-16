@@ -1,10 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-import Util
-import Matrix
-import SimplicialComplex
-import HasseDiagram
-import Filtration
+import Persistence.Util
+import Persistence.Matrix
+import Persistence.SimplicialComplex
+import Persistence.HasseDiagram
+import Persistence.Filtration
 
 import Data.Vector as V
 import Data.List as L
@@ -73,7 +73,7 @@ formatTestResults results =
           Success   -> a
           Failure m -> a L.++ [m L.++ "\n"]
       details   = L.foldl accum [] results
-  in unlines $ summary:details
+  in '\n':(unlines $ summary:details)
 
 matrix1 :: IMatrix
 matrix1 = V.fromList $ L.map V.fromList
@@ -179,7 +179,7 @@ metric2 (a, b) (c, d) =
   let x = a - c; y = b - d
   in sqrt $ x*x + y*y
 
-scales1 = [10.0, 8.0, 6.0]
+scales1 = Right [10.0, 8.0, 6.0]
 testFiltration1 = makeRipsFiltrationFast scales1 metric2 pointCloud1
 nsTestFiltration1 = simple2Filtr testFiltration1
 
@@ -235,7 +235,7 @@ pointCloud2 = Right
 
 --8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
 --1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
-scales2 = [10.0, 8.0, 6.0]
+scales2 = Right [10.0, 8.0, 6.0]
 testFiltration2 = makeRipsFiltrationFast scales2 metric2 pointCloud2
 nsTestFiltration2 = simple2Filtr testFiltration2
 
@@ -253,8 +253,7 @@ metric3 (x0, y0, z0) (x1, y1, z1) =
   let dx = x1 - x0; dy = y1 - y0; dz = z1 - z0 in
   sqrt (dx*dx + dy*dy + dz*dz)
 
-octaScales :: [Double]
-octaScales = [2.1, 1.6, 1.1, 0.5]
+octaScales = Right [2.1, 1.6, 1.1, 0.5]
 
 --5 connected components from 0 to 2, 1 void from 2 to 3
 octahedron = makeRipsFiltrationFast octaScales metric3 octahedralCloud
@@ -275,8 +274,7 @@ sqrCloud = Right
   , (0, 1)
   ]
 
-sqrScales :: [Double]
-sqrScales = [2.0, 1.5, 1.1, 0.5]
+sqrScales = Right [2.0, 1.5, 1.1, 0.5]
 
 --11 connected components from 0 to 1, 1 loop starting at 1
 square = makeRipsFiltrationFast sqrScales metric2 sqrCloud
@@ -394,7 +392,7 @@ mobius = Right
   , ( 1.115377, -0.000000, -0.146842)
   ]
 
-mobScales = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15]
+mobScales = Right [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15]
 mobiusStrip = makeRipsFiltrationFast mobScales metric3 mobius
 nsmobius = simple2Filtr mobiusStrip
 
@@ -453,7 +451,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity), (0, Infinity), (0, Infinity)], [(2,Infinity),(2,Infinity)], []]
     in checkPass "indexBarCodesSimple testFiltration1" actual expect
 
-  , let actual = scaleBarCodesSimple (Right scales1) testFiltration1
+  , let actual = scaleBarCodesSimple scales1 testFiltration1
         expect = Just $ V.fromList $ L.map V.fromList [[(6.0, Finite 10.0), (6.0, Finite 10.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Infinity), (6.0, Infinity), (6.0, Infinity)], [(10.0, Infinity), (10.0, Infinity)], []]
     in checkPass "scaleBarCodesSimple testFiltration1" actual expect
 
@@ -461,7 +459,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity), (0, Infinity), (0, Infinity)], [(2,Infinity),(2,Infinity)], [], []]
     in checkPass "indexBarCodes testFiltration1" actual expect
 
-  , let actual = scaleBarCodes (Right scales1) nsTestFiltration1
+  , let actual = scaleBarCodes scales1 nsTestFiltration1
         expect = Just $ V.fromList $ L.map V.fromList [[(6.0, Finite 10.0), (6.0, Finite 10.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Finite 8.0), (6.0, Infinity), (6.0, Infinity), (6.0, Infinity)], [(10.0, Infinity), (10.0, Infinity)], [], []]
     in checkPass "scaleBarCodes testFiltration1" actual expect
 
@@ -471,7 +469,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 2),(0,Infinity)], [], [(2,Finite 3)], [], []]
     in checkPass "indexBarCodesSimple octahedron" actual expect
 
-  , let actual = scaleBarCodesSimple (Right octaScales) octahedron
+  , let actual = scaleBarCodesSimple octaScales octahedron
         expect = Just $ V.fromList $ L.map V.fromList [[(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6), (0.5, Infinity)], [], [(1.6,Finite 2.1)], [], []]
     in checkPass "scaleBarCodesSimple octahedron" actual expect
 
@@ -479,7 +477,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 2),(0,Infinity)], [], [(2,Finite 3)], [], [], []]
     in checkPass "indexBarCodes octahedron" actual expect
 
-  , let actual = scaleBarCodes (Right octaScales) nsoctahedron
+  , let actual = scaleBarCodes octaScales nsoctahedron
         expect = Just $ V.fromList $ L.map V.fromList [[(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6),(0.5, Finite 1.6), (0.5, Infinity)], [], [(1.6,Finite 2.1)], [], [], []]
     in checkPass "scaleBarCodes octahedron" actual expect
 
@@ -489,7 +487,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(1,Infinity)]]
     in checkPass "indexBarCodesSimple square" actual expect
 
-  , let actual = scaleBarCodesSimple (Right sqrScales) square
+  , let actual = scaleBarCodesSimple sqrScales square
         expect = Just $ V.fromList $ L.map V.fromList [[(0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Infinity)], [(1.1,Infinity)]]
     in checkPass "scaleBarCodesSimple square" actual expect
 
@@ -497,7 +495,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(1,Infinity)], []]
     in checkPass "indexBarCodes square" actual expect
 
-  , let actual = scaleBarCodes (Right sqrScales) nssquare
+  , let actual = scaleBarCodes sqrScales nssquare
         expect = Just $ V.fromList $ L.map V.fromList [[(0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Finite 1.1), (0.5, Infinity)], [(1.1,Infinity)], []]
     in checkPass "scaleBarCodes square" actual expect
 
@@ -507,7 +505,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1),(0,Finite 1),(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(4, Finite 5), (3, Finite 5), (3, Finite 5), (4, Infinity)], [], [], []]
     in checkPass "indexBarCodesSimple mobius" actual expect
 
-  , let actual = scaleBarCodesSimple (Right mobScales) mobiusStrip
+  , let actual = scaleBarCodesSimple mobScales mobiusStrip
         expect = Just $ V.fromList $ L.map V.fromList $ [[(0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Infinity)], [(0.35, Finite 0.4), (0.3, Finite 0.4), (0.3, Finite 0.4), (0.35, Infinity)], [], [], []]
     in checkPass "scaleBarCodesSimple mobius" actual expect
 
@@ -515,7 +513,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 4), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1),(0,Finite 1),(0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity)], [(4, Finite 5), (3, Finite 5), (3, Finite 5), (4, Infinity)], [], [], [], []]
     in checkPass "indexBarCodes mobius" actual expect
 
-  , let actual = scaleBarCodes (Right mobScales) nsmobius
+  , let actual = scaleBarCodes mobScales nsmobius
         expect = Just $ V.fromList $ L.map V.fromList $ [[(0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Infinity)], [(0.35, Finite 0.4), (0.3, Finite 0.4), (0.3, Finite 0.4), (0.35, Infinity)], [], [], [], []]
     in checkPass "scaleBarCodes mobius" actual expect
 

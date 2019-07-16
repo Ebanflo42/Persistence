@@ -8,7 +8,7 @@ cabal-version: 1.12
 
 name:           Persistence
 version:        2.0
-description:    Please see the README on GitHub at <https://github.com/Ebanflo42/Persistence>
+description:    A topological data anlysis library motivated by flexibility when it comes to the type of data being analyzed. If your data comes with a meaningful binary function into into an ordered set, you can use Persistence to analyze your data. The library also provides functions for analyzing directed\/undirected, weighted\/unweighted graphs. See the README at <https://github.com/Ebanflo42/Persistence> for resources on learning about topological data analysis.
 homepage:       https://github.com/Ebanflo42/Persistence#readme
 bug-reports:    https://github.com/Ebanflo42/Persistence/issues
 author:         Eben Kadile
@@ -26,13 +26,13 @@ source-repository head
 
 library
   exposed-modules:
-      Filtration
-      HasseDiagram
-      Matrix
-      SimplicialComplex
-      Util
+      Persistence.Filtration
+      Persistence.HasseDiagram
+      Persistence.SimplicialComplex
   other-modules:
       Paths_Persistence
+      Persistence.Matrix
+      Persistence.Util
   hs-source-dirs:
       src
   build-depends:

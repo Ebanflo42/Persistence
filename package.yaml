@@ -34,7 +34,7 @@ extra-source-files:
 
 # common to point users to the README.md file.
 
-description:         Please see the README on GitHub at <https://github.com/Ebanflo42/Persistence>
+description:         A topological data anlysis library motivated by flexibility when it comes to the type of data being analyzed. If your data comes with a meaningful binary function into into an ordered set, you can use Persistence to analyze your data. The library also provides functions for analyzing directed\/undirected, weighted\/unweighted graphs. See the README at <https://github.com/Ebanflo42/Persistence> for resources on learning about topological data analysis.
 
 
 

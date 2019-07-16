@@ -9,19 +9,23 @@ This module contains functions for constructing filtrations and computing persis
 
 A filtration is a finite sequence of simplicial complexes where each complex is a subset of the next. This means that a filtration can be thought of as a single simplicial complex where each of the simplices is labeled with a "filtration index" that represents the index in the sequence where that simplex enters the filtration.
 
-One way to create a filtration, given a simplicial complex, a metric for the vertices, and a list of distances, is to loop through the distances from greatest to least: create a simplicial complex each iteration which excludes simplices that contain pairs of vertices which are further than the current distance apart. This method will produce a filtration of Vietoris-Rips complexes - each filtration index will correspond to a Rips complex whose scale is the corresponding distance.
+One way to create a filtration, given a simplicial complex, a metric for the vertices, and a list of distances, is to loop through the distances from greatest to least: create a simplicial complex each iteration which excludes simplices that contain pairs of vertices which are further than the current distance apart. This method will produce a filtration of Vietoris-Rips complexes - each filtration index will correspond to a Rips complex whose scale is the corresponding distance. This filtration represents the topology of the data at each of the scales with which it was constructed.
 
 NOTE: It's important that, even though the smallest filtration index represents the smallest scale at which the data is being anaylzed, all functions in this library receive your list of scales sorted in *decreasing* order.
 
-An essential thing to note about the way this library is set up is the distinction between "fast" and "light" functions. Light functions call the metric every time distance between two points is required, which is a lot. Fast functions store the distances between points and access them in constant time, BUT this means they use O(n^2) memory with respect to the number of data points, so it's a really bad idea to use this optimization on substantially large data.
+An essential thing to note in this library is the distinction between "fast" and "light" functions. Light functions call the metric every time distance between two points is required, which is a lot. Fast functions store the distances between points and access them in constant time, BUT this means they use O(n^2) memory with respect to the number of data points, so it's a really bad idea to use this optimization on substantially large data if you don't have a lot of RAM.
 
-Persistent homology is the main event of topological data analysis. It allows one to identify clusters, tunnels, cavities, and higher dimensional holes that persist in the data throughout many scales. The output of the persistence algorithm is a barcode diagram. A single barcode represents the filtration index where a feature appears and the index where it disappears (if it does). Alternatively, a barcode can represent the scale at which a feature and the scale at which it ends. Thus, short barcodes are typically interpretted as sampling irregularities and long barcodes are interpretted as actual features of whatever the underlying data set represents.
+Persistent homology is the main event of topological data analysis. It allows one to identify clusters, tunnels, cavities, and higher dimensional holes that persist in the data throughout many scales. The output of the persistence algorithm is a barcode diagram. A single barcode represents the filtration index where a feature appears and the index where it disappears (if it does). Alternatively, a barcode can represent the scale at which a feature and the scale at which it ends. Thus, short barcodes are typically interpretted as sampling irregularities and long barcodes are interpretted as actual features of whatever the underlying data set represents. In this context, what a feature *is* depends on which dimension the barcode diagram is; 0-dimensional features are connected components, 1-dimensional features are loops or tunnels, 2-dimensional features are hollow volumes, and higher dimensional features correspond to heigher-dimensional cavities.
 
 After you've got the barcodes of a data set, you might want to compare it with that of a different data set. This is the purpose of bottleneck distance, which corresponds to the Hausdorff distance between barcode diagrams.
 
+Another way to compare barcode diagrams is by using persistence landscapes. The peristence landscape of a barcode diagram is a finite sequence of piecewise-linear, real-valued functions. This means they can be used to take averages and compute distances between barcode diagrams. See "A Persistence Landscapes Toolbox For Topological Statistics" by Bubenik and Dlotko for more information.
+
+WARNING: The persistence landscape functions have not been fully tested. Use them with caution. If you get any errors or unexpected output, please don't hesitate to email me.
+
 -}
 
-module Filtration (
+module Persistence.Filtration (
   -- * Types
     FilterSimplex
   , SimpleFiltration
@@ -38,8 +42,10 @@ module Filtration (
   -- * Construction
   , filterByWeightsFast
   , makeRipsFiltrationFast
+  , makeRipsFiltrationFastPar
   , filterByWeightsLight
   , makeRipsFiltrationLight
+  , makeRipsFiltrationLightPar
   -- * Persistent homology
   , indexBarCodes
   , indexBarCodesSimple
@@ -59,9 +65,8 @@ module Filtration (
   , metricLp
   ) where
 
-import Util
-import Matrix
-import SimplicialComplex
+import Persistence.Util
+import Persistence.SimplicialComplex
 
 import Data.Maybe
 import Data.List as L
@@ -92,12 +97,16 @@ type FilterSimplex = (Int, Vector Int, Vector Int)
 type SimpleFiltration = (Int, Vector (Vector FilterSimplex))
 
 {- |
-  Representation of a filtration which, unlike `SimpleFiltration`, can cope with vertices that have a non-zero
-  filtration index. Vertices of the filtration are represented like all other simplices except that they don't their own have vertices or faces.
+  Representation of a filtration which, unlike `SimpleFiltration`, can cope with vertices that have a non-zero filtration index. Vertices of the filtration are represented like all other simplices except that they don't their own have vertices or faces.
+
+  Note that, since this library currently only deals with static pointcloud data, all of the filtration construction functions produce vertices whose filtration index is 0. Thus, if you want to use this type you will have to construct the instances yourself.
 -}
 type Filtration = Vector (Vector FilterSimplex)
 
--- | Type for representing inifinite bottleneck distance and infinite bar codes.
+{- |
+  A type extending the number line to positive and negative infinity.
+  Used for representing infinite barcodes, bottleneck distance, and persistence landscapes.
+-}
 data Extended a = Finite a
                 | Infinity
                 | MinusInfty
@@ -133,6 +142,7 @@ instance (Ord a, Eq a) => Ord (Extended a) where
   MinusInfty <= _      = True
   _ <= MinusInfty      = False
 
+-- | Arithmetic is defined in the canonical way based on the arithmetic of `a`.
 instance Num a => Num (Extended a) where
 
   _ + Infinity        = Infinity
@@ -173,16 +183,17 @@ unExtend Infinity   = 1.0/0.0
 unExtend (Finite x) = x
 unExtend MinusInfty = -1.0/0.0
 
--- | `(x, Finite y)` is a feature that appears at index/scale x and disappears at index/scale y, `(x, Infinity)` begins at x and doesn't disappear.
+-- | (x, Finite y) is a topological feature that appears at the index or scale x and disappears at the index or scale y. (x, Infinity) begins at x and doesn't disappear.
 type BarCode a = (a, Extended a)
 
 {- |
   A Persistence landscape is a certain type of piecewise linear function based on a barcode diagram.
   It can be represented as a list of critical points paired with critical values.
+  Useful for taking averages and differences between barcode diagrams.
 -}
 type Landscape = Vector (Vector (Extended Double, Extended Double))
 
--- * Filtration utilities
+-- * Utilities
 
 -- | Shows all the information in a simplex.
 sim2String :: FilterSimplex -> String
@@ -225,20 +236,22 @@ simple2Filtr (n, x) =
   in (mapWithIndex (\i (a,b,c) ->
        (a,i `cons` V.empty,c)) $ V.replicate n (0, V.empty, V.empty)) `cons` x'
 
--- * Filtration construction
+-- * Construction
 
 {- |
-  Given a list of scales, a simplicial complex,
-  and a weighted graph (see SimplicialComplex) which encodes a metric on the vertices,
-  this function creates a filtration out of a simplicial complex by removing simplices
+  This function creates a filtration out of a simplicial complex by removing simplices
   that contain edges that are too long for each scale in the list.
   This is really a helper function to be called by makeRipsFiltrationFast,
   but I decided to expose it in case you have a simplicial complex and weighted graph lying around.
   The scales MUST be in decreasing order.
 -}
-filterByWeightsFast :: Ord a => [a] -> (SimplicialComplex, Graph a) -> SimpleFiltration
-filterByWeightsFast scales ((numVerts, simplices), graph) =
-  let edgeInSimplex edge simplex =
+filterByWeightsFast :: Ord a
+                    => Either (Vector a) [a] -- ^Scales in decreasing order
+                    -> (SimplicialComplex, Graph a) -- ^Simplicial complex and a graph encoding the distance between every data point as well as whether or not they are within the largest scale of each other.
+                    -> SimpleFiltration
+filterByWeightsFast scales' ((numVerts, simplices), graph) =
+  let scales = case scales' of Left v -> V.toList v; Right l -> l
+      edgeInSimplex edge simplex =
         (V.any (\x -> V.head edge == x) simplex) && (V.any (\x -> V.last edge == x) simplex)
       edgeTooLong scale edge     = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
       maxIndex                   = (L.length scales) - 1
@@ -281,30 +294,44 @@ filterByWeightsFast scales ((numVerts, simplices), graph) =
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
 {- |
-  Given a list of scales, a metric, and a data set,
-  this function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
-  The scales MUST be in decreasing order. Note that this a fast function,
-  meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
+  This function constructs a filtration of the Vietoris-Rips complexes associated with the scales.
+  Note that this a fast function, meaning it uses O(n^2) memory to quickly access distances where n is the number of data points.
 -}
-makeRipsFiltrationFast :: (Ord a, Eq b) => [a]
-                       -> (b -> b -> a)
-                       -> Either (Vector b) [b]
+makeRipsFiltrationFast :: (Ord a, Eq b)
+                       => Either (Vector a) [a] -- ^Scales in decreasing order
+                       -> (b -> b -> a) -- ^Metric
+                       -> Either (Vector b) [b] -- ^Data set
                        -> SimpleFiltration
-makeRipsFiltrationFast scales metric dataSet =
-  filterByWeightsFast scales $ makeRipsComplexFast (L.head scales) metric dataSet
+makeRipsFiltrationFast scales metric =
+  let scale = case scales of Left v -> V.head v; Right l -> L.head l
+  in (filterByWeightsFast scales) . (makeRipsComplexFast scale metric)
+
+{- |
+  Same as above except it uses parallelism when computing the Vietoris-Rips complex of the largest scale.
+-}
+makeRipsFiltrationFastPar :: (Ord a, Eq b)
+                          => Either (Vector a) [a] -- ^Scales in decreasing order
+                          -> (b -> b -> a) -- ^Metric
+                          -> Either (Vector b) [b] -- ^Data set
+                          -> SimpleFiltration
+makeRipsFiltrationFastPar scales metric =
+  let scale = case scales of Left v -> V.head v; Right l -> L.head l
+  in (filterByWeightsFast scales) . (makeRipsComplexFastPar scale metric)
 
 {- |
   The same as filterbyWeightsFast except it uses far less memory at the cost of speed.
   Note that the scales must be in decreasing order.
 -}
 filterByWeightsLight :: Ord a
-                     => [a]
-                     -> (b -> b -> a)
-                     -> Either (Vector b) [b]
-                     -> SimplicialComplex
+                     => Either (Vector a) [a] -- ^Scales in decreasing order
+                     -> (b -> b -> a) -- ^Metric
+                     -> Either (Vector b) [b] -- ^Data set
+                     -> SimplicialComplex -- ^Vietoris-Rips complex of the data at the largest scale.
                      -> SimpleFiltration
-filterByWeightsLight scales metric dataSet (numVerts, simplices) =
-  let edgeInSimplex edge simplex =
+filterByWeightsLight scales' metric dataSet (numVerts, simplices) =
+  let scales = case scales' of Left v -> V.toList v; Right l -> l
+
+      edgeInSimplex edge simplex =
         (V.any (\x -> V.head edge == x) simplex) && (V.any (\x -> V.last edge == x) simplex)
       vector                     = case dataSet of Left v -> v; Right l -> V.fromList l
       edgeTooLong scale edge     = scale <= (metric (vector ! (edge ! 0)) (vector ! (edge ! 1)))
@@ -344,15 +371,28 @@ filterByWeightsLight scales metric dataSet (numVerts, simplices) =
         V.map (V.map (\(v, f) -> (0, v, f))) $ simplices)
 
 {- |
-  Given a list of scales in decreasing order, a metric, and a data set,
-  this constructs the filtration of Vietoris-Rips complexes corresponding to the scales.
+  Constructs the filtration of Vietoris-Rips complexes corresponding to each of the scales.
 -}
-makeRipsFiltrationLight :: (Ord a, Eq b) => [a]
-                        -> (b -> b -> a)
-                        -> Either (Vector b) [b]
+makeRipsFiltrationLight :: (Ord a, Eq b)
+                        => Either (Vector a) [a] -- ^List of scales in decreasing order
+                        -> (b -> b -> a) -- ^Metric
+                        -> Either (Vector b) [b] -- ^Data set
                         -> SimpleFiltration
 makeRipsFiltrationLight scales metric dataSet =
-  filterByWeightsLight scales metric dataSet $ makeRipsComplexLight (L.head scales) metric dataSet
+  let scale = case scales of Left v -> V.head v; Right l -> L.head l
+  in filterByWeightsLight scales metric dataSet $ makeRipsComplexLight scale metric dataSet
+
+{- |
+  Same as above except it uses parallelism when computing the Vietoris-Rips complex of the largest scale.
+-}
+makeRipsFiltrationLightPar :: (Ord a, Eq b)
+                        => Either (Vector a) [a] -- ^List of scales in decreasing order
+                        -> (b -> b -> a) -- ^Metric
+                        -> Either (Vector b) [b] -- ^Data set
+                        -> SimpleFiltration
+makeRipsFiltrationLightPar scales metric dataSet =
+  let scale = case scales of Left v -> V.head v; Right l -> L.head l
+  in filterByWeightsLight scales metric dataSet $ makeRipsComplexLightPar scale metric dataSet
 
 -- * Persistent Homology
 
@@ -555,7 +595,7 @@ indexBarCodesSimple (numVerts, allSimplices) =
           (verts `cons` (fstMarked `cons` V.empty)) (fstSlots `cons` V.empty)
 
 {- |
-  The nth entry in the list will again describe the n-dimensional topology of the filtration.
+  The nth entry in the list will describe the n-dimensional topology of the filtration.
   However, features are encoded by the scales where they appear and disappear. For consistency,
   scales must be in decreasing order.
 -}
@@ -581,7 +621,7 @@ scaleBarCodesSimple scales filtration =
 
   in V.map (V.map translateBarCode) $ indexBarCodesSimple filtration
 
--- * Bottleneck distance
+-- * Comparing barcode diagrams
 
 {- |
   The standard (Euclidean) metric between index barcodes.
@@ -603,7 +643,8 @@ indexMetric (i, Finite j) (k, Finite l) =
   (referred to as bottleneck distance in TDA) between the two sets.
   Returns nothing if either list of barcodes is empty.
 -}
-bottleNeckDistance :: Ord b => (BarCode a -> BarCode a -> Extended b)
+bottleNeckDistance :: Ord b
+                   => (BarCode a -> BarCode a -> Extended b)
                    -> Vector (BarCode a)
                    -> Vector (BarCode a)
                    -> Maybe (Extended b)
@@ -762,6 +803,7 @@ evalLandscape landscape i arg =
             _          -> error "Persistence.Filtration.evalLandscape.findPointNeighbors: bad argument. This is a bug. Please email the Persistence maintainers."
         anything                 -> error $ "Persistence.Filtration.evalLandscape.findPointNeighbors: " L.++ (show anything) L.++ ". This is a bug. Please email the Persistence maintainers."
 
+-- | Evaluate all the real-valued functions in the landscape.
 evalLandscapeAll :: Landscape -> Extended Double -> Vector (Extended Double)
 evalLandscapeAll landscape arg =
   if V.null landscape then V.empty
@@ -805,12 +847,15 @@ diffLandscapes :: Landscape -> Landscape -> Landscape
 diffLandscapes scape1 scape2 = linearComboLandscapes [1, -1] [scape1, scape2]
 
 {- |
-  Take a power, p (could be infinity), an interval, a stepsize, and a persistence landscape.
   If p>=1 then it will compute the L^p norm on the given interval.
   Uses trapezoidal approximation.
   You should ensure that the stepsize partitions the interval evenly.
 -}
-normLp :: Extended Double -> (Double, Double) -> Double -> Landscape -> Maybe Double
+normLp :: Extended Double -- ^p, the power of the norm
+       -> (Double, Double) -- ^Interval to compute the integral over
+       -> Double -- ^Step size
+       -> Landscape -- ^Persistence landscape whose norm is to be computed
+       -> Maybe Double
 normLp p interval step landscape =
   let len = V.length landscape
       a   = fst interval
@@ -841,5 +886,10 @@ normLp p interval step landscape =
   Given the same information as above, computes the L^p distance between the two landscapes.
   One way to compare the topologies of two filtrations.
 -}
-metricLp :: Extended Double -> (Double, Double) -> Double -> Landscape -> Landscape -> Maybe Double
+metricLp :: Extended Double -- ^p, power of the metric
+         -> (Double, Double) -- ^Interval on which the integral will be computed
+         -> Double -- ^Step size
+         -> Landscape -- ^First landscape
+         -> Landscape -- ^Second landscape
+         -> Maybe Double
 metricLp p interval step scape1 scape2 = normLp p interval step $ diffLandscapes scape1 scape2

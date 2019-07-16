@@ -5,11 +5,13 @@ License    : BSD 3 Clause
 Maintainer : eben.cowley42@gmail.com
 Stability  : experimental
 
-This module provides functions for constructing neighborhood graphs, clique complexes, Vietoris-Rips complexes, and Čech complexes, as well as the computation of Betti numbers.
+This module provides functions for constructing neighborhood graphs, clique complexes, and Vietoris-Rips complexes, as well as the computation of Betti numbers.
 
-An important thing to know about this module is the difference between "fast" and "light" functions. Fast functions encode the metric in a 2D vector, so that distances don't need to be computed over and over again and can instead be accessed in constant time. Unfortunately, this takes O(n^2) memory so I would strongly recomend against using it for larger data sets; this is why "light" functions exist.
+A simplicial complex is like a generalization of a graph, where you can have any number of n-dimensional simplices (line-segments, triangles, tetrahedrons), glued along their boundaries so that the intersection of any two simplices is a simplicial complex. These objects are fundamental to topological data analysis.
 
-A neighborhood graph is a graph where an edge exists between two vertices if and only if the vertices fall within a given distance of each other. Graphs here are more of a helper data type for constructing filtrations, which is why they have a somewhat odd representation. Not to worry though, I've supplied a way of encoding graphs of a more generic representation.
+An important thing to note about this module, and the library in general, is the difference between "fast" and "light" functions. Fast functions encode the metric in a 2D vector, so that distances don't need to be computed over and over again and can instead be accessed in constant time. Unfortunately, this takes O(n^2) memory so I would strongly recomend against using it for larger data sets unless you have a lot of RAM. "Light" functions do not use this speed optimization.
+
+The neighborhood graph of point cloud data is a graph where an edge exists between two data points if and only if the vertices fall within a given distance of each other. Graphs here are more of a helper data type for constructing filtrations, which is why they have a somewhat odd representation. Not to worry, though, I've supplied a way of encoding graphs of a more generic representation.
 
 The clique complex of a graph is a simplicial complex whose simplices are the complete subgraphs of the given graph. The Vietoris-Rips complex is the clique complex of the neighborhood graph.
 
@@ -17,7 +19,7 @@ Betti numbers measure the number of n-dimensional holes in a given simplicial co
 
 -}
 
-module SimplicialComplex (
+module Persistence.SimplicialComplex (
   -- * Types
     Simplex
   , SimplicialComplex
@@ -43,8 +45,8 @@ module SimplicialComplex (
   --, simplicialHomologyPar
   ) where
 
-import Util
-import Matrix
+import Persistence.Util
+import Persistence.Matrix
 
 import Data.List as L
 import Data.Vector as V
@@ -71,7 +73,7 @@ type Simplex = (Vector Int, Vector Int)
 type SimplicialComplex = (Int, Vector (Vector Simplex))
 
 {- |
-  This represents the (symmetric) adjacency matrix of some weighted, undirected graph. The type `a` is whatever distance is in your data analysis procedure.
+  This represents the (symmetric) adjacency matrix of some weighted, undirected graph. The type a  is whatever distance is in your data analysis procedure.
   The reason graphs are represented like this is because their main purpose is too speed up the construction of simplicial complexes and filtrations.
   If the clique complex of this graph were to be constructed, only the adjacencies would matter. But if a filtration is constructed all the distances
   will be required over and over again - this allows them to be accessed in constant time.
@@ -100,9 +102,8 @@ getDim = L.length . snd
 
 {- |
   Takes the number of vertices and each edge paired with its weight to output the graph encoded as a 2D vector.
-  If only you have an unweighted graph, you can still encode your graph by simply letting the type `a` be `()`.
-  If you have a weighted graph but there isn't a distance between every vertex, you can use the `Extended` type (essentially the same as Maybe)
-  from the `Filtration` module which is already an instance of Ord.
+  If only you have an unweighted graph, you can still encode your graph by simply letting the type a be ().
+  If you have a weighted graph but there isn't a distance between every vertex, you can use the Extended type (essentially the same as Maybe) from the Filtration module which is already an instance of Ord.
 -}
 encodeWeightedGraph :: Int -> (Int -> Int -> (a, Bool)) -> Graph a
 encodeWeightedGraph numVerts edge =
@@ -139,7 +140,7 @@ makeNbrhdGraphPar scale metric dataSet =
 
 {- |
   Makes a simplicial complex where the simplices are the complete subgraphs (cliques) of the given graph.
-  Mainly a helper function for `makeRipsComplexFast`,
+  Mainly a helper function for makeRipsComplexFast,
   but it might be useful if you happen to have a graph you want to analyze.
   I highly recomend using the parallel version, as this process is very expensive.
 -}

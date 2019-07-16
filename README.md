@@ -1,15 +1,13 @@
 # Persistence
 A topological data analysis library for Haskell.
 
-The objective of the library is to provide users with the ability to deduce the topological features of metric spaces and graphs. If you have a function (a metric, for example) that takes two points in your data to an element of an ordered set, you can use Persistence to analyze the topology of your data.
+This library is motivated by flexibility when it comes to the type of data being analyzed. If your data comes with a meaningful binary function into into an ordered set, you can use Persistence to analyze your data. The library also provides functions for analyzing directed\/undirected, weighted\/unweighted graphs.
 
 Visit https://hackage.haskell.org/package/Persistence to see the documentation for the stable version. There is also documentation in each module.
 
 GitHub: https://github.com/Ebanflo42/Persistence
 
-Relevant files for development: Util.hs, Matrix.hs, SimplicialComplex.hs, HasseDiagram.hs, Persistence.hs, Testing.hs
-
-If you have the Haskell `stack` tool installed, compile and run tests with `stack test`.
+If you have the Haskell `stack` tool installed, compile and run tests with `stack test` (you may have to expose the modules `Util` and `Matrix` in the file `Persistence.cabal` to get it to work).
 
 # Learning about Topological Data Analysis
 
@@ -41,15 +39,13 @@ https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 `Testing.hs`:
 
-1) Test Persistence landscape functions.
+1) More tests for Persistence landscape functions.
 
-2) Test construction of the directed flag complex.
-
-3) Make some filtrations whose vertices don't all have index 0 and test persistent homology on them.
+2) Make some filtrations whose vertices don't all have index 0 and test persistent homology on them.
 
 `SimplicialComplex.hs`:
 
-1) Fix simplicial homology over the integers (might have to port integer matrix implementations to Peter Lumsdaine's module).
+1) Fix simplicial homology over the integers.
 
 2) Implement construction of the Cech complex (n points form an (n-1)-simplex if balls of a certain radius centered at each of the points intersect).
 
