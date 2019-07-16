@@ -51,10 +51,4 @@ https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 3) Implement construction of the alpha-complex (sub-complex of the Delaunay triangulation where the vertices of every simplex are within a certain distance).
 
-General:
-
-1) Update documentation for `Filtration.hs` once more changes have been finalized.
-
-2) A more consistent, well-motivated, and concise philosophy for parallelism needs to be implemented.
-
 See each of the files for an overview of its inner-workings.

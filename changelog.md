@@ -40,7 +40,7 @@
 
 - Fixed non-exhaustive pattern match in `BottleNeckDistance` functions.
 
-## 2.0 -- To be determined
+## 2.0
 
 ### Changed
 

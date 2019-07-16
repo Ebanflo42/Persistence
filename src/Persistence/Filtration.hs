@@ -97,7 +97,7 @@ type FilterSimplex = (Int, Vector Int, Vector Int)
 type SimpleFiltration = (Int, Vector (Vector FilterSimplex))
 
 {- |
-  Representation of a filtration which, unlike `SimpleFiltration`, can cope with vertices that have a non-zero filtration index. Vertices of the filtration are represented like all other simplices except that they don't their own have vertices or faces.
+  Representation of a filtration which, unlike SimpleFiltration, can cope with vertices that have a non-zero filtration index. Vertices of the filtration are represented like all other simplices except that they don't their own have vertices or faces.
 
   Note that, since this library currently only deals with static pointcloud data, all of the filtration construction functions produce vertices whose filtration index is 0. Thus, if you want to use this type you will have to construct the instances yourself.
 -}

@@ -1,9 +1,11 @@
 *.o
 *.hi
+*.sh
 *.js
 *.png
 *.css
 *.gif
+dist-newstyle
 dist
 docs
 Testing
