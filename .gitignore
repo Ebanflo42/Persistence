@@ -5,6 +5,7 @@
 *.png
 *.css
 *.gif
+*.lock
 dist-newstyle
 dist
 docs

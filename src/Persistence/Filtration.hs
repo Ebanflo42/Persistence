@@ -253,7 +253,7 @@ filterByWeightsFast scales' ((numVerts, simplices), graph) =
   let scales = case scales' of Left v -> V.toList v; Right l -> l
       edgeInSimplex edge simplex =
         (V.any (\x -> V.head edge == x) simplex) && (V.any (\x -> V.last edge == x) simplex)
-      edgeTooLong scale edge     = scale <= (fst $ graph ! (edge ! 0) ! (edge ! 1))
+      edgeTooLong scale edge     = scale <= (fst $ graph `indexGraph` (edge ! 0, edge ! 1))
       maxIndex                   = (L.length scales) - 1
 
       calcIndices 0 [] sc         = sc

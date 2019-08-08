@@ -65,3 +65,9 @@
 - Persistent homology functions that return Bar codes in terms of scales.
 
 - Functions for constructing and manipulating persistence landscapes.
+
+## 2.0.1
+
+### Changed
+
+- Representation of graphs now takes half as much memory.

@@ -29,6 +29,7 @@ module Persistence.SimplicialComplex (
   , getDim
   , encodeWeightedGraph
   , wGraph2sc
+  , indexGraph
   -- * Construction
   , makeNbrhdGraph
   , makeNbrhdGraphPar
@@ -80,7 +81,7 @@ type SimplicialComplex = (Int, Vector (Vector Simplex))
 -}
 type Graph a = Vector (Vector (a, Bool))
 
--- * Simplicial complex utilities
+-- * Utilities
 
 -- | Show all the information in a simplicial complex.
 sc2String :: SimplicialComplex -> String
@@ -100,6 +101,12 @@ sc2String (v, allSimplices) =
 getDim :: SimplicialComplex -> Int
 getDim = L.length . snd
 
+-- | Safely index into the adjacency matrix of a graph.
+indexGraph :: Graph a -> (Int, Int) -> (a, Bool)
+indexGraph graph (i, j) =
+  if i < j then graph ! j ! i
+  else graph ! i ! j
+
 {- |
   Takes the number of vertices and each edge paired with its weight to output the graph encoded as a 2D vector.
   If only you have an unweighted graph, you can still encode your graph by simply letting the type a be ().
@@ -107,18 +114,21 @@ getDim = L.length . snd
 -}
 encodeWeightedGraph :: Int -> (Int -> Int -> (a, Bool)) -> Graph a
 encodeWeightedGraph numVerts edge =
-  mapWithIndex (\i r -> mapWithIndex (\j _ -> edge i j) r) $ V.replicate numVerts (V.replicate numVerts ())
+  mapWithIndex (\i r ->
+    mapWithIndex (\j _ -> edge i j)
+      $ V.replicate (i + 1) ()) $ V.replicate numVerts ()
 
 -- | Given a weighted graph, construct a 1-dimensional simplicial complex in the canonical way. Betti numbers of this simplicial complex can be used to count cycles and connected components.
 wGraph2sc :: Graph a -> SimplicialComplex
 wGraph2sc graph =
-  let numVerts = V.length graph
+  let numVerts              = V.length graph
       getEdges index result =
         if index == numVerts then result
         else
-          V.map (\(i, b) ->
-            (V.fromList [index, i], V.empty)) $ V.filter snd
-              $ mapWithIndex (\i (_, b) -> (i, b)) $ V.take (numVerts - index) $ graph ! index
+          let new = V.map (\(i, b) ->
+                      (V.fromList [index, i], V.empty)) $ V.filter snd
+                        $ mapWithIndex (\i (_, b) -> (i, b)) $ graph ! index
+          in getEdges (index + 1) result
   in (numVerts, (getEdges 0 V.empty) `cons` V.empty)
 
 {- |
@@ -128,15 +138,17 @@ wGraph2sc graph =
 makeNbrhdGraph :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> Graph a
 makeNbrhdGraph scale metric dataSet =
   let vector = case dataSet of Left v -> v; Right l -> V.fromList l
-  in V.map (\x -> V.map (\y -> let d = metric x y in (d, d <= scale)) vector) vector
+  in mapWithIndex (\i x -> V.map (\y ->
+       let d = metric x y in (d, d <= scale)) $ V.take (i + 1) vector) vector
 
 -- | Parallel version of the above.
 makeNbrhdGraphPar :: (Ord a, Eq b) => a -> (b -> b -> a) -> Either (Vector b) [b] -> Graph a
 makeNbrhdGraphPar scale metric dataSet =
   let vector = case dataSet of Left v -> v; Right l -> V.fromList l
-  in parMapVec (\x -> V.map (\y -> let d = metric x y in (d, d <= scale)) vector) vector
+  in parMapWithIndex (\i x -> V.map (\y ->
+       let d = metric x y in (d, d <= scale)) $ V.take (i + 1) vector) vector
 
--- * Simplicial complex construction
+-- * Construction
 
 {- |
   Makes a simplicial complex where the simplices are the complete subgraphs (cliques) of the given graph.
@@ -172,7 +184,7 @@ makeCliqueComplex graph =
       maxCliques =
         (\(x, y) -> (x, V.fromList y)) $ makePair
           $ sortVecs $ L.map V.fromList $ L.filter (\c -> L.length c > 1)
-            $ getMaximalCliques (\i j -> snd $ graph ! i ! j) [0..numVerts - 1]
+            $ getMaximalCliques (\i j -> snd $ graph `indexGraph` (i, j)) [0..numVerts - 1]
 
       --generates faces of simplices and records the boundary indices
       combos :: Int
@@ -235,7 +247,7 @@ makeCliqueComplexPar graph =
       maxCliques =
         (\(x, y) -> (x, V.fromList y)) $ makePair
           $ sortVecs $ L.map V.fromList $ L.filter (\c -> L.length c > 1)
-            $ getMaximalCliques (\i j -> snd $ graph ! i ! j) [0..numVerts - 1]
+            $ getMaximalCliques (\i j -> snd $ graph `indexGraph` (i, j)) [0..numVerts - 1]
 
       --generates faces of simplices and records the boundary indices
       combos :: Int

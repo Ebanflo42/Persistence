@@ -1,6 +1,6 @@
 name:                Persistence
 
-version:             2.0
+version:             2.0.1
 
 github:              "Ebanflo42/Persistence"
 
@@ -38,7 +38,7 @@ synopsis:         A versatile library for topological data analysis.
 
 category:         Data, Math
 
-description:      A topological data anlysis library motivated by flexibility when it comes to the type of data being analyzed. If your data comes with a meaningful binary function into into an ordered set, you can use Persistence to analyze your data. The library also provides functions for analyzing directed\/undirected, weighted\/unweighted graphs. See the README for resources on learning about topological data anlysis.
+description:      A topological data anlysis library motivated by flexibility when it comes to the type of data being analyzed. If your data comes with a meaningful binary function into an ordered set, you can use Persistence to analyze your data. The library also provides functions for analyzing directed\/undirected, weighted\/unweighted graphs. See the README for resources on learning about topological data anlysis.
 
 dependencies:
 
