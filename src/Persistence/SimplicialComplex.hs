@@ -99,9 +99,9 @@ sc2String (v, allSimplices) =
 
 -- | Get the dimension of the highest dimensional simplex (constant time).
 getDim :: SimplicialComplex -> Int
-getDim = L.length . snd
+getDim = V.length . snd
 
--- | Safely index into the adjacency matrix of a graph.
+-- | Index into the adjacency matrix of a graph, flipping the indices if necessary.
 indexGraph :: Graph a -> (Int, Int) -> (a, Bool)
 indexGraph graph (i, j) =
   if i < j then graph ! j ! i
@@ -316,7 +316,7 @@ makeRipsComplexLight :: (Ord a, Eq b)
                      -> SimplicialComplex
 makeRipsComplexLight scale metric dataSet =
   let vector   = case dataSet of Left v -> v; Right l -> V.fromList l
-      numVerts = L.length vector
+      numVerts = V.length vector
 
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
@@ -384,8 +384,8 @@ makeRipsComplexLightPar :: (Ord a, Eq b)
                         -> Either (Vector b) [b]
                         -> SimplicialComplex
 makeRipsComplexLightPar scale metric dataSet =
-  let numVerts = L.length dataSet
-      vector   = case dataSet of Left v -> v; Right l -> V.fromList l
+  let vector   = case dataSet of Left v -> v; Right l -> V.fromList l
+      numVerts = V.length vector
 
       --make a list with an entry for every dimension of simplices
       organizeCliques 1 _       = []
@@ -508,7 +508,7 @@ bettiNumbers sc =
           if i == dim then (snd $ V.last ranks):(calc i1)
           else ((snd $ ranks ! i1) - (fst $ ranks ! i)):(calc i1)
   in
-    if L.null $ snd sc then [fst sc]
+    if V.null $ snd sc then [fst sc]
     else L.reverse $ calc dim
 
 -- | Calculates all of the Betti numbers in parallel.
@@ -598,7 +598,7 @@ simplicialHomology sc =
           let i1 = i - 1
           in (getUnsignedDiagonal $ normalFormInt $ imgInKerInt (boundOps ! i1) (boundOps ! i)):(calc i1)
   in
-    if L.null $ snd sc then [L.replicate (fst sc) 0]
+    if V.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim
 
 -- | Same as simplicialHomology except it computes each of the groups in parallel and uses parallel matrix computations.
@@ -616,5 +616,5 @@ simplicialHomologyPar sc =
           in evalPar (getUnsignedDiagonal $ normalFormIntPar $ --see Util for evalPar
             imgInKerIntPar (boundOps ! i1) (boundOps ! i)) $ calc i1
   in
-    if L.null $ snd sc then [L.replicate (fst sc) 0]
+    if V.null $ snd sc then [L.replicate (fst sc) 0]
     else L.reverse $ L.map (L.filter (/=1)) $ calc dim

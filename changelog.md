@@ -71,3 +71,13 @@
 ### Changed
 
 - Representation of graphs now takes half as much memory.
+
+## 3.0
+
+### Added
+
+- Module for constructing graphs.
+
+- More efficient algorithms for constructing the neighborhood graph.
+
+- Algorithms for dealing with sets of trajectories in Euclidean space.
