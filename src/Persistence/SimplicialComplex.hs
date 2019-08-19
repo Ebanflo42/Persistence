@@ -527,7 +527,7 @@ bettiNumbersPar sc =
           if i == dim then evalPar (snd $ V.last ranks) (calc i1) --see Util for evalPar
           else evalPar ((snd $ ranks ! i1) - (fst $ ranks ! i)) (calc i1)
   in
-    if L.null $ snd sc then [fst sc]
+    if V.null $ snd sc then [fst sc]
     else L.reverse $ calc dim
 
 --gets the first boundary operator

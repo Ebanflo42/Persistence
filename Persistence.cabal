@@ -7,7 +7,7 @@ cabal-version: 1.12
 -- hash: 8b7fcc7836b916f046653da257033f5fbdeb90a49069ff85be71bca358f359c0
 
 name:           Persistence
-version:        2.0.2
+version:        2.0.3
 category:       Data, Math
 synopsis:       A versatile library for topological data analysis.
 description:    A topological data analysis library motivated by flexibility when it comes to the type of data being analyzed. If your data comes with a meaningful binary function into an ordered set, you can use Persistence to analyze your data. The library also provides functions for analyzing directed\/undirected, weighted\/unweighted graphs. See the README for resources on learning about topological data anlysis.

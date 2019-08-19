@@ -665,7 +665,7 @@ bottleNeckDistances :: Ord b => (BarCode a -> BarCode a -> Extended b)
                     -> Vector (Vector (BarCode a))
                     -> Vector (Maybe (Extended b))
 bottleNeckDistances metric diagrams1 diagrams2 =
-  let d = (L.length diagrams1) - (L.length diagrams2)
+  let d = (V.length diagrams1) - (V.length diagrams2)
   in
     if d >= 0
     then (V.zipWith (bottleNeckDistance metric) diagrams1 diagrams2) V.++ (V.replicate d Nothing)
