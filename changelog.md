@@ -81,3 +81,7 @@
 - More efficient algorithms for constructing the neighborhood graph.
 
 - Algorithms for dealing with sets of trajectories in Euclidean space.
+
+### Changed
+
+- Distance types must now be unboxed.

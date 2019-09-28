@@ -1,6 +1,6 @@
 name:                Persistence
 
-version:             2.0.3
+version:             3.0
 
 github:              "Ebanflo42/Persistence"
 
@@ -42,15 +42,17 @@ description:      A topological data anlysis library motivated by flexibility wh
 
 dependencies:
 
-- base >= 4.0 && < 4.13
+- base
 
-- containers >0.5
+- containers
 
-- vector >= 0.12
+- vector
 
-- maximal-cliques >=0.1
+- maximal-cliques
 
-- parallel ==3.2.*
+- parallel
+
+- bytestring
 
 
 library:

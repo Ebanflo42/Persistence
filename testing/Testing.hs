@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 import Persistence.Util
+import Persistence.Graph
 import Persistence.Matrix
 import Persistence.SimplicialComplex
 import Persistence.HasseDiagram
@@ -20,18 +21,6 @@ instance ToString Int where
 
 instance ToString Bool where
   toString b = if b then "1" else "0"
-
-instance ToString IMatrix where
-  toString mat =
-    let printVec vec =
-          if V.null vec then ""
-          else
-            let x = V.head vec
-            in (show x) L.++ ((if x < 0 then " " else "  ") L.++ (printVec $ V.tail vec))
-        print m =
-          if V.null m then ""
-          else (printVec $ V.head m) L.++ ('\n':(print $ V.tail m))
-    in print mat
 
 instance ToString [Int] where
   toString = show
@@ -75,6 +64,7 @@ formatTestResults results =
       details   = L.foldl accum [] results
   in '\n':(unlines $ summary:details)
 
+{--
 matrix1 :: IMatrix
 matrix1 = V.fromList $ L.map V.fromList
   [ [ 2, 3, 5]
@@ -152,26 +142,28 @@ snf6 = V.fromList $ L.map V.fromList $
   , [ 0, 0, 462, 0]
   , [ 0, 0,   0, 0]
   ]
+--}
 
+pointCloud1 :: Either (Vector (Double, Double)) [(Double, Double)]
 pointCloud1 = Right
-  [ ( -7, -19)
-  , ( -6, -16)
-  , (  2, -16)
-  , ( 11, -16)
-  , ( 11, -11)
-  , ( -6,  -9)
-  , (  2,  -9)
-  , ( 11,  -6)
-  , (-11,  -5)
-  , (  6,  -3)
-  , (  0,   0)
-  , ( -2,   3)
-  , ( 11,   3)
-  , (-14,   8)
-  , (  1,   8)
-  , ( -8,  14)
-  , ( 10,  19)
-  , ( 17,  20)
+  [ ( -7.0, -19.0)
+  , ( -6.0, -16.0)
+  , (  2.0, -16.0)
+  , ( 11.0, -16.0)
+  , ( 11.0, -11.0)
+  , ( -6.0,  -9.0)
+  , (  2.0,  -9.0)
+  , ( 11.0,  -6.0)
+  , (-11.0,  -5.0)
+  , (  6.0,  -3.0)
+  , (  0.0,   0.0)
+  , ( -2.0,   3.0)
+  , ( 11.0,   3.0)
+  , (-14.0,   8.0)
+  , (  1.0,   8.0)
+  , ( -8.0,  14.0)
+  , ( 10.0,  19.0)
+  , ( 17.0,  20.0)
   ]
 
 metric2 :: Floating a => (a, a) -> (a, a) -> a
@@ -180,65 +172,67 @@ metric2 (a, b) (c, d) =
   in sqrt $ x*x + y*y
 
 scales1 = Right [10.0, 8.0, 6.0]
-testFiltration1 = makeRipsFiltrationFast scales1 metric2 pointCloud1
+testFiltration1 = ripsFiltrationFast scales1 metric2 pointCloud1
 nsTestFiltration1 = simple2Filtr testFiltration1
 
+pointCloud2 :: Either (Vector (Double, Double)) [(Double, Double)]
 pointCloud2 = Right
-  [ (  1, -22)
-  , (  4, -21)
-  , ( -3, -20)
-  , (  4, -19)
-  , ( -7, -18)
-  , (  5, -17)
-  , ( -7, -12)
-  , ( -1, -12)
-  , (  3, -12)
-  , (  6, -12)
-  , (  8, -12)
-  , ( -9, -10)
-  , ( -4,  -9)
-  , (-12,  -8)
-  , (  7,  -8)
-  , ( -8,  -7)
-  , ( -5,  -7)
-  , (-11,  -6)
-  , (  9,  -5)
-  , ( -6,  -4)
-  , (-14,  -3)
-  , (-12,  -3)
-  , (  7,  -3)
-  , (  5,  -1)
-  , ( -7,   0)
-  , (  0,   0)
-  , (  8,   0)
-  , (-12,   1)
-  , (  2,   1)
-  , (  0,   2)
-  , (-10,   3)
-  , ( -7,   3)
-  , (  6,   3)
-  , ( -2,   5)
-  , ( 10,   5)
-  , ( -8,   9)
-  , (  8,   9)
-  , ( -9,  11)
-  , (  6,  11)
-  , ( -6,  12)
-  , ( -4,  13)
-  , (  2,  13)
-  , (  8,  13)
-  , ( -2,  14)
-  , (  5,  14)
-  , ( -4,  16)
-  , (  1,  16)
+  [ (  1.0, -22.0)
+  , (  4.0, -21.0)
+  , ( -3.0, -20.0)
+  , (  4.0, -19.0)
+  , ( -7.0, -18.0)
+  , (  5.0, -17.0)
+  , ( -7.0, -12.0)
+  , ( -1.0, -12.0)
+  , (  3.0, -12.0)
+  , (  6.0, -12.0)
+  , (  8.0, -12.0)
+  , ( -9.0, -10.0)
+  , ( -4.0,  -9.0)
+  , (-12.0,  -8.0)
+  , (  7.0,  -8.0)
+  , ( -8.0,  -7.0)
+  , ( -5.0,  -7.0)
+  , (-11.0,  -6.0)
+  , (  9.0,  -5.0)
+  , ( -6.0,  -4.0)
+  , (-14.0,  -3.0)
+  , (-12.0,  -3.0)
+  , (  7.0,  -3.0)
+  , (  5.0,  -1.0)
+  , ( -7.0,   0.0)
+  , (  0.0,   0.0)
+  , (  8.0,   0.0)
+  , (-12.0,   1.0)
+  , (  2.0,   1.0)
+  , (  0.0,   2.0)
+  , (-10.0,   3.0)
+  , ( -7.0,   3.0)
+  , (  6.0,   3.0)
+  , ( -2.0,   5.0)
+  , ( 10.0,   5.0)
+  , ( -8.0,   9.0)
+  , (  8.0,   9.0)
+  , ( -9.0,  11.0)
+  , (  6.0,  11.0)
+  , ( -6.0,  12.0)
+  , ( -4.0,  13.0)
+  , (  2.0,  13.0)
+  , (  8.0,  13.0)
+  , ( -2.0,  14.0)
+  , (  5.0,  14.0)
+  , ( -4.0,  16.0)
+  , (  1.0,  16.0)
   ]
 
 --8 connected components at index 0, 2 connected components at index 1, 1 connected component at index 2
 --1 loop lasting from 0 to 1, 1 loop lasting from 1 to 2, 1 loop starting at 1, 1 loop starting at 2
 scales2 = Right [10.0, 8.0, 6.0]
-testFiltration2 = makeRipsFiltrationFast scales2 metric2 pointCloud2
+testFiltration2 = ripsFiltrationFast scales2 metric2 pointCloud2
 nsTestFiltration2 = simple2Filtr testFiltration2
 
+octahedralCloud :: Either (Vector (Double, Double, Double)) [(Double, Double, Double)]
 octahedralCloud = Right
   [ ( 1, 0, 0)
   , (-1, 0, 0)
@@ -256,9 +250,10 @@ metric3 (x0, y0, z0) (x1, y1, z1) =
 octaScales = Right [2.1, 1.6, 1.1, 0.5]
 
 --5 connected components from 0 to 2, 1 void from 2 to 3
-octahedron = makeRipsFiltrationFast octaScales metric3 octahedralCloud
+octahedron = ripsFiltrationFast octaScales metric3 octahedralCloud
 nsoctahedron = simple2Filtr octahedron
 
+sqrCloud :: Either (Vector (Double, Double)) [(Double, Double)]
 sqrCloud = Right
   [ (0, 0)
   , (1, 0)
@@ -277,7 +272,7 @@ sqrCloud = Right
 sqrScales = Right [2.0, 1.5, 1.1, 0.5]
 
 --11 connected components from 0 to 1, 1 loop starting at 1
-square = makeRipsFiltrationFast sqrScales metric2 sqrCloud
+square = ripsFiltrationFast sqrScales metric2 sqrCloud
 nssquare = simple2Filtr square
 
 dGraph1 =
@@ -329,6 +324,7 @@ directedGraph = encodeDirectedGraph 18 dGraph1
 dCliqueComplex = hDiagram2sc $ directedFlagComplex directedGraph
 
 --Mobius strip created in blender
+mobius :: Either (Vector (Double, Double, Double)) [(Double, Double, Double)]
 mobius = Right
   [ ( 1.250000,  0.000000,  0.000000)
   , ( 0.750000,  0.000000,  0.000000)
@@ -393,11 +389,13 @@ mobius = Right
   ]
 
 mobScales = Right [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15]
-mobiusStrip = makeRipsFiltrationFast mobScales metric3 mobius
+mobiusStrip = ripsFiltrationFast mobScales metric3 mobius
 nsmobius = simple2Filtr mobiusStrip
 
 tests =
-  [ let actual = kernelInt matrix1
+  [
+    {--
+    let actual = kernelInt matrix1
         expect = Just $ kernel1
     in checkPass "kernelInt matrix1" actual expect
 
@@ -444,10 +442,11 @@ tests =
   , let actual = normalFormIntPar matrix6
         expect = Just $ snf6
     in checkPass "normalFormIntPar matrix6" actual expect
+    --}
 
   --test filtration 1
 
-  , let actual = indexBarCodesSimple testFiltration1
+    let actual = indexBarCodesSimple testFiltration1
         expect = Just $ V.fromList $ L.map V.fromList [[(0, Finite 2), (0, Finite 2), (0,Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Finite 1), (0, Infinity), (0, Infinity), (0, Infinity)], [(2,Infinity),(2,Infinity)], []]
     in checkPass "indexBarCodesSimple testFiltration1" actual expect
 
@@ -517,6 +516,7 @@ tests =
         expect = Just $ V.fromList $ L.map V.fromList $ [[(0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.35), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.25), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Finite 0.2), (0.15, Infinity)], [(0.35, Finite 0.4), (0.3, Finite 0.4), (0.3, Finite 0.4), (0.35, Infinity)], [], [], [], []]
     in checkPass "scaleBarCodes mobius" actual expect
 
+    {--
   , let complex = getComplex 1 $ Right nssquare
         actual  = bettiNumbers complex
         expect  = Just [1,1]
@@ -546,6 +546,7 @@ tests =
         actual  = bettiNumbersPar complex
         expect  = Just [3,2,0,0]
     in checkPass "bettiNumbersPar testFiltration1 2" actual expect
+   --}
 
   --for now we only check if the landscape functions don't throw errors
 
@@ -585,6 +586,7 @@ tests =
 
   --Hasse diagram tests
 
+  {--
   , let complex = dGraph2sc 18 dGraph1
         actual  = bettiNumbers complex
         expect  = Just [1,25]
@@ -593,6 +595,7 @@ tests =
   , let actual = bettiNumbers dCliqueComplex
         expect = Just [1,8,2,0,0,0,0]
     in checkPass "bettiNumbers dCliquecComplex" actual expect
+  --}
   ]
 
 main = putStrLn $ formatTestResults tests

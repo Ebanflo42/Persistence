@@ -43,6 +43,10 @@ https://academic.csuohio.edu/bubenik_p/papers/persistenceLandscapes.pdf
 
 2) Make some filtrations whose vertices don't all have index 0 and test persistent homology on them.
 
+`Filtration.hs`
+
+1) `indexBarCodes` and `indexBarCodesSimple` are both broken from the transition to unboxed vectors.
+
 `SimplicialComplex.hs`:
 
 1) Fix simplicial homology over the integers.
