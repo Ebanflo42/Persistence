@@ -9,6 +9,14 @@ GitHub: https://github.com/Ebanflo42/Persistence
 
 If you have the Haskell `stack` tool installed, compile and run tests with `stack test` (you may have to expose the modules `Util` and `Matrix` in the file `Persistence.cabal` to get it to work).
 
+# Update March 16 2021
+
+I do not plan on further developing this package; my research has taken me in directions which are rather far-removed from TDA.
+
+If you came across this library because you are interested in TDA, check out the resources below.
+
+If you came across this library because you are interested in a performant implementation of TDA in Haskell, this library will probably be dissatisfactory. Persistence 2 *works*, but it is written very naively using boxed vectors and often nested boxed vectors which get copied and rearranged an excessive amount during runtime. This library may be useful as a reference for the fundamental logic of a pure-functional implementation of algorithms in TDA, but in order for reasonable performance to be achieved it must be re-written using unboxed, probably mutable, arrays. I currently have no plans to perform this re-writing.
+
 # Learning about Topological Data Analysis
 
 Computing simplicial homology:
